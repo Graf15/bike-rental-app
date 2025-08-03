@@ -1,0 +1,106 @@
+:root {
+  font-family: Arial, sans-serif;
+  background-color: rgb(255, 255, 255);
+  color: rgb(25, 25, 25);
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+/* Убираем отступы и задаём базовую структуру */
+body {
+  margin: 0;
+  padding: 0;
+  background-color: rgb(250, 250, 250);
+  color: rgb(44, 44, 44);
+}
+
+/* Для таблиц: аккуратная рамка и выравнивание */
+table {
+  border: 1px solid #ccc;
+  border-collapse: collapse;
+  width: 100%;
+}
+
+th,
+td {
+  border: 1px solid #ccc;
+  padding: 8px;
+  text-align: left;
+}
+
+/* Подсветка строки при наведении */
+tr:hover {
+  background-color: #ffc765;
+  transition: background-color 0.2s ease;
+  cursor: pointer;
+}
+
+/* Сброс ненужного выделения по умолчанию */
+* {
+  box-sizing: border-box;
+}
+
+button:disabled {
+  background-color: #149210ac;
+  color: #ffffff;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: not-allowed;
+}
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-edit {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: not-allowed;
+  transition: all 0.2s ease;
+}
+
+.btn-delete {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: not-allowed;
+  transition: all 0.2s ease;
+}
+
+.status {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  display: inline-block;
+  min-width: 80px;
+}
+
+.status-planned {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-progress {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.status-completed {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.low-stock {
+  color: #dc2626;
+  font-weight: 600;
+}
