@@ -43,8 +43,8 @@ th input {
 
 th input:focus {
   outline: none;
-  border-color: #00c851;
-  box-shadow: 0 0 0 3px rgba(0, 200, 81, 0.1);
+  border-color: var(--color-primary-green);
+  box-shadow: 0 0 0 3px var(--color-primary-green-light);
 }
 
 tr:nth-child(even) {
@@ -104,12 +104,12 @@ button {
 .sort-arrow {
   margin-left: 8px;
   font-size: 0.8em;
-  color: #FFA500;  
+  color: var(--color-primary-orange);
   transition: transform 0.2s ease;
 }
 
 .filter-select-box:hover .arrow {
-  color: #21a73f;
+  color: var(--color-primary-green);
 }
 
 /* Стили поповера */
@@ -161,12 +161,12 @@ button {
 }
 
 .popover::-webkit-scrollbar-thumb {
-  background: #20A740;
+  background: var(--color-primary-green);
   border-radius: 3px;
 }
 
 .popover::-webkit-scrollbar-thumb:hover {
-  background: #1e973a;
+  background: var(--color-primary-green-hover);
 }
 
 .popover-option {
@@ -188,10 +188,10 @@ button {
 }
 
 .popover-option.selected {
-  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  background: linear-gradient(135deg, var(--color-primary-green-lighter) 0%, var(--color-primary-green-light) 100%);
   font-weight: 600;
-  color: #00a441;
-  border: 1px solid #00c851;
+  color: var(--color-primary-green);
+  border: 1px solid var(--color-primary-green);
 }
 
 .popover-option:hover {
@@ -200,6 +200,6 @@ button {
 }
 
 .popover-option.selected:hover {
-  background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+  background: linear-gradient(135deg, var(--color-primary-green-light) 0%, var(--color-primary-green-light) 100%);
   transform: translateX(2px);
 }

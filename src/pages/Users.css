@@ -17,7 +17,7 @@
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  background: linear-gradient(135deg, var(--color-primary-green) 0%, var(--color-primary-green-hover) 100%);
   color: white;
   border: none;
   padding: 12px 24px;
@@ -30,7 +30,7 @@
 
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 15px rgba(16, 185, 129, 0.3);
+  box-shadow: 0 8px 15px var(--color-primary-green-light);
 }
 
 .loading, .error {

@@ -3,6 +3,7 @@ import "./Popover.css";
 
 const BikeStatusPopover = ({ bike, onStatusChange, onCreateMaintenance }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [position, setPosition] = useState({ top: 0, left: 0 });
   const popoverRef = useRef(null);
   const triggerRef = useRef(null);
 
@@ -39,6 +40,28 @@ const BikeStatusPopover = ({ bike, onStatusChange, onCreateMaintenance }) => {
     };
   }, [isOpen]);
 
+  useEffect(() => {
+    if (isOpen && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      const popoverHeight = 300; // примерная высота поповера
+      const popoverWidth = 200;
+      
+      let top = rect.bottom + 4;
+      let left = rect.left;
+      
+      // Проверяем, не выходит ли поповер за пределы экрана
+      if (left + popoverWidth > window.innerWidth) {
+        left = window.innerWidth - popoverWidth - 10;
+      }
+      
+      if (top + popoverHeight > window.innerHeight) {
+        top = rect.top - popoverHeight - 4;
+      }
+      
+      setPosition({ top, left });
+    }
+  }, [isOpen]);
+
   const handleStatusClick = (newStatus) => {
     if (newStatus === "в ремонте") {
       // Открываем модальное окно создания ремонта
@@ -65,7 +88,14 @@ const BikeStatusPopover = ({ bike, onStatusChange, onCreateMaintenance }) => {
       </button>
 
       {isOpen && (
-        <div ref={popoverRef} className="status-popover">
+        <div 
+          ref={popoverRef} 
+          className="status-popover"
+          style={{
+            top: `${position.top}px`,
+            left: `${position.left}px`
+          }}
+        >
           <div className="popover-header">
             <span>Изменить статус</span>
           </div>

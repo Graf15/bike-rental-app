@@ -7,7 +7,7 @@ const PartsRequests = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [selectedRequest, setSelectedRequest] = useState(null);
+ 
 
   useEffect(() => {
     fetchData();
@@ -157,9 +157,9 @@ const PartsRequests = () => {
       case "новый":
         return "#3b82f6";
       case "заказано":
-        return "#f59e0b";
+        return "#FFA500";
       case "получено":
-        return "#10b981";
+        return "rgb(32, 167, 64)";
       case "отменено":
         return "#6b7280";
       default:

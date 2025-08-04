@@ -30,16 +30,13 @@
 }
 
 .status-popover {
-  position: absolute;
-  top: 100%;
-  left: 0;
+  position: fixed;
   z-index: 1000;
   background: white;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
   min-width: 200px;
-  margin-top: 4px;
   animation: popoverShow 0.15s ease-out;
 }
 
@@ -100,7 +97,7 @@
   flex-shrink: 0;
 }
 
-.status-green { background: #10b981; }
+.status-green { background: var(--color-primary-green); }
 .status-blue { background: #3b82f6; }
 .status-yellow { background: #f59e0b; }
 .status-purple { background: #8b5cf6; }
@@ -108,7 +105,7 @@
 
 .current-mark {
   margin-left: auto;
-  color: #10b981;
+  color: var(--color-primary-green);
   font-weight: bold;
 }
 

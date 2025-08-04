@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pg_isready:*)",
+      "Bash(psql:*)",
+      "Bash(timeout 10s npm start)",
+      "Bash(timeout 15s npm run dev)",
+      "Bash(curl:*)"
+    ],
+    "deny": []
+  }
+}
