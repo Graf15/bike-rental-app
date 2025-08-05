@@ -132,3 +132,17 @@ Task({
 - **Frontend**: Enhanced MaintenanceTable with priority badges, filtering, cost tracking
 - **UI Components**: WeeklyScheduleManager for automated scheduling
 - **Business Logic**: Prevents duplicate active repairs through database constraints and API validation
+
+## Git Repository Information
+- **GitHub URL**: https://github.com/Graf15/bike-rental-app
+- **Local Path**: D:\projects\bike-rental-app
+- **Main Branch**: main
+- **Last Commit**: d525159 (Объединение с удаленным репозиторием)
+- **Git Status**: All changes committed and pushed successfully
+
+## Session Continuation Notes
+- **Working Directory**: D:\projects\bike-rental-app
+- **Database Password**: 1515 (in backend/db.js)
+- **All systems fully functional**: repair system, database constraints, UI components
+- **No pending issues**: All todos completed, system tested and working
+- **Direct Database Access**: Available via MCP PostgreSQL tools
