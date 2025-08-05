@@ -1,0 +1,205 @@
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+th,
+td {
+  border: 1px solid #e5e7eb;
+  padding: 12px 16px;
+  text-align: left;
+}
+
+th {
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  cursor: pointer;
+  position: relative;
+  font-weight: 600;
+  color: #374151;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+th:hover {
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+}
+
+th input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 13px;
+  transition: all 0.2s ease;
+}
+
+th input:focus {
+  outline: none;
+  border-color: var(--color-primary-green);
+  box-shadow: 0 0 0 3px var(--color-primary-green-light);
+}
+
+tr:nth-child(even) {
+  background-color: #f9fafb;
+}
+
+tr:hover {
+  background-color: #f3f4f6;
+}
+
+td {
+  color: #374151;
+}
+
+button {
+  padding: 8px 16px;
+  cursor: not-allowed;
+  background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%);
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #6b7280;
+  transition: all 0.2s ease;
+}
+
+
+
+
+.filter-select-box {
+  border: 1px solid #d1d5db;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  user-select: none;
+  transition: all 0.2s ease;
+  font-size: 13px;
+}
+
+.filter-select-box:hover {
+  background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+  border-color: #9ca3af;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.arrow {
+  margin-left: 8px;
+  font-size: 0.8em;
+  transition: transform 0.2s ease;
+}
+
+.sort-arrow {
+  margin-left: 8px;
+  font-size: 0.8em;
+  color: var(--color-primary-orange);
+  transition: transform 0.2s ease;
+}
+
+.filter-select-box:hover .arrow {
+  color: var(--color-primary-green);
+}
+
+/* Стили поповера */
+
+.popover-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(2px);
+  z-index: 999;
+}
+
+.popover {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1),
+    0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  z-index: 1000;
+}
+
+/* Позиционированный поповер */
+.popover.positioned {
+  position: fixed;
+  min-width: 200px;
+  max-width: 400px;
+}
+
+/* Центрированный поповер (если нужен в будущем) */
+.popover.centered {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  min-width: 300px;
+}
+
+/* Кастомный скроллбар */
+.popover::-webkit-scrollbar {
+  width: 6px;
+}
+
+.popover::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 3px;
+}
+
+.popover::-webkit-scrollbar-thumb {
+  background: var(--color-primary-green);
+  border-radius: 3px;
+}
+
+.popover::-webkit-scrollbar-thumb:hover {
+  background: var(--color-primary-green-hover);
+}
+
+.popover-option {
+  padding: 10px 12px;
+  cursor: pointer;
+  user-select: none;
+  border-radius: 8px;
+  margin-bottom: 2px;
+  font-size: 14px;
+  color: #374151;
+  transition: all 0.15s ease;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.popover-option:last-child {
+  margin-bottom: 0;
+}
+
+.popover-option.selected {
+  background: linear-gradient(135deg, var(--color-primary-green-lighter) 0%, var(--color-primary-green-light) 100%);
+  font-weight: 600;
+  color: var(--color-primary-green);
+  border: 1px solid var(--color-primary-green);
+}
+
+.popover-option:hover {
+  background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+  transform: translateX(2px);
+}
+
+.popover-option.selected:hover {
+  background: linear-gradient(135deg, var(--color-primary-green-light) 0%, var(--color-primary-green-light) 100%);
+  transform: translateX(2px);
+}

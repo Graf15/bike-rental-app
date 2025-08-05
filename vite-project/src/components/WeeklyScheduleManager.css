@@ -1,0 +1,399 @@
+/* WeeklyScheduleManager.css */
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.weekly-schedule-modal {
+  background: white;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 900px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+.modal-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid #e9ecef;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f8f9fa;
+  border-radius: 8px 8px 0 0;
+}
+
+.modal-header h2 {
+  margin: 0;
+  color: #495057;
+  font-size: 20px;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #6c757d;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.close-btn:hover {
+  background: #e9ecef;
+  color: #495057;
+}
+
+.error-message {
+  margin: 16px 24px;
+  padding: 12px;
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+  border-radius: 4px;
+}
+
+.schedule-summary {
+  padding: 16px 24px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e9ecef;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.summary-stats {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.summary-stats .stat {
+  padding: 6px 12px;
+  background: white;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  border: 1px solid #dee2e6;
+}
+
+.summary-stats .day-stat {
+  background: #e8f5e8;
+  border-color: var(--color-primary-green);
+  color: var(--color-primary-green);
+}
+
+.btn-generate {
+  padding: 8px 16px;
+  background: var(--color-primary-green);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-generate:hover:not(:disabled) {
+  background: var(--color-primary-green-hover);
+}
+
+.btn-generate:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+}
+
+.modal-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+}
+
+.bikes-schedule-list {
+  padding: 16px 24px;
+}
+
+.bike-schedule-item {
+  padding: 16px;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  margin-bottom: 12px;
+  background: white;
+  transition: border-color 0.2s;
+}
+
+.bike-schedule-item:hover {
+  border-color: #dee2e6;
+}
+
+.bike-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.bike-number {
+  font-weight: 600;
+  font-size: 16px;
+  color: #495057;
+}
+
+.bike-model {
+  color: #6c757d;
+  font-size: 14px;
+}
+
+.bike-status {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.status-в-наличии {
+  background: #e8f5e8;
+  color: var(--color-primary-green);
+}
+
+.status-в-ремонте {
+  background: #fff3e0;
+  color: var(--color-primary-orange);
+}
+
+.status-арендован {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+
+.schedule-controls {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+/* Toggle Switch */
+.toggle-switch {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle-switch input[type="checkbox"] {
+  display: none;
+}
+
+.slider {
+  position: relative;
+  width: 50px;
+  height: 24px;
+  background: #ccc;
+  border-radius: 24px;
+  transition: 0.3s;
+}
+
+.slider:before {
+  content: "";
+  position: absolute;
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background: white;
+  border-radius: 50%;
+  transition: 0.3s;
+}
+
+input:checked + .slider {
+  background: var(--color-primary-green);
+}
+
+input:checked + .slider:before {
+  transform: translateX(26px);
+}
+
+.toggle-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #495057;
+}
+
+.day-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.day-selector label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #495057;
+}
+
+.day-selector select {
+  padding: 6px 12px;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  font-size: 14px;
+  background: white;
+  min-width: 140px;
+}
+
+.day-selector select:focus {
+  outline: none;
+  border-color: var(--color-primary-green);
+  box-shadow: 0 0 0 2px rgba(32, 167, 64, 0.1);
+}
+
+.schedule-info {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #f8f9fa;
+}
+
+.schedule-info small {
+  color: #6c757d;
+  font-size: 12px;
+}
+
+.modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid #e9ecef;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  background: #f8f9fa;
+  border-radius: 0 0 8px 8px;
+}
+
+.btn-cancel,
+.btn-save {
+  padding: 8px 16px;
+  border: 1px solid;
+  border-radius: 4px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-cancel {
+  background: white;
+  border-color: #6c757d;
+  color: #6c757d;
+}
+
+.btn-cancel:hover:not(:disabled) {
+  background: #e9ecef;
+}
+
+.btn-save {
+  background: var(--color-primary-green);
+  border-color: var(--color-primary-green);
+  color: white;
+}
+
+.btn-save:hover:not(:disabled) {
+  background: var(--color-primary-green-hover);
+  border-color: var(--color-primary-green-hover);
+}
+
+.btn-cancel:disabled,
+.btn-save:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.loading {
+  padding: 40px;
+  text-align: center;
+  color: #6c757d;
+  font-size: 16px;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .weekly-schedule-modal {
+    width: 95%;
+    max-height: 90vh;
+  }
+
+  .modal-header {
+    padding: 16px 20px;
+  }
+
+  .modal-header h2 {
+    font-size: 18px;
+  }
+
+  .schedule-summary {
+    padding: 12px 20px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .summary-stats {
+    justify-content: center;
+    margin-bottom: 12px;
+  }
+
+  .bikes-schedule-list {
+    padding: 12px 20px;
+  }
+
+  .bike-schedule-item {
+    padding: 12px;
+  }
+
+  .schedule-controls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .toggle-switch {
+    justify-content: space-between;
+  }
+
+  .day-selector {
+    justify-content: space-between;
+  }
+
+  .day-selector select {
+    min-width: auto;
+    flex: 1;
+  }
+
+  .modal-footer {
+    padding: 12px 20px;
+    flex-direction: column;
+  }
+
+  .btn-cancel,
+  .btn-save {
+    width: 100%;
+    padding: 12px;
+  }
+}

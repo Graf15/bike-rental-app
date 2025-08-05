@@ -1,0 +1,346 @@
+/* MaintenanceTable.css */
+
+.table-summary {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+}
+
+.summary-stats {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.summary-stats .stat {
+  padding: 6px 12px;
+  background: white;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  border: 1px solid #dee2e6;
+}
+
+.summary-stats .stat.critical {
+  background: #f8d7da;
+  border-color: #f5c6cb;
+  color: #721c24;
+}
+
+.summary-stats .stat.overdue {
+  background: #fff3cd;
+  border-color: #ffeaa7;
+  color: #856404;
+}
+
+.summary-stats .stat.in-progress {
+  background: #d1ecf1;
+  border-color: #bee5eb;
+  color: #0c5460;
+}
+
+.maintenance-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.maintenance-table th,
+.maintenance-table td {
+  padding: 12px 8px;
+  text-align: left;
+  border-bottom: 1px solid #e9ecef;
+  vertical-align: top;
+}
+
+.maintenance-table th {
+  background: #f8f9fa;
+  font-weight: 600;
+  color: #495057;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.maintenance-table tbody tr:hover {
+  background-color: #f8f9fa;
+}
+
+.row-overdue {
+  background-color: #fff5f5 !important;
+}
+
+.row-overdue:hover {
+  background-color: #fed7d7 !important;
+}
+
+/* Bike info column */
+.bike-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bike-number {
+  font-weight: 600;
+}
+
+.overdue-badge {
+  font-size: 16px;
+  cursor: help;
+}
+
+/* Status badges */
+.status {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-planned {
+  background: #e3f2fd;
+  color: #1565c0;
+  border: 1px solid #bbdefb;
+}
+
+.status-progress {
+  background: #fff3e0;
+  color: #ef6c00;
+  border: 1px solid var(--color-primary-orange);
+}
+
+.status-waiting {
+  background: #f3e5f5;
+  color: #7b1fa2;
+  border: 1px solid #ce93d8;
+}
+
+.status-completed {
+  background: #e8f5e8;
+  color: var(--color-primary-green);
+  border: 1px solid var(--color-primary-green);
+}
+
+/* Repair type badges */
+.repair-type-badge {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.repair-type-current {
+  background: #ffebee;
+  color: #c62828;
+  border: 1px solid #ffcdd2;
+}
+
+.repair-type-weekly {
+  background: #e8f5e8;
+  color: var(--color-primary-green);
+  border: 1px solid var(--color-primary-green);
+}
+
+.repair-type-longterm {
+  background: #e1f5fe;
+  color: #0277bd;
+  border: 1px solid #b3e5fc;
+}
+
+/* Priority badges */
+.priority-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.priority-badge {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+  color: white;
+}
+
+.priority-critical {
+  background: #d32f2f;
+  box-shadow: 0 0 8px rgba(211, 47, 47, 0.3);
+}
+
+.priority-high {
+  background: #f57c00;
+}
+
+.priority-medium {
+  background: #1976d2;
+}
+
+.priority-low {
+  background: #388e3c;
+}
+
+.priority-very-low {
+  background: #616161;
+}
+
+.priority-label {
+  font-size: 12px;
+  color: #666;
+}
+
+/* Date and timing information */
+.date-cell {
+  min-width: 120px;
+}
+
+.days-info {
+  font-size: 11px;
+  margin-top: 4px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+.days-info.overdue {
+  background: #ffebee;
+  color: #c62828;
+  border: 1px solid #ffcdd2;
+}
+
+.days-info.urgent {
+  background: #fff3e0;
+  color: #ef6c00;
+  border: 1px solid #ffcc02;
+}
+
+/* Duration and cost styling */
+.duration-exceeded,
+.cost-exceeded {
+  background: #ffebee;
+  color: #c62828;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+/* Action buttons */
+.action-buttons {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.action-buttons button {
+  padding: 6px 8px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.btn-status {
+  background: #e3f2fd;
+  color: #1565c0;
+  border: 1px solid #bbdefb;
+}
+
+.btn-status:hover {
+  background: #bbdefb;
+}
+
+.btn-edit {
+  background: #fff3e0;
+  color: #ef6c00;
+  border: 1px solid #ffcc02;
+}
+
+.btn-edit:hover {
+  background: #ffcc02;
+}
+
+.btn-delete {
+  background: #ffebee;
+  color: #c62828;
+  border: 1px solid #ffcdd2;
+}
+
+.btn-delete:hover {
+  background: #ffcdd2;
+}
+
+/* Responsive design */
+@media (max-width: 1200px) {
+  .maintenance-table th,
+  .maintenance-table td {
+    padding: 8px 6px;
+    font-size: 14px;
+  }
+  
+  .priority-cell {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  
+  .summary-stats {
+    gap: 12px;
+  }
+  
+  .summary-stats .stat {
+    font-size: 12px;
+    padding: 4px 8px;
+  }
+}
+
+@media (max-width: 800px) {
+  .action-buttons {
+    flex-direction: column;
+  }
+  
+  .bike-info {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  
+  .days-info {
+    display: block;
+  }
+}
+
+/* Sort arrows */
+.sort-arrow {
+  margin-left: 8px;
+  color: #999;
+  font-size: 12px;
+}
+
+/* Filter inputs */
+.maintenance-table thead tr:nth-child(2) th input {
+  width: 90%;
+  padding: 4px 8px;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.maintenance-table thead tr:nth-child(2) th input:focus {
+  outline: none;
+  border-color: var(--color-primary-green);
+  box-shadow: 0 0 0 2px rgba(32, 167, 64, 0.1);
+}
