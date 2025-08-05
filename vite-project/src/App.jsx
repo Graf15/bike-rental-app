@@ -6,6 +6,7 @@ import Users from "./pages/Users";
 import Parts from "./pages/Parts";
 import Maintenance from "./pages/Maintenance";
 import PartsRequests from "./pages/PartsRequests";
+import RepairsSchedule from "./pages/RepairsSchedule";
 import "./App.css";
 
 function App() {
@@ -20,7 +21,7 @@ function App() {
             element={
               <div>
                 <h1>Управление арендой</h1>
-                <p>Страница в разработке...</p>
+                <p>Страница в разработке...ntc</p>
               </div>
             }
           />
@@ -55,6 +56,7 @@ function App() {
               </div>
             }
           />
+          <Route path="/repairs-schedule" element={<RepairsSchedule />} />
         </Routes>
       </Layout>
     </Router>
