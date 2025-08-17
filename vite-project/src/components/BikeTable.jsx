@@ -130,7 +130,10 @@ const BikeTable = ({
 
   // Состояния для пагинации и отображения
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(50);
+  const [pageSize, setPageSize] = useState(() => {
+    const saved = localStorage.getItem('bikeTablePageSize');
+    return saved ? parseInt(saved, 10) : 50;
+  });
   const [visibleColumns, setVisibleColumns] = useState(() => {
     const saved = localStorage.getItem('bikeTableVisibleColumns');
     return saved ? JSON.parse(saved) : [
@@ -167,9 +170,8 @@ const BikeTable = ({
   const resizeStartX = useRef(0);
   const resizeStartWidth = useRef(0);
 
-  // Рефы для таблицы и фиксированного скроллбара
+  // Реф для контейнера таблицы
   const tableContainerRef = useRef(null);
-  const fakeScrollRef = useRef(null);
 
   const selectOptions = {
     wheel_size: ["20", "24", "26", "27.5", "29"],
@@ -246,12 +248,13 @@ const BikeTable = ({
     // Изменяем только выбранный столбец
     const newWidths = { ...columnWidths, [resizingColumn.current]: newWidth };
     setColumnWidths(newWidths);
+    // Сохраняем сразу новые ширины
+    saveColumnWidths(newWidths);
   };
 
   const handleResizeEnd = () => {
     if (!isResizing.current) return;
     
-    saveColumnWidths(columnWidths);
     isResizing.current = false;
     resizingColumn.current = null;
     
@@ -345,6 +348,7 @@ const BikeTable = ({
   const handlePageSizeChange = (newSize) => {
     setPageSize(newSize);
     setCurrentPage(1); // Сбрасываем на первую страницу
+    localStorage.setItem('bikeTablePageSize', newSize.toString());
   };
 
   const handleStatusChange = async (bikeId, newStatus) => {
@@ -455,7 +459,7 @@ const BikeTable = ({
   const visibleColumnsData = columns.filter(col => visibleColumns.includes(col.key));
 
   return (
-    <div className="table-with-sticky-scroll" style={{ position: "relative" }}>
+    <>
       <TableControls
         // Фильтры
         onClearFilters={clearAllFilters}
@@ -579,7 +583,7 @@ const BikeTable = ({
             onClose={() => setPopoverInfo({ key: null, visible: false })}
           />
         )}
-    </div>
+    </>
   );
 };
 

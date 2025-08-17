@@ -26,11 +26,19 @@
 }
 
 /* Убираем отступы и задаём базовую структуру */
+html {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
 body {
   margin: 0;
   padding: 0;
   background-color: rgb(250, 250, 250);
   color: rgb(44, 44, 44);
+  min-height: 100vh;
+  height: auto;
 }
 
 /* Для таблиц: аккуратная рамка и выравнивание */
@@ -44,7 +52,24 @@ th,
 td {
   border: 1px solid #ccc;
   padding: 8px;
-  text-align: left;
+  text-align: center;
+  padding: 8px 4px;
+}
+
+th input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 5px 5px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 13px;
+    transition: all 0.2s ease;
+  }
+
+  th input:focus {
+  outline: none;
+  border-color: var(--color-primary-green);
+  box-shadow: 0 0 0 3px var(--color-primary-green-light);
 }
 
 /* Подсветка строки при наведении */
@@ -148,4 +173,10 @@ button:disabled {
 .low-stock {
   color: #dc2626;
   font-weight: 600;
+}
+
+.sort-arrow {
+    margin-left: 8px;
+    color: var(--color-primary-green);
+    font-size: 12px;
 }

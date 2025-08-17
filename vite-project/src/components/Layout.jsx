@@ -105,15 +105,7 @@ const Layout = ({ children }) => {
         </nav>
 
         <div className="sidebar-footer">
-          <div className={`user-info ${isCollapsed ? "collapsed" : ""}`}>
-            <div className="user-avatar">👤</div>
-            {!isCollapsed && (
-              <div className="user-details">
-                <span className="user-name">Администратор</span>
-                <span className="user-role">Система управления</span>
-              </div>
-            )}
-          </div>
+          {/* Временно убран контент для исправления белого элемента */}
         </div>
       </aside>
 
