@@ -23,7 +23,9 @@ const TableControls = ({
   pageSizeOptions = [50, 100, 200, 500]
 }) => {
   const [showColumnSelector, setShowColumnSelector] = useState(false);
+  const [showPageSizeSelector, setShowPageSizeSelector] = useState(false);
   const columnSelectorRef = useRef(null);
+  const pageSizeRef = useRef(null);
 
   const handleClearFilters = () => {
     if (onClearFilters) {
@@ -41,6 +43,11 @@ const TableControls = ({
     if (onPageSizeChange) {
       onPageSizeChange(newSize);
     }
+  };
+
+  const handlePageSizeSelect = (newSize) => {
+    handlePageSizeChange(newSize);
+    setShowPageSizeSelector(false);
   };
 
   const goToPage = (page) => {
@@ -139,23 +146,7 @@ const TableControls = ({
       <div className="table-controls-center">
         {/* Информация о записях */}
         <div className="records-info">
-          Записи {Math.min((currentPage - 1) * pageSize + 1, totalItems)}–{Math.min(currentPage * pageSize, totalItems)} из {totalItems}
-        </div>
-      </div>
-
-      <div className="table-controls-right">
-        {/* Выбор размера страницы */}
-        <div className="page-size-selector">
-          <label>Показать:</label>
-          <select 
-            value={pageSize} 
-            onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-            className="page-size-select"
-          >
-            {pageSizeOptions.map(size => (
-              <option key={size} value={size}>{size}</option>
-            ))}
-          </select>
+          {Math.min((currentPage - 1) * pageSize + 1, totalItems)}–{Math.min(currentPage * pageSize, totalItems)} из {totalItems}
         </div>
 
         {/* Пагинация */}
@@ -195,6 +186,41 @@ const TableControls = ({
             </button>
           </div>
         )}
+      </div>
+
+      <div className="table-controls-right">
+        {/* Выбор размера страницы */}
+        <div className="page-size-selector" style={{ position: 'relative' }}>
+          <label>Показать:</label>
+          <div 
+            ref={pageSizeRef}
+            className="rows-selector-button"
+            onClick={() => setShowPageSizeSelector(!showPageSizeSelector)}
+          >
+            {pageSize}
+            <span className="arrow">{showPageSizeSelector ? '▲' : '▼'}</span>
+          </div>
+          
+          {showPageSizeSelector && (
+            <>
+              <div 
+                className="popover-overlay" 
+                onClick={() => setShowPageSizeSelector(false)} 
+              />
+              <div className="popover rows-selector-popover">
+                {pageSizeOptions.map(size => (
+                  <div
+                    key={size}
+                    className={`popover-option ${size === pageSize ? 'selected' : ''}`}
+                    onClick={() => handlePageSizeSelect(size)}
+                  >
+                    {size}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

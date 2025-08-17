@@ -6,7 +6,7 @@
   overflow: auto;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
-  scroll-behavior: smooth;
+  scroll-behavior: smooth; 
 }
 
 
@@ -40,6 +40,26 @@
   transform: scale(0.95);
 }
 
+/* Стили для фиксированного скроллбара */
+div[style*="position: fixed"][style*="bottom: 0"]::-webkit-scrollbar {
+  height: 16px;
+}
+
+div[style*="position: fixed"][style*="bottom: 0"]::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+div[style*="position: fixed"][style*="bottom: 0"]::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, var(--color-primary-green) 0%, var(--color-primary-green-hover) 100%);
+  border-radius: 8px;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+div[style*="position: fixed"][style*="bottom: 0"]::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, var(--color-primary-green-hover) 0%, var(--color-primary-green) 100%);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
 
 table {
   border-collapse: collapse;
@@ -142,19 +162,6 @@ td {
   color: #374151;
 }
 
-button {
-  padding: 8px 16px;
-  cursor: not-allowed;
-  background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%);
-  border: none;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 500;
-  color: #6b7280;
-  transition: all 0.2s ease;
-}
-
-
 
 
 .filter-select-box {
@@ -192,6 +199,7 @@ button {
 /* Стили поповера */
 
 .popover-overlay {
+
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.15);

@@ -64,6 +64,11 @@ th input {
     border-radius: 8px;
     font-size: 13px;
     transition: all 0.2s ease;
+    text-align: center;
+  }
+
+  th input::placeholder {
+    text-align: center;
   }
 
   th input:focus {
@@ -145,6 +150,45 @@ button:disabled {
   opacity: 0.6;
 }
 
+/* Стандартная вторичная кнопка - переиспользуемая */
+.btn-secondary {
+  background-color: white;
+  color: var(--color-primary-green);
+  border: 1px solid var(--color-primary-green);
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  user-select: none;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--color-primary-green);
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px var(--color-primary-green-light);
+}
+
+.btn-secondary:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 1px 4px var(--color-primary-green-light);
+}
+
+.btn-secondary:disabled {
+  background: #f3f4f6;
+  color: #9ca3af;
+  border-color: #d1d5db;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
 .status {
   padding: 4px 8px;
   border-radius: 12px;
@@ -179,4 +223,190 @@ button:disabled {
     margin-left: 8px;
     color: var(--color-primary-green);
     font-size: 12px;
+}
+
+/* Стили для переиспользуемого компонента выбора количества строк */
+.rows-selector-button {
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  user-select: none;
+  position: relative;
+}
+
+.rows-selector-button:hover {
+  background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+  border-color: var(--color-primary-green);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.rows-selector-button .arrow {
+  font-size: 0.8em;
+  color: var(--color-primary-green);
+  transition: transform 0.2s ease;
+}
+
+.rows-selector-popover {
+  position: absolute !important;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 120px;
+  max-width: 120px;
+  z-index: 1300;
+  animation: popoverFadeIn 0.15s ease-out;
+}
+
+@keyframes popoverFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Базовые стили поповера для переиспользования */
+.popover {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1),
+    0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  z-index: 1201;
+}
+
+.popover.positioned {
+  position: fixed;
+  min-width: 200px;
+  max-width: 400px;
+}
+
+.popover-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(2px);
+  z-index: 1200;
+}
+
+.popover-option {
+  padding: 10px 12px;
+  cursor: pointer;
+  user-select: none;
+  border-radius: 8px;
+  margin-bottom: 2px;
+  font-size: 14px;
+  color: #374151;
+  transition: all 0.15s ease;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.popover-option:last-child {
+  margin-bottom: 0;
+}
+
+.popover-option.selected {
+  background: linear-gradient(135deg, var(--color-primary-green-lighter) 0%, var(--color-primary-green-light) 100%);
+  font-weight: 600;
+  color: var(--color-primary-green);
+  border: 1px solid var(--color-primary-green);
+}
+
+.popover-option:hover {
+  background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+  transform: translateX(2px);
+}
+
+.popover-option.selected:hover {
+  background: linear-gradient(135deg, var(--color-primary-green-light) 0%, var(--color-primary-green-light) 100%);
+  transform: translateX(2px);
+}
+
+/* Переиспользуемые стили для центрального блока управления таблицей */
+.table-controls-center {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+  justify-content: center;
+}
+
+.records-info {
+  color: #6b7280;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Стили кнопок пагинации - переиспользуемые */
+.pagination-btn {
+  padding: 8px 12px;
+  background: white;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 40px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+  border-color: var(--color-primary-green);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.pagination-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.pagination-btn.active {
+  background: linear-gradient(135deg, var(--color-primary-green) 0%, var(--color-primary-green-hover) 100%);
+  border-color: var(--color-primary-green);
+  color: white;
+  font-weight: 600;
+  box-shadow: 0 2px 4px var(--color-primary-green-light);
+}
+
+.pagination-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.pagination-dots {
+  padding: 8px 4px;
+  color: #6b7280;
+  font-weight: 500;
 }
