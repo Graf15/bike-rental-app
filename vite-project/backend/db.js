@@ -5,7 +5,9 @@ const pool = new Pool({
   user: "postgres",
   host: "localhost",
   database: "bikerental",
-  password: "1515",
+  password: "rYRxB7aLT5bh",
+
+
   port: 5432, // стандартный порт PostgreSQL
 });
 

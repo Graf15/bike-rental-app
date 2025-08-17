@@ -61,7 +61,7 @@
   flex-direction: column;
   align-items: center;
   padding: 8px 12px;
-  border-radius: 6px;
+  border-radius: 8px;
   background: #e9ecef;
   border: 2px solid transparent;
   min-width: 60px;
@@ -93,7 +93,7 @@
   background: var(--color-primary-green);
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   font-weight: 600;
   font-size: 16px;
   cursor: pointer;
@@ -168,7 +168,7 @@
   width: 100%;
   padding: 6px 8px;
   border: 1px solid #dee2e6;
-  border-radius: 4px;
+  border-radius: 8px;
   font-size: 12px;
   background: white;
 }
@@ -206,7 +206,7 @@
 /* Status Badges */
 .status {
   padding: 4px 8px;
-  border-radius: 12px;
+  border-radius: 8px;
   font-size: 12px;
   font-weight: 500;
   text-transform: uppercase;
@@ -246,7 +246,7 @@
   background: var(--color-primary-green);
   color: white;
   padding: 4px 12px;
-  border-radius: 16px;
+  border-radius: 8px;
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
@@ -282,7 +282,7 @@
 .day-selector {
   padding: 6px 12px;
   border: 1px solid #dee2e6;
-  border-radius: 4px;
+  border-radius: 8px;
   font-size: 12px;
   background: white;
   cursor: pointer;

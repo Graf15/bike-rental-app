@@ -79,7 +79,7 @@
 
 .urgency-badge {
   padding: 4px 8px;
-  border-radius: 12px;
+  border-radius: 8px;
   font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -119,7 +119,7 @@
 /* Бейджи статусов и приоритетов */
 .status-badge {
   padding: 4px 10px;
-  border-radius: 12px;
+  border-radius: 8px;
   font-size: 0.75rem;
   font-weight: 600;
   color: white;

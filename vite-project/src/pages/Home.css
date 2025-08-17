@@ -92,7 +92,7 @@
 .page-content {
   flex: 1;
   background: white;
-  border-radius: 16px;
+  border-radius: 12px;
   padding: 24px;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
     0 2px 4px -1px rgba(0, 0, 0, 0.06);
@@ -131,7 +131,7 @@
   text-align: center;
   background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
   border: 1px solid #fecaca;
-  border-radius: 16px;
+  border-radius: 12px;
   color: #991b1b;
 }
 
@@ -233,7 +233,7 @@
   color: white;
   border: none;
   padding: 10px 16px;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;

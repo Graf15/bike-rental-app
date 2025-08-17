@@ -5,7 +5,9 @@
       "Bash(psql:*)",
       "Bash(timeout 10s npm start)",
       "Bash(timeout 15s npm run dev)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(node:*)",
+      "Bash(rm:*)"
     ],
     "deny": []
   }

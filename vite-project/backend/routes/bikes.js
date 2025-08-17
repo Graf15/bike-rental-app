@@ -146,7 +146,7 @@ router.delete("/:id", async (req, res) => {
     
     // Проверяем существование велосипеда
     const bikeCheck = await client.query(
-      'SELECT id, bike_number, model FROM bikes WHERE id = $1',
+      'SELECT id, name as bike_name, model FROM bikes WHERE id = $1',
       [id]
     );
     

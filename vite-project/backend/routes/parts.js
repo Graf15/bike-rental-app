@@ -252,7 +252,8 @@ router.get("/:id/usage", async (req, res) => {
         mp.*,
         me.дата_начала,
         me.статус_ремонта,
-        b.bike_number,
+        b.id as bike_id,
+        b.name as bike_name,
         b.model as bike_model
       FROM maintenance_parts mp
       JOIN maintenance_events me ON mp.событие_id = me.id

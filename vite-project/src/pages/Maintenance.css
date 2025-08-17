@@ -25,7 +25,7 @@
   color: white;
   border: none;
   padding: 0.75rem 1.5rem;
-  border-radius: 0.375rem;
+  border-radius: 8px;
   cursor: pointer;
   font-weight: 500;
   transition: background-color 0.2s;
@@ -40,7 +40,7 @@
   color: var(--color-primary-green);
   border: 2px solid var(--color-primary-green);
   padding: 0.75rem 1.5rem;
-  border-radius: 0.375rem;
+  border-radius: 8px;
   cursor: pointer;
   font-weight: 500;
   transition: all 0.2s;
@@ -93,7 +93,7 @@
 .event-info {
   background: #f8f9fa;
   padding: 16px;
-  border-radius: 6px;
+  border-radius: 8px;
   margin-bottom: 20px;
   border-left: 4px solid var(--color-primary-green);
 }

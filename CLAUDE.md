@@ -133,6 +133,16 @@ Task({
 - **UI Components**: WeeklyScheduleManager for automated scheduling
 - **Business Logic**: Prevents duplicate active repairs through database constraints and API validation
 
+### Advanced Table System (2025-01-17)
+- **Column Resizing**: Fully functional drag-to-resize system for all table columns
+- **Independent Sizing**: Each column resizes independently without affecting others
+- **Persistence**: Column widths saved to localStorage and restored on page load
+- **Dynamic CSS**: Uses injected CSS rules with !important for reliable width control
+- **Minimum Width**: Enforces 50px minimum width to prevent unusable columns
+- **Visual Feedback**: Hover effects and resize cursors for better UX
+- **Performance**: Uses useRef for resize state to prevent unnecessary re-renders
+- **Table Layout**: Fixed layout with dynamic width adjustment for optimal scrolling
+
 ## Git Repository Information
 - **GitHub URL**: https://github.com/Graf15/bike-rental-app
 - **Local Path**: D:\projects\bike-rental-app
@@ -141,8 +151,10 @@ Task({
 - **Git Status**: All changes committed and pushed successfully
 
 ## Session Continuation Notes
-- **Working Directory**: D:\projects\bike-rental-app
-- **Database Password**: 1515 (in backend/db.js)
-- **All systems fully functional**: repair system, database constraints, UI components
+- **Working Directory**: G:\project\vite-project
+- **Database Password**: rYRxB7aLT5bh (in backend/db.js)
+- **All systems fully functional**: repair system, database constraints, UI components, table resizing
+- **Table Features**: Independent column resizing, localStorage persistence, optimized scrolling
 - **No pending issues**: All todos completed, system tested and working
 - **Direct Database Access**: Available via MCP PostgreSQL tools
+- **Current Dev Server**: http://localhost:5175 (Vite auto-assigns ports)

@@ -144,16 +144,6 @@ const Home = () => {
       </div>
 
       <div className="page-content">
-        <div className="content-header">
-          <h2>Список велосипедов</h2>
-          <button
-            className="btn-primary"
-            onClick={() => handleOpenMaintenanceModal()}
-          >
-            + Создать ремонт
-          </button>
-        </div>
-
         <BikeTable
           bikes={bikes}
           onBikeUpdate={fetchBikes}

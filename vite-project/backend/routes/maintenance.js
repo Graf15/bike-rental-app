@@ -72,11 +72,12 @@ router.get("/", async (req, res) => {
     const result = await db.query(`
       SELECT 
         me.*,
-        b.bike_number,
+        b.id as bike_id,
+        b.name as bike_name,
         b.model,
         b.status as bike_status,
-        manager.username as manager_name,
-        executor.username as executor_name,
+        manager.name as manager_name,
+        executor.name as executor_name,
         -- Расчет количества дней до планируемой даты
         CASE 
           WHEN me."ремонт_запланирован_на" IS NOT NULL 
@@ -226,7 +227,8 @@ router.post("/", async (req, res) => {
       `
       SELECT 
         me.*,
-        b.bike_number,
+        b.id as bike_id,
+        b.name as bike_name,
         b.model,
         b.status as bike_status,
         manager.username as manager_name,
@@ -328,7 +330,8 @@ router.patch("/:id", async (req, res) => {
       `
       SELECT 
         me.*,
-        b.bike_number,
+        b.id as bike_id,
+        b.name as bike_name,
         b.model,
         b.status as bike_status,
         manager.username as manager_name,
@@ -665,7 +668,7 @@ router.get("/:id/history", async (req, res) => {
     const result = await db.query(`
       SELECT 
         rsh.*,
-        u.username as changed_by_name
+        u.name as changed_by_name
       FROM repair_status_history rsh
       LEFT JOIN users u ON rsh.changed_by_id = u.id
       WHERE rsh.repair_id = $1
@@ -685,7 +688,8 @@ router.get("/weekly-schedule", async (req, res) => {
     const result = await db.query(`
       SELECT 
         ws.*,
-        b.bike_number,
+        b.id as bike_id,
+        b.name as bike_name,
         b.model,
         b.status as bike_status,
         CASE ws.day_of_week
@@ -700,7 +704,7 @@ router.get("/weekly-schedule", async (req, res) => {
       FROM weekly_repair_schedule ws
       LEFT JOIN bikes b ON ws.bike_id = b.id
       WHERE ws.is_active = true
-      ORDER BY ws.day_of_week, b.bike_number
+      ORDER BY ws.day_of_week, b.name
     `);
     
     res.json(result.rows);
@@ -824,7 +828,7 @@ router.get("/analytics/bike-downtime/:bikeId", async (req, res) => {
     const result = await db.query(`
       SELECT 
         bsh.*,
-        u.username as changed_by_name,
+        u.name as changed_by_name,
         CASE 
           WHEN bsh.reason = 'repair_started' THEN 'Начало ремонта'
           WHEN bsh.reason = 'repair_completed' THEN 'Завершение ремонта'
@@ -864,7 +868,8 @@ router.get("/parts-needs", async (req, res) => {
       SELECT 
         me.id as repair_id,
         me.bike_id,
-        b.bike_number,
+        b.id as bike_id,
+        b.name as bike_name,
         b.model,
         me."тип_ремонта" as repair_type_ru,
         me.repair_type,
@@ -918,7 +923,8 @@ router.get("/:id", async (req, res) => {
       `
       SELECT 
         me.*,
-        b.bike_number,
+        b.id as bike_id,
+        b.name as bike_name,
         b.model,
         b.status as bike_status,
         manager.username as manager_name,
