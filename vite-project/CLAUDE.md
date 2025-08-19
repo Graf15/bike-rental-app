@@ -44,6 +44,8 @@ This is a bike rental management system with a React frontend and Express backen
 - Credentials hardcoded in `backend/db.js` (should be moved to env vars)
 - **PostgreSQL Path**: `C:\Program Files\PostgreSQL\17\bin` (добавлен в системную PATH)
 - **psql command**: Доступен как `/c/Program Files/PostgreSQL/17/bin/psql` или после перезапуска терминала просто `psql`
+- **npm Path**: `C:\Users\nsnu_\AppData\Roaming\npm` (добавлен в системную PATH для Claude Code)
+- **Node.js Path**: `C:\Program Files\nodejs` (глобальная установка)
 
 ### Key Development Notes
 - Backend uses mixed database references (`pool` vs `db`) - needs consistency

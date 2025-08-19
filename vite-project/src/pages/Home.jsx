@@ -9,6 +9,7 @@ const Home = () => {
   const [error, setError] = useState(null);
   const [isMaintenanceModalOpen, setIsMaintenanceModalOpen] = useState(false);
   const [selectedBikeId, setSelectedBikeId] = useState(null);
+  const [statusFilter, setStatusFilter] = useState(null);
 
   // Загрузка данных о велосипедах при монтировании компонента
   const fetchBikes = async () => {
@@ -106,6 +107,17 @@ const Home = () => {
     }));
   };
 
+  // Функция для обработки клика по карточке статуса
+  const handleStatusClick = (status) => {
+    if (statusFilter === status) {
+      // Если уже выбран этот статус, убираем фильтр
+      setStatusFilter(null);
+    } else {
+      // Устанавливаем новый фильтр
+      setStatusFilter(status);
+    }
+  };
+
   if (loading) {
     return (
       <div className="home-page">
@@ -150,7 +162,11 @@ const Home = () => {
         </div>
         <div className="header-stats">
           {getStatusStats().map(({ status, count, color, label }) => (
-            <div key={status} className="stat-card">
+            <div 
+              key={status} 
+              className={`stat-card ${statusFilter === status ? 'active' : ''}`}
+              onClick={() => handleStatusClick(status)}
+            >
               <div className="stat-content">
                 <span 
                   className="status-indicator"
@@ -172,6 +188,7 @@ const Home = () => {
           onBikeUpdate={fetchBikes}
           onCreateMaintenance={handleOpenMaintenanceModal}
           onBikeEdit={handleBikeEdit}
+          statusFilter={statusFilter}
         />
       </div>
 

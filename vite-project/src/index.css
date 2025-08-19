@@ -484,31 +484,45 @@ button:disabled {
 
 .header-stats {
   display: flex;
-  gap: 16px;
+  gap: 12px;
   flex-shrink: 0;
+  flex-wrap: wrap;
 }
 
 .stat-card {
   background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
   border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 20px 24px;
-  min-width: 140px;
+  border-radius: 8px;
+  padding: 12px 16px;
+  min-width: 90px;
   transition: all 0.2s ease;
   position: relative;
   overflow: hidden;
+  cursor: pointer;
 }
 
 .stat-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 12px rgba(0, 0, 0, 0.1);
-  border-color: #d1d5db;
+  border-color: var(--color-primary-green);
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+}
+
+.stat-card.active {
+  background: linear-gradient(135deg, var(--color-primary-green-light-background) 0%, var(--color-primary-green-lighter) 100%);
+  border-color: var(--color-primary-green);
+  box-shadow: 0 4px 8px var(--color-primary-green-light);
+}
+
+.stat-card.active:hover {
+  background: linear-gradient(135deg, var(--color-primary-green-light-background) 0%, var(--color-primary-green-light) 100%);
+  border-color: var(--color-primary-green-hover);
 }
 
 .stat-content {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
 .status-indicator {
@@ -526,15 +540,15 @@ button:disabled {
 }
 
 .stat-number {
-  font-size: 24px;
+  font-size: 18px;
   font-weight: 700;
   color: #1f2937;
   line-height: 1;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .stat-label {
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 500;
   color: #6b7280;
   line-height: 1;
@@ -560,11 +574,11 @@ button:disabled {
 
 @media (max-width: 768px) {
   .page-header {
-    padding: 24px 20px;
+    padding: 20px 16px;
   }
   
   .page-title {
-    font-size: 24px;
+    font-size: 22px;
   }
   
   .page-subtitle {
@@ -572,15 +586,19 @@ button:disabled {
   }
   
   .header-stats {
-    flex-direction: column;
-    gap: 12px;
+    gap: 8px;
   }
   
   .stat-card {
-    padding: 16px 20px;
+    padding: 10px 12px;
+    min-width: 70px;
   }
   
   .stat-number {
-    font-size: 20px;
+    font-size: 16px;
+  }
+  
+  .stat-label {
+    font-size: 10px;
   }
 }

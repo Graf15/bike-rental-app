@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect  } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import BikeStatusPopover from "./BikeStatusPopover";
 import BikeActionsMenu from "./BikeActionsMenu";
 import TableControls from "./TableControls";
@@ -120,6 +120,7 @@ const BikeTable = ({
   onCreateMaintenance,
   onBikeEdit,
   onBikeDelete,
+  statusFilter,
 }) => {
   // Состояния для сортировки и фильтрации
   const [sortColumn, setSortColumn] = useState(null);
@@ -220,9 +221,9 @@ const BikeTable = ({
   };
 
   // Функции для ресайза столбцов
-  const saveColumnWidths = (widths) => {
+  const saveColumnWidths = useCallback((widths) => {
     localStorage.setItem('bikeTableColumnWidths', JSON.stringify(widths));
-  };
+  }, []);
 
   const handleResizeStart = (e, columnKey) => {
     e.preventDefault();
@@ -239,7 +240,7 @@ const BikeTable = ({
     document.body.style.userSelect = 'none';
   };
 
-  const handleResizeMove = (e) => {
+  const handleResizeMove = useCallback((e) => {
     if (!isResizing.current || !resizingColumn.current) return;
     
     const deltaX = e.clientX - resizeStartX.current;
@@ -250,9 +251,9 @@ const BikeTable = ({
     setColumnWidths(newWidths);
     // Сохраняем сразу новые ширины
     saveColumnWidths(newWidths);
-  };
+  }, [columnWidths, saveColumnWidths]);
 
-  const handleResizeEnd = () => {
+  const handleResizeEnd = useCallback(() => {
     if (!isResizing.current) return;
     
     isResizing.current = false;
@@ -262,7 +263,7 @@ const BikeTable = ({
     document.removeEventListener('mouseup', handleResizeEnd);
     document.body.style.cursor = '';
     document.body.style.userSelect = '';
-  };
+  }, [handleResizeMove]);
 
   // Динамическое обновление CSS для ширин столбцов
   useEffect(() => {
@@ -273,7 +274,7 @@ const BikeTable = ({
       .table-container table { width: ${totalWidth}px !important; }
     `;
     
-    Object.entries(columnWidths).forEach(([key, width], index) => {
+    Object.values(columnWidths).forEach((width, index) => {
       css += `
         .table-container th:nth-child(${index + 1}),
         .table-container td:nth-child(${index + 1}) {
@@ -306,7 +307,7 @@ const BikeTable = ({
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
     };
-  }, []);
+  }, [handleResizeMove, handleResizeEnd]);
 
   const handleSort = (column) => {
     if (sortColumn === column) {
@@ -321,6 +322,19 @@ const BikeTable = ({
     setFilters((prev) => ({ ...prev, [field]: value }));
     setCurrentPage(1); // Сбрасываем на первую страницу при фильтрации
   };
+
+  // Применение фильтра статуса извне (от кликов по карточкам в header)
+  useEffect(() => {
+    if (statusFilter) {
+      setFilters(prev => ({ ...prev, status: [statusFilter] }));
+    } else {
+      setFilters(prev => {
+        const { status: _, ...rest } = prev;
+        return rest;
+      });
+    }
+    setCurrentPage(1);
+  }, [statusFilter]);
 
   // Функции для управления таблицей
   const clearAllFilters = () => {
