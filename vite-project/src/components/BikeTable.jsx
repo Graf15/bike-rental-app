@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect  } from "react";
 import BikeStatusPopover from "./BikeStatusPopover";
 import BikeActionsMenu from "./BikeActionsMenu";
 import TableControls from "./TableControls";
@@ -18,7 +18,7 @@ const formatDate = (dateString) => {
       day: "2-digit"
     });
   } catch (error) {
-    return "—";
+    return error;
   }
 };
 

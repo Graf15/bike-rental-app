@@ -42,6 +42,8 @@ This is a bike rental management system with a React frontend and Express backen
 - PostgreSQL database: `bikerental`
 - Default connection: localhost:5432
 - Credentials hardcoded in `backend/db.js` (should be moved to env vars)
+- **PostgreSQL Path**: `C:\Program Files\PostgreSQL\17\bin` (добавлен в системную PATH)
+- **psql command**: Доступен как `/c/Program Files/PostgreSQL/17/bin/psql` или после перезапуска терминала просто `psql`
 
 ### Key Development Notes
 - Backend uses mixed database references (`pool` vs `db`) - needs consistency

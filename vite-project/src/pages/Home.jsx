@@ -75,6 +75,37 @@ const Home = () => {
     );
   };
 
+  // Функция для получения статистики статусов с цветами
+  const getStatusStats = () => {
+    const statusMap = {
+      "в наличии": { color: "green", label: "в наличии" },
+      "в прокате": { color: "blue", label: "в прокате" }, 
+      "в ремонте": { color: "orange", label: "в ремонте" },
+      "бронь": { color: "purple", label: "бронь" },
+      "продан": { color: "red", label: "продан" },
+      "украден": { color: "red", label: "украден" },
+      "невозврат": { color: "red", label: "невозврат" },
+      "требует ремонта": { color: "red", label: "требует ремонта" }
+    };
+
+    const statusCounts = {};
+    
+    bikes.forEach(bike => {
+      if (statusCounts[bike.status]) {
+        statusCounts[bike.status]++;
+      } else {
+        statusCounts[bike.status] = 1;
+      }
+    });
+
+    return Object.entries(statusCounts).map(([status, count]) => ({
+      status,
+      count,
+      color: statusMap[status]?.color || "gray",
+      label: statusMap[status]?.label || status
+    }));
+  };
+
   if (loading) {
     return (
       <div className="home-page">
@@ -118,28 +149,20 @@ const Home = () => {
           </p>
         </div>
         <div className="header-stats">
-          <div className="stat-card">
-            <div className="stat-number">{bikes.length}</div>
-            <div className="stat-label">Всего велосипедов</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-number">
-              {bikes.filter((bike) => bike.status === "в наличии").length}
+          {getStatusStats().map(({ status, count, color, label }) => (
+            <div key={status} className="stat-card">
+              <div className="stat-content">
+                <span 
+                  className="status-indicator"
+                  style={{ backgroundColor: `var(--color-primary-${color})` }}
+                ></span>
+                <div className="stat-info">
+                  <div className="stat-number">{count}</div>
+                  <div className="stat-label">{label}</div>
+                </div>
+              </div>
             </div>
-            <div className="stat-label">В наличии</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-number">
-              {bikes.filter((bike) => bike.status === "в прокате").length}
-            </div>
-            <div className="stat-label">В прокате</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-number">
-              {bikes.filter((bike) => bike.status === "в ремонте").length}
-            </div>
-            <div className="stat-label">В ремонте</div>
-          </div>
+          ))}
         </div>
       </div>
 

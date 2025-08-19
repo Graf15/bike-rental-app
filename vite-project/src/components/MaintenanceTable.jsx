@@ -63,15 +63,15 @@ const MaintenanceTable = ({ events, onUpdate }) => {
   const getStatusClass = (status) => {
     switch (status) {
       case "запланирован":
-        return "status-planned";
+        return "status-badge status-badge-blue";
       case "в ремонте":
-        return "status-progress";
+        return "status-badge status-badge-orange";
       case "ожидает деталей":
-        return "status-waiting";
+        return "status-badge status-badge-purple";
       case "ремонт выполнен":
-        return "status-completed";
+        return "status-badge status-badge-green";
       default:
-        return "";
+        return "status-badge";
     }
   };
 
@@ -234,7 +234,7 @@ const MaintenanceTable = ({ events, onUpdate }) => {
               </td>
               <td>
                 <span
-                  className={`status ${getStatusClass(event.статус_ремонта)}`}
+                  className={getStatusClass(event.статус_ремонта)}
                 >
                   {event.статус_ремонта}
                 </span>

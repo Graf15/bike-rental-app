@@ -13,7 +13,6 @@ router.get("/", async (req, res) => {
   }
 });
 
-export default router;
 
 // GET /api/bikes/:id - получить конкретный велосипед
 router.get("/:id", async (req, res) => {
@@ -183,3 +182,5 @@ router.delete("/:id", async (req, res) => {
     client.release();
   }
 });
+
+export default router;

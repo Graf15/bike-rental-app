@@ -8,16 +8,22 @@ const BikeStatusPopover = ({ bike, onStatusChange, onCreateMaintenance }) => {
   const triggerRef = useRef(null);
 
   const statuses = [
-    { value: "в наличии", label: "В наличии", color: "green" },
-    { value: "в прокате", label: "В прокате", color: "blue" },
-    { value: "в ремонте", label: "В ремонте", color: "yellow" },
-    { value: "бронь", label: "Бронь", color: "purple" },
-    { value: "продан", label: "Продан", color: "red" },
-    { value: "украден", label: "Украден", color: "red" },
-    { value: "невозврат", label: "Невозврат", color: "red" },
+    { value: "в наличии", label: "в наличии", color: "green" },
+    { value: "в прокате", label: "в прокате", color: "blue" },
+    { value: "в ремонте", label: "в ремонте", color: "orange" },
+    { value: "бронь", label: "бронь", color: "purple" },
+    { value: "продан", label: "продан", color: "red" },
+    { value: "украден", label: "украден", color: "red" },
+    { value: "невозврат", label: "невозврат", color: "red" },
   ];
 
   const currentStatus = statuses.find((s) => s.value === bike.status);
+
+  const getStatusBadgeClass = (status) => {
+    const statusObj = statuses.find(s => s.value === status);
+    if (!statusObj) return "status-badge";
+    return `status-badge status-badge-${statusObj.color}`;
+  };
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -77,10 +83,7 @@ const BikeStatusPopover = ({ bike, onStatusChange, onCreateMaintenance }) => {
     <div className="status-popover-container">
       <button
         ref={triggerRef}
-        className={`status-badge status-${bike.status.replace(
-          /\s+/g,
-          "-"
-        )} status-clickable`}
+        className={`${getStatusBadgeClass(bike.status)} clickable`}
         onClick={() => setIsOpen(!isOpen)}
       >
         {currentStatus?.label || bike.status}

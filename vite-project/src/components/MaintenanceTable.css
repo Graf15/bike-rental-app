@@ -96,38 +96,7 @@
 }
 
 /* Status badges */
-.status {
-  padding: 4px 8px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
 
-.status-planned {
-  background: #e3f2fd;
-  color: #1565c0;
-  border: 1px solid #bbdefb;
-}
-
-.status-progress {
-  background: #fff3e0;
-  color: #ef6c00;
-  border: 1px solid var(--color-primary-orange);
-}
-
-.status-waiting {
-  background: #f3e5f5;
-  color: #7b1fa2;
-  border: 1px solid #ce93d8;
-}
-
-.status-completed {
-  background: #e8f5e8;
-  color: var(--color-primary-green);
-  border: 1px solid var(--color-primary-green);
-}
 
 /* Repair type badges */
 .repair-type-badge {
