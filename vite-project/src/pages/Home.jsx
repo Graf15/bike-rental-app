@@ -120,7 +120,7 @@ const Home = () => {
 
   if (loading) {
     return (
-      <div className="home-page">
+      <div className="page-container home-page">
         <div className="page-header">
           <h1 className="page-title">Управление велосипедами</h1>
           <p className="page-subtitle">Загрузка данных...</p>
@@ -134,7 +134,7 @@ const Home = () => {
 
   if (error) {
     return (
-      <div className="home-page">
+      <div className="page-container home-page">
         <div className="page-header">
           <h1 className="page-title">Управление велосипедами</h1>
           <p className="page-subtitle">Произошла ошибка при загрузке данных</p>
@@ -151,7 +151,7 @@ const Home = () => {
   }
 
   return (
-    <div className="home-page">
+    <div className="page-container home-page">
       <div className="page-header">
         <div className="header-content">
           <h1 className="page-title">Управление велосипедами</h1>

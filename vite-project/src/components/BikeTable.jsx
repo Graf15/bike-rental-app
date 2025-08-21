@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import BikeStatusPopover from "./BikeStatusPopover";
 import BikeActionsMenu from "./BikeActionsMenu";
 import TableControls from "./TableControls";
+import MultiSelectPopover from "./MultiSelectPopover";
 import "./BikeTable.css";
 
 // Функция для форматирования даты
@@ -22,86 +23,6 @@ const formatDate = (dateString) => {
   }
 };
 
-const MultiSelectPopover = ({
-  options,
-  selected,
-  onChange,
-  visible,
-  anchorRef,
-  onClose,
-}) => {
-  const popoverRef = useRef(null);
-  const [position, setPosition] = useState({ top: 0, left: 0, width: 0 });
-
-  useEffect(() => {
-    if (visible && anchorRef?.current) {
-      const rect = anchorRef.current.getBoundingClientRect();
-      setPosition({
-        top: rect.bottom + 4,
-        left: rect.left,
-        width: rect.width,
-      });
-    }
-  }, [anchorRef, visible]);
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (
-        popoverRef.current &&
-        !popoverRef.current.contains(event.target) &&
-        anchorRef?.current &&
-        !anchorRef.current.contains(event.target)
-      ) {
-        onClose();
-      }
-    };
-
-    if (visible) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [visible, onClose, anchorRef]);
-
-  if (!visible || !Array.isArray(options) || options.length === 0) return null;
-
-  const toggleOption = (value) => {
-    if (selected.includes(value)) {
-      onChange(selected.filter((v) => v !== value));
-    } else {
-      onChange([...selected, value]);
-    }
-  };
-
-  return (
-    <>
-      <div className="popover-overlay" onClick={onClose} />
-      <div
-        className="popover positioned"
-        ref={popoverRef}
-        style={{
-          top: `${position.top}px`,
-          left: `${position.left}px`,
-          minWidth: `${position.width}px`,
-        }}
-      >
-        {options.map((option) => (
-          <div
-            key={option}
-            className={`popover-option ${
-              selected.includes(option) ? "selected" : ""
-            }`}
-            onClick={() => toggleOption(option)}
-          >
-            {option} {selected.includes(option) && "✓"}
-          </div>
-        ))}
-      </div>
-    </>
-  );
-};
 
 // Компонент для ресайза столбцов
 const ColumnResizer = ({ onMouseDown }) => {
@@ -247,11 +168,13 @@ const BikeTable = ({
     const newWidth = Math.max(50, resizeStartWidth.current + deltaX); // минимум 50px
     
     // Изменяем только выбранный столбец
-    const newWidths = { ...columnWidths, [resizingColumn.current]: newWidth };
-    setColumnWidths(newWidths);
-    // Сохраняем сразу новые ширины
-    saveColumnWidths(newWidths);
-  }, [columnWidths, saveColumnWidths]);
+    setColumnWidths(prevWidths => {
+      const newWidths = { ...prevWidths, [resizingColumn.current]: newWidth };
+      // Сохраняем сразу новые ширины
+      saveColumnWidths(newWidths);
+      return newWidths;
+    });
+  }, [saveColumnWidths]);
 
   const handleResizeEnd = useCallback(() => {
     if (!isResizing.current) return;
@@ -271,13 +194,13 @@ const BikeTable = ({
     
     // Создаём CSS правила для каждого столбца
     let css = `
-      .table-container table { width: ${totalWidth}px !important; }
+      .home-page .table-container table { width: ${totalWidth}px !important; }
     `;
     
     Object.values(columnWidths).forEach((width, index) => {
       css += `
-        .table-container th:nth-child(${index + 1}),
-        .table-container td:nth-child(${index + 1}) {
+        .home-page .table-container th:nth-child(${index + 1}),
+        .home-page .table-container td:nth-child(${index + 1}) {
           width: ${width}px !important;
           min-width: ${width}px !important;
           max-width: ${width}px !important;
@@ -546,7 +469,6 @@ const BikeTable = ({
                     placeholder="Фильтр"
                     value={filters[key] || ""}
                     onChange={(e) => updateFilter(key, e.target.value)}
-                    style={{ width: "90%" }}
                   />
                 )}
               </th>

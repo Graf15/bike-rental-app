@@ -1,27 +1,6 @@
-/* RepairsSchedule.css */
+/* RepairsSchedule.css - специфичные стили только для страницы планирования ремонтов */
 
-.repairs-schedule-page {
-  padding: 2rem;
-  background: #f8f9fa;
-  min-height: 100vh;
-}
-
-/* Header Section - стили перенесены в index.css */
-
-.header-content h1 {
-  margin: 0;
-  color: #333;
-  font-size: 28px;
-}
-
-.page-description {
-  margin: 8px 0 0 0;
-  color: #666;
-  font-size: 16px;
-  line-height: 1.5;
-}
-
-/* Weekly Statistics */
+/* Weekly Statistics - в правой части header */
 .weekly-stats {
   display: flex;
   flex-direction: column;
@@ -76,153 +55,22 @@
   margin-top: 2px;
 }
 
-/* Generate Button */
-.btn-generate {
-  align-self: flex-end;
-  padding: 12px 24px;
-  background: var(--color-primary-green);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-weight: 600;
-  font-size: 16px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.btn-generate:hover:not(:disabled) {
-  background: var(--color-primary-green-hover);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(32, 167, 64, 0.3);
-}
-
-.btn-generate:disabled {
-  background: #6c757d;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-}
-
-/* Table Container */
-.schedule-table-container {
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  overflow: hidden;
-}
-
-.schedule-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.schedule-table th,
-.schedule-table td {
-  padding: 12px 16px;
-  text-align: left;
-  border-bottom: 1px solid #e9ecef;
-  vertical-align: middle;
-}
-
-.schedule-table th {
-  background: #f8f9fa;
-  font-weight: 600;
-  color: #495057;
-  cursor: pointer;
-  user-select: none;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-
-.schedule-table th:hover {
-  background: #e9ecef;
-}
-
-
-
-/* Filter Row */
-.filter-row th {
-  background: #fff;
-  padding: 8px 16px;
-}
-
-.filter-input {
-  width: 100%;
-  padding: 6px 8px;
-  border: 1px solid #dee2e6;
-  border-radius: 8px;
-  font-size: 12px;
-  background: white;
-}
-
-.filter-input:focus {
-  outline: none;
-  border-color: var(--color-primary-green);
-  box-shadow: 0 0 0 2px rgba(32, 167, 64, 0.1);
-}
-
-/* Table Rows */
-.schedule-table tbody tr {
-  transition: background-color 0.2s ease;
-}
-
-.schedule-table tbody tr:hover {
-  background-color: #f8f9fa;
-}
-
-.schedule-table tbody tr.scheduled {
+/* Специфичные стили для запланированных велосипедов */
+tr.scheduled {
   background-color: #f0f9f0;
 }
 
-.schedule-table tbody tr.scheduled:hover {
+tr.scheduled:hover {
   background-color: #e8f5e8;
 }
 
-/* Bike Number Column */
-.bike-number {
-  font-weight: bold;
-  color: #495057;
-  font-size: 16px;
-}
-
-/* Статусы используют централизованные стили из index.css */
-
-/* Day Assignment Column */
-.day-assignment {
-  min-width: 150px;
-}
-
-.scheduled-day {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.day-chip {
-  background: var(--color-primary-green);
-  color: white;
-  padding: 4px 12px;
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.not-scheduled {
-  color: #6c757d;
-  font-style: italic;
-  font-size: 14px;
-}
 
 /* Action Buttons */
 .action-buttons {
   display: flex;
   gap: 8px;
   align-items: center;
+  justify-content: center;
 }
 
 .btn-remove {
@@ -235,25 +83,6 @@
   transition: background-color 0.2s ease;
 }
 
-.btn-remove:hover {
-  background: #ffebee;
-}
-
-.day-selector {
-  padding: 6px 12px;
-  border: 1px solid #dee2e6;
-  border-radius: 8px;
-  font-size: 12px;
-  background: white;
-  cursor: pointer;
-  min-width: 140px;
-}
-
-.day-selector:focus {
-  outline: none;
-  border-color: var(--color-primary-green);
-  box-shadow: 0 0 0 2px rgba(32, 167, 64, 0.1);
-}
 
 /* Loading and Error States */
 .loading, .error {
@@ -273,29 +102,12 @@
 
 /* Responsive Design */
 @media (max-width: 1200px) {
-  /* page-header стили в index.css */
-  
-  .btn-generate {
-    align-self: stretch;
-    justify-content: center;
-  }
-  
   .day-stats {
     justify-content: center;
   }
 }
 
 @media (max-width: 768px) {
-  .repairs-schedule-page {
-    padding: 1rem;
-  }
-  
-  /* page-header стили в index.css */
-  
-  .header-content h1 {
-    font-size: 24px;
-  }
-  
   .day-stats {
     gap: 4px;
   }
@@ -303,12 +115,6 @@
   .day-stat {
     min-width: 50px;
     padding: 6px 8px;
-  }
-  
-  .schedule-table th,
-  .schedule-table td {
-    padding: 8px 12px;
-    font-size: 14px;
   }
   
   .day-selector {

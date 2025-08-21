@@ -1,6 +1,4 @@
-.maintenance-page {
-  padding: 2rem;
-}
+/* Используются общие стили .page-container из index.css */
 
 /* page-header стили перенесены в index.css */
 
@@ -166,7 +164,7 @@
   }
   
   .btn-primary,
-  .btn-secondary {
+  .btn-secondary-green {
     width: 100%;
     text-align: center;
   }

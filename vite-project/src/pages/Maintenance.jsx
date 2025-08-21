@@ -62,7 +62,7 @@ const Maintenance = () => {
           setStatusChangeModal({ 
             open: true, 
             eventId, 
-            currentStatus: eventData.статус_ремонта,
+            currentStatus: eventData.status,
             eventData 
           });
           break;
@@ -121,12 +121,12 @@ const Maintenance = () => {
   if (error) return <div className="error">Ошибка: {error}</div>;
 
   return (
-    <div className="maintenance-page">
+    <div className="page-container">
       <div className="page-header">
         <h1>Обслуживание велосипедов</h1>
         <div className="page-actions">
           <button 
-            className="btn-secondary" 
+            className="btn btn-secondary-green" 
             onClick={() => setIsScheduleModalOpen(true)}
           >
             📅 Еженедельное расписание

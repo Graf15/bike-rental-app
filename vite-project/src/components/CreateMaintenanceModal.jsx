@@ -415,7 +415,7 @@ const CreateMaintenanceModal = ({
                 <button
                   type="button"
                   onClick={() => setShowBikeTable(true)}
-                  className="btn-secondary"
+                  className="btn btn-secondary-green"
                 >
                   Изменить
                 </button>
@@ -658,7 +658,7 @@ const CreateMaintenanceModal = ({
                   <button
                     type="button"
                     onClick={() => setShowPartsTable(false)}
-                    className="btn-secondary"
+                    className="btn btn-secondary-green"
                   >
                     Закрыть
                   </button>
@@ -701,7 +701,7 @@ const CreateMaintenanceModal = ({
           </div>
 
           <div className="modal-footer">
-            <button type="button" onClick={onClose} className="btn-secondary">
+            <button type="button" onClick={onClose} className="btn btn-secondary-green">
               Отмена
             </button>
             <button

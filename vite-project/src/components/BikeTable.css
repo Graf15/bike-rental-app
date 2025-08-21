@@ -77,6 +77,8 @@ td {
   overflow: hidden;
   min-width: 30px;
   box-sizing: border-box;
+  padding: 8px 12px;
+  text-align: center;
 }
 
 /* Модель остается выровненной по левому краю */
@@ -103,7 +105,6 @@ thead tr:first-child th {
   background: #f1f5f9;
   height: 48px;
   box-sizing: border-box;
-  border-bottom: 3px solid #e5e7eb;
 }
 
 /* Строка с фильтрами */

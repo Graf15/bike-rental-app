@@ -74,7 +74,6 @@ const PartsTable = ({ parts, onUpdate }) => {
                   placeholder="Фильтр"
                   value={filters[key] || ""}
                   onChange={(e) => updateFilter(key, e.target.value)}
-                  style={{ width: "90%" }}
                 />
               </th>
             ))}

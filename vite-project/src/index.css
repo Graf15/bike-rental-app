@@ -61,20 +61,7 @@ body {
   cursor: pointer;
  }
 
-/* Для таблиц: аккуратная рамка и выравнивание */
-table {
-  border: 1px solid #ccc;
-  border-collapse: collapse;
-  width: 100%;
-}
-
-th,
-td {
-  border: 1px solid #ccc;
-  padding: 8px;
-  text-align: center;
-  padding: 8px 4px;
-}
+/* Глобальные стили таблиц удалены - используются специфичные стили в компонентах */
 
 th input {
     width: 100%;
@@ -109,104 +96,108 @@ tr:hover {
   box-sizing: border-box;
 }
 
-button:disabled {
-  background-color: var(--color-primary-green-light);
-  color: #ffffff;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  cursor: not-allowed;
-}
-.action-buttons {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
 
-.btn-edit {
-  background: linear-gradient(135deg, var(--color-primary-green) 0%, var(--color-primary-green-hover) 100%);
-  color: white;
-  border: none;
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  opacity: 0.85;
-}
 
-.btn-edit:hover:not(:disabled) {
-  opacity: 1;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px var(--color-primary-green-light);
-}
 
-.btn-edit:disabled {
-  background: #9ca3af;
-  cursor: not-allowed;
-  opacity: 0.6;
-}
 
-.btn-delete {
-  background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
-  color: white;
-  border: none;
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  opacity: 0.85;
-}
-
-.btn-delete:hover:not(:disabled) {
-  opacity: 1;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(248, 113, 113, 0.3);
-}
-
-.btn-delete:disabled {
-  background: #9ca3af;
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-/* Стандартная вторичная кнопка - переиспользуемая */
-.btn-secondary {
-  background-color: white;
-  color: var(--color-primary-green);
-  border: 1px solid var(--color-primary-green);
+/* Базовый класс для всех кнопок */
+.btn {
   padding: 0.75rem 1.5rem;
   border-radius: 8px;
   cursor: pointer;
   font-weight: 500;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
   font-size: 14px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   user-select: none;
+  border: 1px solid transparent;
+  text-decoration: none;
 }
 
-.btn-secondary:hover:not(:disabled) {
+.btn:disabled {
+  background: #f3f4f6 !important;
+  color: #9ca3af !important;
+  border-color: #d1d5db !important;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* Зеленые кнопки */
+.btn-primary-green {
+  background: var(--color-primary-green);
+  color: white;
+  border-color: var(--color-primary-green);
+}
+
+.btn-primary-green:hover:not(:disabled) {
+  background: var(--color-primary-green-hover);
+  border-color: var(--color-primary-green-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px var(--color-primary-green-light);
+}
+
+.btn-primary-green:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 1px 4px var(--color-primary-green-light);
+}
+
+.btn-secondary-green {
+  background: white;
+  color: var(--color-primary-green);
+  border-color: var(--color-primary-green);
+}
+
+.btn-secondary-green:hover:not(:disabled) {
   background: var(--color-primary-green);
   color: white;
   transform: translateY(-1px);
   box-shadow: 0 2px 8px var(--color-primary-green-light);
 }
 
-.btn-secondary:active:not(:disabled) {
+.btn-secondary-green:active:not(:disabled) {
   transform: translateY(0);
   box-shadow: 0 1px 4px var(--color-primary-green-light);
 }
 
-.btn-secondary:disabled {
-  background: #f3f4f6;
-  color: #9ca3af;
-  border-color: #d1d5db;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
+/* Оранжевые кнопки */
+.btn-primary-orange {
+  background: var(--color-primary-orange);
+  color: white;
+  border-color: var(--color-primary-orange);
+}
+
+.btn-primary-orange:hover:not(:disabled) {
+  background: var(--color-primary-orange-hover);
+  border-color: var(--color-primary-orange-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px var(--color-primary-orange-light);
+}
+
+.btn-primary-orange:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 1px 4px var(--color-primary-orange-light);
+}
+
+.btn-secondary-orange {
+  background: white;
+  color: var(--color-primary-orange);
+  border-color: var(--color-primary-orange);
+}
+
+.btn-secondary-orange:hover:not(:disabled) {
+  background: var(--color-primary-orange);
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px var(--color-primary-orange-light);
+}
+
+.btn-secondary-orange:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 1px 4px var(--color-primary-orange-light);
 }
 
 
@@ -350,12 +341,35 @@ button:disabled {
   font-size: 14px;
   font-weight: 500;
   white-space: nowrap;
+  width: 120px;
+  text-align: right;
 }
 
 .pagination {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  width: 360px;
+}
+
+.pagination-nav-left,
+.pagination-nav-right {
+  width: 40px;
+  display: flex;
+  justify-content: center;
+}
+
+.pagination-numbers {
+  display: flex;
+  align-items: center;
   gap: 4px;
+  width: 280px;
+  justify-content: center;
+}
+
+.nav-btn {
+  width: 36px !important;
+  min-width: 36px !important;
 }
 
 /* Стили кнопок пагинации - переиспользуемые */
@@ -381,6 +395,7 @@ button:disabled {
   border-color: var(--color-primary-green);
   transform: translateY(-1px);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  color: #374151;
 }
 
 .pagination-btn:active:not(:disabled) {
@@ -460,6 +475,26 @@ button:disabled {
   align-items: flex-start;
   gap: 32px;
   border: 1px solid #e5e7eb;
+}
+
+.header-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 16px;
+}
+
+/* Универсальный контейнер для всех страниц */
+.page-container {
+  min-height: 100vh;
+  background: #f8fafc;
+  padding: 2px;
+}
+
+@media (max-width: 768px) {
+  .page-container {
+    padding: 1rem;
+  }
 }
 
 .header-content {

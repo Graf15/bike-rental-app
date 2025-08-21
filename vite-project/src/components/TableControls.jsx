@@ -56,33 +56,28 @@ const TableControls = ({
     }
   };
 
-  // Генерируем номера страниц для отображения
+  // Генерируем фиксированное количество номеров страниц для отображения
   const getPageNumbers = () => {
-    const delta = 2; // Показываем 2 страницы до и после текущей
-    const range = [];
-    const rangeWithDots = [];
-
-    for (let i = Math.max(2, currentPage - delta); 
-         i <= Math.min(totalPages - 1, currentPage + delta); 
-         i++) {
-      range.push(i);
+    if (totalPages <= 7) {
+      // Если страниц мало, показываем все
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
     }
 
-    if (currentPage - delta > 2) {
-      rangeWithDots.push(1, "...");
+    // Всегда показываем ровно 7 элементов: [1] [...] [X] [X] [X] [...] [last]
+    const result = [];
+    
+    if (currentPage <= 4) {
+      // Начало: [1] [2] [3] [4] [5] [...] [last]
+      result.push(1, 2, 3, 4, 5, "...", totalPages);
+    } else if (currentPage >= totalPages - 3) {
+      // Конец: [1] [...] [last-4] [last-3] [last-2] [last-1] [last]
+      result.push(1, "...", totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
     } else {
-      rangeWithDots.push(1);
+      // Середина: [1] [...] [current-1] [current] [current+1] [...] [last]
+      result.push(1, "...", currentPage - 1, currentPage, currentPage + 1, "...", totalPages);
     }
-
-    rangeWithDots.push(...range);
-
-    if (currentPage + delta < totalPages - 1) {
-      rangeWithDots.push("...", totalPages);
-    } else if (totalPages > 1) {
-      rangeWithDots.push(totalPages);
-    }
-
-    return rangeWithDots;
+    
+    return result;
   };
 
   return (
@@ -90,7 +85,7 @@ const TableControls = ({
       <div className="table-controls-left">
         {/* Кнопка сброса фильтров */}
         <button 
-          className={`btn-secondary ${!hasActiveFilters ? 'disabled' : ''}`}
+          className="btn btn-secondary-green"
           onClick={handleClearFilters}
           disabled={!hasActiveFilters}
           title="Сбросить все фильтры"
@@ -101,7 +96,7 @@ const TableControls = ({
         {/* Селектор видимых столбцов */}
         <div className="column-selector" ref={columnSelectorRef}>
           <button 
-            className="btn-secondary"
+            className="btn btn-secondary-green"
             onClick={() => setShowColumnSelector(!showColumnSelector)}
             title="Выбрать столбцы для отображения"
           >
@@ -152,38 +147,44 @@ const TableControls = ({
         {/* Пагинация */}
         {totalPages > 1 && (
           <div className="pagination">
-            <button 
-              className="pagination-btn"
-              onClick={() => goToPage(currentPage - 1)}
-              disabled={currentPage === 1}
-              title="Предыдущая страница"
-            >
-              ‹
-            </button>
+            <div className="pagination-nav-left">
+              <button 
+                className="pagination-btn nav-btn"
+                onClick={() => goToPage(currentPage - 1)}
+                disabled={currentPage === 1}
+                title="Предыдущая страница"
+              >
+                ‹
+              </button>
+            </div>
             
-            {getPageNumbers().map((page, index) => (
-              <React.Fragment key={index}>
-                {page === "..." ? (
-                  <span className="pagination-dots">...</span>
-                ) : (
-                  <button
-                    className={`pagination-btn ${page === currentPage ? 'active' : ''}`}
-                    onClick={() => goToPage(page)}
-                  >
-                    {page}
-                  </button>
-                )}
-              </React.Fragment>
-            ))}
+            <div className="pagination-numbers">
+              {getPageNumbers().map((page, index) => (
+                <React.Fragment key={index}>
+                  {page === "..." ? (
+                    <span className="pagination-dots">...</span>
+                  ) : (
+                    <button
+                      className={`pagination-btn ${page === currentPage ? 'active' : ''}`}
+                      onClick={() => goToPage(page)}
+                    >
+                      {page}
+                    </button>
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
             
-            <button 
-              className="pagination-btn"
-              onClick={() => goToPage(currentPage + 1)}
-              disabled={currentPage === totalPages}
-              title="Следующая страница"
-            >
-              ›
-            </button>
+            <div className="pagination-nav-right">
+              <button 
+                className="pagination-btn nav-btn"
+                onClick={() => goToPage(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                title="Следующая страница"
+              >
+                ›
+              </button>
+            </div>
           </div>
         )}
       </div>

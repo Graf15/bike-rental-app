@@ -31,7 +31,7 @@ const Parts = () => {
   if (error) return <div className="error">Ошибка: {error}</div>;
 
   return (
-    <div className="parts-page">
+    <div className="page-container">
       <div className="page-header">
         <h1>Склад запчастей</h1>
         <button className="btn-primary">+ Добавить запчасть</button>

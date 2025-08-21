@@ -34,7 +34,7 @@ const Users = () => {
   if (error) return <div className="error">Ошибка: {error}</div>;
 
   return (
-    <div className="users-page">
+    <div className="page-container">
       <div className="page-header">
         <h1>Управление менеджерами</h1>
         <button className="btn-primary">+ Добавить менеджера</button>

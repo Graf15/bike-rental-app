@@ -30,7 +30,7 @@ router.get("/", async (req, res) => {
 
     // Фильтр по статусу
     if (status) {
-      whereClause.push(`me."статус_ремонта" = $${paramCount}`);
+      whereClause.push(`me.status = $${paramCount}`);
       queryParams.push(status);
       paramCount++;
     }
@@ -51,13 +51,13 @@ router.get("/", async (req, res) => {
 
     // Фильтр по датам
     if (date_from) {
-      whereClause.push(`me."ремонт_запланирован_на" >= $${paramCount}`);
+      whereClause.push(`me.scheduled_date >= $${paramCount}`);
       queryParams.push(date_from);
       paramCount++;
     }
 
     if (date_to) {
-      whereClause.push(`me."ремонт_запланирован_на" <= $${paramCount}`);
+      whereClause.push(`me.scheduled_date <= $${paramCount}`);
       queryParams.push(date_to);
       paramCount++;
     }
@@ -80,24 +80,24 @@ router.get("/", async (req, res) => {
         executor.name as executor_name,
         -- Расчет количества дней до планируемой даты
         CASE 
-          WHEN me."ремонт_запланирован_на" IS NOT NULL 
-          THEN (me."ремонт_запланирован_на"::DATE - CURRENT_DATE)
+          WHEN me.scheduled_date IS NOT NULL 
+          THEN (me.scheduled_date::DATE - CURRENT_DATE)
           ELSE NULL 
         END as days_until_planned,
         -- Флаг просроченности
         CASE 
-          WHEN me."ремонт_запланирован_на" < CURRENT_DATE AND me."статус_ремонта" != 'ремонт выполнен'
+          WHEN me.scheduled_date < CURRENT_DATE AND me.status != 'ремонт выполнен'
           THEN true 
           ELSE false 
         END as is_overdue
       FROM maintenance_events me
       LEFT JOIN bikes b ON me.bike_id = b.id
-      LEFT JOIN users manager ON me."менеджер_id" = manager.id
-      LEFT JOIN users executor ON me."исполнитель_id" = executor.id
+      LEFT JOIN users manager ON me.manager_id_old = manager.id
+      LEFT JOIN users executor ON me.technician_id = executor.id
       ${whereSQL}
       ORDER BY 
         CASE me.priority WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 3 WHEN 4 THEN 4 ELSE 5 END,
-        me."ремонт_запланирован_на" ASC NULLS LAST,
+        me.scheduled_date ASC NULLS LAST,
         me.created_at DESC
       LIMIT $${limitParamIndex} OFFSET $${offsetParamIndex}
     `, queryParams);
@@ -119,14 +119,14 @@ router.post("/", async (req, res) => {
 
     const {
       bike_id,
-      тип_ремонта,
-      статус_ремонта,
-      ремонт_запланирован_на,
-      дата_начала,
-      менеджер_id,
-      исполнитель_id,
-      примечания,
-      обкатка_выполнена,
+      maintenance_type,
+      status,
+      scheduled_date,
+      start_date,
+      manager_id,
+      technician_id,
+      notes,
+      test_ride_completed,
       // Новые поля
       repair_type = 'current',
       priority = 3,
@@ -147,17 +147,17 @@ router.post("/", async (req, res) => {
     // Проверяем конфликты только для ремонтов, которые реально блокируют велосипед
     // Разрешаем: все планировочные ремонты (статус "запланирован") и долгосрочные ремонты
     const isBlockingRepair = (
-      статус_ремонта === 'в ремонте' || 
-      статус_ремонта === 'ожидает деталей'
+      status === 'в ремонте' || 
+      status === 'ожидает деталей'
     ) && repair_type !== 'longterm'; // Долгосрочные ремонты никогда не блокируют
 
     if (isBlockingRepair) {
       // Ищем другие активные ремонты, которые реально блокируют велосипед
       const conflictingRepairsCheck = await client.query(
-        `SELECT id, "тип_ремонта", "статус_ремонта", repair_type 
+        `SELECT id, maintenance_type, status, repair_type 
          FROM maintenance_events 
          WHERE bike_id = $1 
-         AND "статус_ремонта" IN ('в ремонте', 'ожидает деталей')
+         AND status IN ('в ремонте', 'ожидает деталей')
          AND repair_type != 'longterm'`, // Долгосрочные ремонты не блокируют велосипед
         [bike_id]
       );
@@ -169,8 +169,8 @@ router.post("/", async (req, res) => {
         
         throw new Error(
           `Велосипед #${bike_id} уже находится в активном ремонте (ID: ${conflictingRepair.id}, ` +
-          `тип: ${repairTypeText}, статус: ${conflictingRepair.статус_ремонта}). ` +
-          `Нельзя начать новый "${repair_type}" ремонт со статусом "${статус_ремонта}" пока текущий не завершен.`
+          `тип: ${repairTypeText}, статус: ${conflictingRepair.status}). ` +
+          `Нельзя начать новый "${repair_type}" ремонт со статусом "${status}" пока текущий не завершен.`
         );
       }
     }
@@ -180,14 +180,14 @@ router.post("/", async (req, res) => {
       `
       INSERT INTO maintenance_events (
         bike_id,
-        "тип_ремонта",
-        "статус_ремонта",
-        "ремонт_запланирован_на",
-        "дата_начала",
-        "менеджер_id",
-        "исполнитель_id",
-        "примечания",
-        "обкатка_выполнена",
+        maintenance_type,
+        status,
+        scheduled_date,
+        start_date,
+        manager_id_old,
+        technician_id,
+        notes,
+        test_ride_completed,
         repair_type,
         priority,
         estimated_duration,
@@ -197,14 +197,14 @@ router.post("/", async (req, res) => {
     `,
       [
         bike_id,
-        тип_ремонта,
-        статус_ремонта,
-        ремонт_запланирован_на || null,
-        дата_начала || (статус_ремонта === "запланирован" ? null : new Date()),
-        менеджер_id,
-        исполнитель_id || null,
-        примечания || null,
-        обкатка_выполнена || false,
+        maintenance_type,
+        status,
+        scheduled_date || null,
+        start_date || (status === "запланирован" ? null : new Date()),
+        manager_id,
+        technician_id || null,
+        notes || null,
+        test_ride_completed || false,
         repair_type,
         priority,
         estimated_duration,
@@ -213,7 +213,7 @@ router.post("/", async (req, res) => {
     );
 
     // Обновляем статус велосипеда, если нужно (кроме долгосрочных ремонтов)
-    if (статус_ремонта === "в ремонте" && repair_type !== 'longterm') {
+    if (status === "в ремонте" && repair_type !== 'longterm') {
       await client.query("UPDATE bikes SET status = $1 WHERE id = $2", [
         "в ремонте",
         bike_id,
@@ -235,8 +235,8 @@ router.post("/", async (req, res) => {
         executor.username as executor_name
       FROM maintenance_events me
       LEFT JOIN bikes b ON me.bike_id = b.id
-      LEFT JOIN users manager ON me."менеджер_id" = manager.id
-      LEFT JOIN users executor ON me."исполнитель_id" = executor.id
+      LEFT JOIN users manager ON me.manager_id_old = manager.id
+      LEFT JOIN users executor ON me.technician_id = executor.id
       WHERE me.id = $1
     `,
       [result.rows[0].id]
@@ -300,11 +300,11 @@ router.patch("/:id", async (req, res) => {
       const result = await client.query(updateQuery, values);
 
       // Если изменился статус ремонта, обновляем статус велосипеда
-      if (updateFields.статус_ремонта) {
+      if (updateFields.status) {
         const bikeId = currentEvent.rows[0].bike_id;
         let newBikeStatus = null;
 
-        switch (updateFields.статус_ремонта) {
+        switch (updateFields.status) {
           case "в ремонте":
           case "ожидает деталей":
             newBikeStatus = "в ремонте";
@@ -338,8 +338,8 @@ router.patch("/:id", async (req, res) => {
         executor.username as executor_name
       FROM maintenance_events me
       LEFT JOIN bikes b ON me.bike_id = b.id
-      LEFT JOIN users manager ON me."менеджер_id" = manager.id
-      LEFT JOIN users executor ON me."исполнитель_id" = executor.id
+      LEFT JOIN users manager ON me.manager_id_old = manager.id
+      LEFT JOIN users executor ON me.technician_id = executor.id
       WHERE me.id = $1
     `,
       [id]
@@ -368,7 +368,7 @@ router.delete("/:id", async (req, res) => {
 
     // Получаем информацию о событии перед удалением
     const eventInfo = await client.query(
-      'SELECT bike_id, "статус_ремонта" FROM maintenance_events WHERE id = $1',
+      'SELECT bike_id, status FROM maintenance_events WHERE id = $1',
       [id]
     );
 
@@ -383,7 +383,7 @@ router.delete("/:id", async (req, res) => {
     const activeRepairs = await client.query(
       `
       SELECT id FROM maintenance_events 
-      WHERE bike_id = $1 AND "статус_ремонта" IN ('в ремонте', 'ожидает деталей', 'запланирован')
+      WHERE bike_id = $1 AND status IN ('в ремонте', 'ожидает деталей', 'запланирован')
     `,
       [eventInfo.rows[0].bike_id]
     );
@@ -635,7 +635,7 @@ router.patch("/:id/status", async (req, res) => {
     // Обновляем статус
     const result = await client.query(`
       UPDATE maintenance_events 
-      SET "статус_ремонта" = $1, updated_at = NOW()
+      SET status = $1, updated_at = NOW()
       WHERE id = $2
       RETURNING *
     `, [status, id]);
@@ -645,7 +645,7 @@ router.patch("/:id/status", async (req, res) => {
       await client.query(`
         INSERT INTO repair_status_history (repair_id, old_status, new_status, notes)
         VALUES ($1, $2, $3, $4)
-      `, [id, currentEvent.rows[0]["статус_ремонта"], status, notes]);
+      `, [id, currentEvent.rows[0].status, status, notes]);
     }
     
     await client.query("COMMIT");
@@ -789,16 +789,16 @@ router.get("/analytics/summary", async (req, res) => {
     const result = await db.query(`
       SELECT 
         COUNT(*) as total_repairs,
-        COUNT(CASE WHEN me."статус_ремонта" = 'запланирован' THEN 1 END) as planned,
-        COUNT(CASE WHEN me."статус_ремонта" = 'в ремонте' THEN 1 END) as in_progress,
-        COUNT(CASE WHEN me."статус_ремонта" = 'ожидает деталей' THEN 1 END) as waiting_parts,
-        COUNT(CASE WHEN me."статус_ремонта" = 'ремонт выполнен' THEN 1 END) as completed,
+        COUNT(CASE WHEN me.status = 'запланирован' THEN 1 END) as planned,
+        COUNT(CASE WHEN me.status = 'в ремонте' THEN 1 END) as in_progress,
+        COUNT(CASE WHEN me.status = 'ожидает деталей' THEN 1 END) as waiting_parts,
+        COUNT(CASE WHEN me.status = 'ремонт выполнен' THEN 1 END) as completed,
         COUNT(CASE WHEN me.repair_type = 'current' THEN 1 END) as current_repairs,
         COUNT(CASE WHEN me.repair_type = 'weekly' THEN 1 END) as weekly_repairs,
         COUNT(CASE WHEN me.repair_type = 'longterm' THEN 1 END) as longterm_repairs,
         AVG(me.actual_duration) as avg_duration,
         SUM(me.actual_cost) as total_cost,
-        COUNT(CASE WHEN me."ремонт_запланирован_на" < CURRENT_DATE AND me."статус_ремонта" != 'ремонт выполнен' THEN 1 END) as overdue
+        COUNT(CASE WHEN me.scheduled_date < CURRENT_DATE AND me.status != 'ремонт выполнен' THEN 1 END) as overdue
       FROM maintenance_events me
       ${whereClause}
     `, queryParams);
@@ -871,9 +871,9 @@ router.get("/parts-needs", async (req, res) => {
         b.id as bike_id,
         b.name as bike_name,
         b.model,
-        me."тип_ремонта" as repair_type_ru,
+        me.maintenance_type as repair_type_ru,
         me.repair_type,
-        me."статус_ремонта" as status,
+        me.status,
         me.priority,
         mp."деталь_id" as part_id,
         pm."название" as part_name,
@@ -888,17 +888,17 @@ router.get("/parts-needs", async (req, res) => {
           ELSE 0 
         END as shortage_quantity,
         pm.purchase_price,
-        me."ремонт_запланирован_на" as planned_date
+        me.scheduled_date as planned_date
       FROM maintenance_events me
       JOIN maintenance_parts mp ON me.id = mp."событие_id"
       JOIN part_models pm ON mp."деталь_id" = pm.id
       LEFT JOIN part_stock ps ON pm.id = ps.part_model_id
       LEFT JOIN bikes b ON me.bike_id = b.id
-      WHERE me."статус_ремонта" IN ('запланирован', 'в ремонте', 'ожидает деталей')
+      WHERE me.status IN ('запланирован', 'в ремонте', 'ожидает деталей')
         AND mp."нужно" > mp."использовано"
       ORDER BY 
         me.priority ASC,
-        me."ремонт_запланирован_на" ASC NULLS LAST,
+        me.scheduled_date ASC NULLS LAST,
         shortage_quantity DESC
     `);
     
@@ -931,8 +931,8 @@ router.get("/:id", async (req, res) => {
         executor.username as executor_name
       FROM maintenance_events me
       LEFT JOIN bikes b ON me.bike_id = b.id
-      LEFT JOIN users manager ON me."менеджер_id" = manager.id
-      LEFT JOIN users executor ON me."исполнitель_id" = executor.id
+      LEFT JOIN users manager ON me.manager_id_old = manager.id
+      LEFT JOIN users executor ON me.technician_id = executor.id
       WHERE me.id = $1
     `,
       [id]

@@ -202,7 +202,7 @@ const PartsRequests = () => {
   }
 
   return (
-    <div className="parts-requests-page">
+    <div className="page-container">
       <div className="page-header">
         <div className="header-content">
           <h1 className="page-title">Управление заказами запчастей</h1>
@@ -566,7 +566,7 @@ const CreateRequestModal = ({ onClose, onSubmit }) => {
           </div>
 
           <div className="modal-footer">
-            <button type="button" onClick={onClose} className="btn-secondary">
+            <button type="button" onClick={onClose} className="btn btn-secondary-green">
               Отмена
             </button>
             <button
