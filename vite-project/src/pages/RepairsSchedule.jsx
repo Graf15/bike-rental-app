@@ -24,11 +24,18 @@ const RepairsSchedule = () => {
   const [columnWidths, setColumnWidths] = useState({});
   const [visibleColumns, setVisibleColumns] = useState({});
   
+  // Состояние для порядка столбцов
+  const [columnOrder, setColumnOrder] = useState([]);
+  
   // Refs для ресайза
   const isResizing = useRef(false);
   const resizingColumn = useRef(null);
   const resizeStartX = useRef(0);
   const resizeStartWidth = useRef(0);
+  
+  // Refs для drag & drop
+  const draggedColumn = useRef(null);
+  const dragOverColumn = useRef(null);
   
   // Состояния для поповеров фильтров (как в BikeTable)
   const [popoverInfo, setPopoverInfo] = useState({ key: null, visible: false });
@@ -36,11 +43,11 @@ const RepairsSchedule = () => {
 
   // Опции для выпадающих фильтров
   const selectOptions = {
-    wheel_size: ["20", "24", "26", "27.5", "29"],
+    wheel_size: ["12", "16", "20", "24", "26", "27.5", "29"],
     frame_size: ["д20", "д24", "XS", "S", "M", "L", "XL", "XXL", "13", "14", "15", "15,5", "16", "16,5", "17", "17,5", "18", "18,5", "19", "19,5", "20", "20,5", "21", "21,5", "22", "22,5", "23", "23,5"],
     gender: ["женский", "мужской", "унисекс"],
-    category: ["kids", "econom", "standart", "premium", "эл.вел'", "эл.самокат"],
-    status: ["в наличии", "в прокате", "в ремонте", "бронь", "продан", "украден", "невозврат"],
+    price_segment: ["kids", "econom", "standart", "premium", "эл.вел'", "эл.самокат"],
+    condition_status: ["в наличии", "в прокате", "в ремонте", "бронь", "продан", "украден", "невозврат"],
     scheduled_day: ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье", "Не запланировано"]
   };
 
@@ -59,14 +66,15 @@ const RepairsSchedule = () => {
     
     // Инициализация ширин столбцов
     const defaultWidths = {
-      bike_number: 80,
-      model: 150,
-      year: 80,
+      id: 60,
+      internal_article: 120,
+      model: 200,
+      model_year: 80,
       wheel_size: 100,
       frame_size: 80,
       gender: 80,
-      category: 120,
-      status: 120,
+      price_segment: 120,
+      condition_status: 120,
       scheduled_day: 150,
       actions: 200
     };
@@ -76,20 +84,37 @@ const RepairsSchedule = () => {
     
     // Инициализация видимости столбцов
     const defaultVisible = [
-      "bike_number",
+      "id",
+      "internal_article",
       "model", 
-      "year",
+      "model_year",
       "wheel_size",
       "frame_size",
       "gender",
-      "category",
-      "status",
+      "price_segment",
+      "condition_status",
       "scheduled_day",
       "actions"
     ];
     
+    const defaultOrder = [
+      "id",
+      "internal_article",
+      "model", 
+      "model_year",
+      "wheel_size",
+      "frame_size",
+      "gender",
+      "price_segment",
+      "condition_status",
+      "scheduled_day"
+    ];
+    
     const savedVisible = localStorage.getItem('repairsScheduleVisibleColumns');
     setVisibleColumns(savedVisible ? JSON.parse(savedVisible) : defaultVisible);
+    
+    const savedOrder = localStorage.getItem('repairsScheduleColumnOrder');
+    setColumnOrder(savedOrder ? JSON.parse(savedOrder) : defaultOrder);
   }, []);
 
   const fetchData = async () => {
@@ -172,6 +197,84 @@ const RepairsSchedule = () => {
     document.body.style.cursor = '';
     document.body.style.userSelect = '';
   }, [handleResizeMove]);
+
+  // Функции для drag & drop столбцов
+  const handleDragStart = (e, columnKey) => {
+    if (isResizing.current) {
+      e.preventDefault();
+      return;
+    }
+    draggedColumn.current = columnKey;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', columnKey);
+    
+    // Добавляем CSS класс для визуальной обратной связи
+    setTimeout(() => {
+      e.target.classList.add('dragging');
+    }, 0);
+  };
+
+  const handleDragOver = (e, columnKey) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    dragOverColumn.current = columnKey;
+  };
+
+  const handleDragEnter = (e, columnKey) => {
+    e.preventDefault();
+    if (draggedColumn.current && draggedColumn.current !== columnKey) {
+      e.target.classList.add('drag-over');
+    }
+  };
+
+  const handleDragLeave = (e) => {
+    // Проверяем, действительно ли мы покидаем элемент
+    const rect = e.target.getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
+    
+    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+      e.target.classList.remove('drag-over');
+    }
+  };
+
+  const handleDrop = (e, targetColumnKey) => {
+    e.preventDefault();
+    e.target.classList.remove('drag-over');
+    
+    const sourceColumnKey = draggedColumn.current;
+    if (sourceColumnKey && sourceColumnKey !== targetColumnKey) {
+      const newOrder = [...columnOrder];
+      const sourceIndex = newOrder.indexOf(sourceColumnKey);
+      const targetIndex = newOrder.indexOf(targetColumnKey);
+      
+      // Перемещаем столбец
+      newOrder.splice(sourceIndex, 1);
+      newOrder.splice(targetIndex, 0, sourceColumnKey);
+      
+      setColumnOrder(newOrder);
+      localStorage.setItem('repairsScheduleColumnOrder', JSON.stringify(newOrder));
+    }
+    
+    draggedColumn.current = null;
+    dragOverColumn.current = null;
+    
+    // Очищаем все CSS классы
+    document.querySelectorAll('.repairs-schedule-page th').forEach(th => {
+      th.classList.remove('dragging', 'drag-over');
+    });
+  };
+
+  const handleDragEnd = (e) => {
+    // Очищаем CSS классы
+    e.target.classList.remove('dragging');
+    document.querySelectorAll('.repairs-schedule-page th').forEach(th => {
+      th.classList.remove('drag-over');
+    });
+    
+    draggedColumn.current = null;
+    dragOverColumn.current = null;
+  };
 
   // Очистка event listeners при unmount
   useEffect(() => {
@@ -340,14 +443,15 @@ const RepairsSchedule = () => {
     if (Object.keys(columnWidths).length === 0 || visibleColumns.length === 0) return;
     
     const columns = [
-      { key: "bike_number", label: "№", filterable: true },
+      { key: "id", label: "ID", filterable: true },
+      { key: "internal_article", label: "Внутр. артикул", filterable: true },
       { key: "model", label: "Модель", filterable: true },
-      { key: "year", label: "Год", filterable: true },
+      { key: "model_year", label: "Год", filterable: true },
       { key: "wheel_size", label: "Размер колеса", filterable: true, filterType: "select" },
       { key: "frame_size", label: "Рама", filterable: true, filterType: "select" },
       { key: "gender", label: "Пол", filterable: true, filterType: "select" },
-      { key: "category", label: "Сегмент", filterable: true, filterType: "select" },
-      { key: "status", label: "Статус", filterable: true, filterType: "select" },
+      { key: "price_segment", label: "Сегмент", filterable: true, filterType: "select" },
+      { key: "condition_status", label: "Состояние", filterable: true, filterType: "select" },
       { key: "scheduled_day", label: "Запланированный день", filterable: true, filterType: "select" },
       { key: "actions", label: "Действия", filterable: false },
     ];
@@ -359,11 +463,11 @@ const RepairsSchedule = () => {
       .repairs-schedule-page .table-container table { width: ${totalWidth}px !important; }
     `;
     
-    visibleColumnsData.forEach((col, index) => {
-      const width = columnWidths[col.key] || 100;
+    // Создаем CSS правила для каждого столбца по data-column атрибуту
+    Object.entries(columnWidths).forEach(([columnKey, width]) => {
       css += `
-        .repairs-schedule-page .table-container th:nth-child(${index + 1}),
-        .repairs-schedule-page .table-container td:nth-child(${index + 1}) {
+        .repairs-schedule-page .table-container th[data-column="${columnKey}"],
+        .repairs-schedule-page .table-container td[data-column="${columnKey}"] {
           width: ${width}px !important;
           min-width: ${width}px !important;
           max-width: ${width}px !important;
@@ -386,17 +490,50 @@ const RepairsSchedule = () => {
   if (error) return <div className="error">Ошибка: {error}</div>;
 
   const columns = [
-    { key: "bike_number", label: "№", filterable: true },
+    { key: "id", label: "ID", filterable: true },
+    { key: "internal_article", label: "Внутр. артикул", filterable: true },
     { key: "model", label: "Модель", filterable: true },
-    { key: "year", label: "Год", filterable: true },
+    { key: "model_year", label: "Год", filterable: true },
     { key: "wheel_size", label: "Размер колеса", filterable: true, filterType: "select" },
     { key: "frame_size", label: "Рама", filterable: true, filterType: "select" },
     { key: "gender", label: "Пол", filterable: true, filterType: "select" },
-    { key: "category", label: "Сегмент", filterable: true, filterType: "select" },
-    { key: "status", label: "Статус", filterable: true, filterType: "select" },
+    { key: "price_segment", label: "Сегмент", filterable: true, filterType: "select" },
+    { key: "condition_status", label: "Состояние", filterable: true, filterType: "select" },
     { key: "scheduled_day", label: "Запланированный день", filterable: true, filterType: "select" },
     { key: "actions", label: "Действия", filterable: false },
   ];
+
+  // Получаем упорядоченные столбцы согласно columnOrder
+  const getOrderedColumns = () => {
+    if (columnOrder.length === 0) return columns.filter(col => col.key !== 'actions');
+    
+    const orderedColumns = [];
+    const columnMap = new Map(columns.map(col => [col.key, col]));
+    
+    // Добавляем столбцы в порядке columnOrder (исключая actions)
+    columnOrder.forEach(key => {
+      if (columnMap.has(key) && key !== 'actions') {
+        orderedColumns.push(columnMap.get(key));
+      }
+    });
+    
+    // Добавляем любые новые столбцы, которых нет в columnOrder (исключая actions)
+    columns.forEach(col => {
+      if (!columnOrder.includes(col.key) && col.key !== 'actions') {
+        orderedColumns.push(col);
+      }
+    });
+    
+    // Добавляем actions в конец
+    const actionsColumn = columnMap.get('actions');
+    if (actionsColumn) {
+      orderedColumns.push(actionsColumn);
+    }
+    
+    return orderedColumns;
+  };
+
+  const orderedColumns = getOrderedColumns();
 
 
 
@@ -461,8 +598,20 @@ const RepairsSchedule = () => {
         <table className="schedule-table">
           <thead>
             <tr>
-              {columns.filter(col => visibleColumns.includes(col.key)).map(({ key, label }) => (
-                <th key={key} onClick={() => handleSort(key)}>
+              {orderedColumns.filter(col => visibleColumns.includes(col.key)).map(({ key, label }) => (
+                <th 
+                  key={key}
+                  data-column={key}
+                  draggable={key !== 'actions'}
+                  onClick={() => handleSort(key)}
+                  onDragStart={(e) => key !== 'actions' ? handleDragStart(e, key) : e.preventDefault()}
+                  onDragOver={(e) => key !== 'actions' ? handleDragOver(e, key) : e.preventDefault()}
+                  onDragEnter={(e) => key !== 'actions' ? handleDragEnter(e, key) : e.preventDefault()}
+                  onDragLeave={key !== 'actions' ? handleDragLeave : undefined}
+                  onDrop={(e) => key !== 'actions' ? handleDrop(e, key) : e.preventDefault()}
+                  onDragEnd={key !== 'actions' ? handleDragEnd : undefined}
+                  style={{ cursor: key !== 'actions' && !isResizing.current ? 'move' : 'default' }}
+                >
                   {label}{" "}
                   <span className="sort-arrow">
                     {sortColumn === key && (sortAsc ? "▲" : "▼")}
@@ -475,8 +624,8 @@ const RepairsSchedule = () => {
               ))}
             </tr>
             <tr className="filter-row">
-              {columns.filter(col => visibleColumns.includes(col.key)).map(({ key, filterable, filterType }) => (
-                <th key={key}>
+              {orderedColumns.filter(col => visibleColumns.includes(col.key)).map(({ key, filterable, filterType }) => (
+                <th key={key} data-column={key}>
                   {filterable && (
                     <>
                       {filterType === 'select' ? (
@@ -513,31 +662,34 @@ const RepairsSchedule = () => {
               const bikeSchedule = getScheduleForBike(bike.id);
               return (
                 <tr key={bike.id} className={bikeSchedule ? 'scheduled' : ''}>
-                  {columns.filter(col => visibleColumns.includes(col.key)).map(({ key }) => {
+                  {orderedColumns.filter(col => visibleColumns.includes(col.key)).map(({ key }) => {
                     const bikeSchedule = getScheduleForBike(bike.id);
                     
-                    if (key === 'bike_number') {
-                      return <td key={key}>{bike.bike_number}</td>;
+                    if (key === 'id') {
+                      return <td key={key} data-column={key}>{bike.id}</td>;
+                    }
+                    if (key === 'internal_article') {
+                      return <td key={key} data-column={key}>{bike.internal_article}</td>;
                     }
                     if (key === 'model') {
-                      return <td key={key}>{bike.model}</td>;
+                      return <td key={key} data-column={key}>{bike.model}</td>;
                     }
-                    if (key === 'year') {
-                      return <td key={key}>{bike.year}</td>;
+                    if (key === 'model_year') {
+                      return <td key={key} data-column={key}>{bike.model_year}</td>;
                     }
                     if (key === 'wheel_size') {
-                      return <td key={key}>{bike.wheel_size}"</td>;
+                      return <td key={key} data-column={key}>{bike.wheel_size}"</td>;
                     }
                     if (key === 'frame_size') {
-                      return <td key={key}>{bike.frame_size}</td>;
+                      return <td key={key} data-column={key}>{bike.frame_size}</td>;
                     }
                     if (key === 'gender') {
-                      return <td key={key}>{bike.gender}</td>;
+                      return <td key={key} data-column={key}>{bike.gender}</td>;
                     }
-                    if (key === 'category') {
-                      return <td key={key}>{bike.category}</td>;
+                    if (key === 'price_segment') {
+                      return <td key={key} data-column={key}>{bike.price_segment}</td>;
                     }
-                    if (key === 'status') {
+                    if (key === 'condition_status') {
                       // Маппинг статусов на цвета
                       const getStatusBadgeClass = (status) => {
                         const statusColorMap = {
@@ -554,16 +706,16 @@ const RepairsSchedule = () => {
                       };
                       
                       return (
-                        <td key={key}>
-                          <span className={getStatusBadgeClass(bike.status)}>
-                            {bike.status}
+                        <td key={key} data-column={key}>
+                          <span className={getStatusBadgeClass(bike.condition_status)}>
+                            {bike.condition_status}
                           </span>
                         </td>
                       );
                     }
                     if (key === 'scheduled_day') {
                       return (
-                        <td key={key}>
+                        <td key={key} data-column={key}>
                           {bikeSchedule ? (
                             <div>
                               <span>
@@ -578,7 +730,7 @@ const RepairsSchedule = () => {
                     }
                     if (key === 'actions') {
                       return (
-                        <td key={key}>
+                        <td key={key} data-column={key}>
                           <div className="action-buttons">
                             {bikeSchedule ? (
                               <button 
@@ -608,7 +760,7 @@ const RepairsSchedule = () => {
                         </td>
                       );
                     }
-                    return <td key={key}></td>;
+                    return <td key={key} data-column={key}></td>;
                   })}
                 </tr>
               );

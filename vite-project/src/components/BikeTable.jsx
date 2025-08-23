@@ -3,6 +3,7 @@ import BikeStatusPopover from "./BikeStatusPopover";
 import BikeActionsMenu from "./BikeActionsMenu";
 import TableControls from "./TableControls";
 import MultiSelectPopover from "./MultiSelectPopover";
+import DateRangeFilter from "./DateRangeFilter";
 import "./BikeTable.css";
 
 // Функция для форматирования даты
@@ -59,24 +60,26 @@ const BikeTable = ({
   const [visibleColumns, setVisibleColumns] = useState(() => {
     const saved = localStorage.getItem('bikeTableVisibleColumns');
     return saved ? JSON.parse(saved) : [
-      'bike_number', 'model', 'model_year', 'wheel_size', 'frame_size', 
-      'frame_number', 'gender', 'segment', 'last_service_date', 'notes', 'status'
+      'id', 'model', 'internal_article', 'brand_name', 'model_year', 'wheel_size', 
+      'frame_size', 'frame_number', 'gender', 'price_segment', 'last_maintenance_date', 'condition_status', 'notes'
     ];
   });
 
   // Дефолтные ширины столбцов
   const defaultColumnWidths = {
-    bike_number: 60,
-    model: 150,
+    id: 60,
+    model: 200,
+    internal_article: 120,
+    brand_name: 100,
     model_year: 80,
-    wheel_size: 120,
+    wheel_size: 100,
     frame_size: 80,
     frame_number: 120,
     gender: 80,
-    segment: 100,
-    last_service_date: 120,
+    price_segment: 120,
+    last_maintenance_date: 140,
+    condition_status: 120,
     notes: 150,
-    status: 100,
     actions: 120
   };
 
@@ -86,17 +89,30 @@ const BikeTable = ({
     return saved ? { ...defaultColumnWidths, ...JSON.parse(saved) } : defaultColumnWidths;
   });
 
+  // Состояние для порядка столбцов
+  const [columnOrder, setColumnOrder] = useState(() => {
+    const saved = localStorage.getItem('bikeTableColumnOrder');
+    return saved ? JSON.parse(saved) : [
+      'id', 'model', 'internal_article', 'brand_name', 'model_year', 'wheel_size', 
+      'frame_size', 'frame_number', 'gender', 'price_segment', 'last_maintenance_date', 'condition_status', 'notes'
+    ];
+  });
+
   // Состояние для ресайза - используем ref чтобы избежать перерендеров
   const isResizing = useRef(false);
   const resizingColumn = useRef(null);
   const resizeStartX = useRef(0);
   const resizeStartWidth = useRef(0);
 
+  // Refs для drag & drop
+  const draggedColumn = useRef(null);
+  const dragOverColumn = useRef(null);
+
   // Реф для контейнера таблицы
   const tableContainerRef = useRef(null);
 
   const selectOptions = {
-    wheel_size: ["20", "24", "26", "27.5", "29"],
+    wheel_size: ["12", "16", "20", "24", "26", "27.5", "29"],
     frame_size: [
       "д20",
       "д24",
@@ -128,12 +144,11 @@ const BikeTable = ({
       "23,5",
     ],
     gender: ["женский", "мужской", "унисекс"],
-    segment: ["kids", "econom", "standart", "premium", "эл.вел'", "эл.самокат"],
-    status: [
+    price_segment: ["kids", "econom", "standart", "premium", "эл.вел'", "эл.самокат"],
+    condition_status: [
       "в наличии",
-      "в прокате",
+      "в прокате", 
       "в ремонте",
-      "требует ремонта",
       "бронь",
       "продан",
       "украден",
@@ -188,19 +203,99 @@ const BikeTable = ({
     document.body.style.userSelect = '';
   }, [handleResizeMove]);
 
+  // Функции для drag & drop столбцов
+  const handleDragStart = (e, columnKey) => {
+    if (isResizing.current) {
+      e.preventDefault();
+      return;
+    }
+    draggedColumn.current = columnKey;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', columnKey);
+    
+    // Добавляем CSS класс для визуальной обратной связи
+    setTimeout(() => {
+      e.target.classList.add('dragging');
+    }, 0);
+  };
+
+  const handleDragOver = (e, columnKey) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    dragOverColumn.current = columnKey;
+  };
+
+  const handleDragEnter = (e, columnKey) => {
+    e.preventDefault();
+    if (draggedColumn.current && draggedColumn.current !== columnKey) {
+      e.target.classList.add('drag-over');
+    }
+  };
+
+  const handleDragLeave = (e) => {
+    // Проверяем, действительно ли мы покидаем элемент
+    const rect = e.target.getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
+    
+    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+      e.target.classList.remove('drag-over');
+    }
+  };
+
+  const handleDrop = (e, targetColumnKey) => {
+    e.preventDefault();
+    e.target.classList.remove('drag-over');
+    
+    const sourceColumnKey = draggedColumn.current;
+    if (sourceColumnKey && sourceColumnKey !== targetColumnKey) {
+      const newOrder = [...columnOrder];
+      const sourceIndex = newOrder.indexOf(sourceColumnKey);
+      const targetIndex = newOrder.indexOf(targetColumnKey);
+      
+      // Перемещаем столбец
+      newOrder.splice(sourceIndex, 1);
+      newOrder.splice(targetIndex, 0, sourceColumnKey);
+      
+      setColumnOrder(newOrder);
+      localStorage.setItem('bikeTableColumnOrder', JSON.stringify(newOrder));
+    }
+    
+    draggedColumn.current = null;
+    dragOverColumn.current = null;
+    
+    // Очищаем все CSS классы
+    document.querySelectorAll('.bike-table th').forEach(th => {
+      th.classList.remove('dragging', 'drag-over');
+    });
+  };
+
+  const handleDragEnd = (e) => {
+    // Очищаем CSS классы
+    e.target.classList.remove('dragging');
+    document.querySelectorAll('.bike-table th').forEach(th => {
+      th.classList.remove('drag-over');
+    });
+    
+    draggedColumn.current = null;
+    dragOverColumn.current = null;
+  };
+
   // Динамическое обновление CSS для ширин столбцов
   useEffect(() => {
-    const totalWidth = Object.values(columnWidths).reduce((sum, width) => sum + width, 0);
+    const orderedColumns = getOrderedColumns();
+    const totalWidth = orderedColumns.reduce((sum, col) => sum + (columnWidths[col.key] || 100), 0) + (columnWidths.actions || 120);
     
-    // Создаём CSS правила для каждого столбца
+    // Создаём CSS правила для каждого столбца по его ключу
     let css = `
       .home-page .table-container table { width: ${totalWidth}px !important; }
     `;
     
-    Object.values(columnWidths).forEach((width, index) => {
+    // Создаем CSS правила для каждого столбца по data-column атрибуту
+    Object.entries(columnWidths).forEach(([columnKey, width]) => {
       css += `
-        .home-page .table-container th:nth-child(${index + 1}),
-        .home-page .table-container td:nth-child(${index + 1}) {
+        .home-page .table-container th[data-column="${columnKey}"],
+        .home-page .table-container td[data-column="${columnKey}"] {
           width: ${width}px !important;
           min-width: ${width}px !important;
           max-width: ${width}px !important;
@@ -216,7 +311,7 @@ const BikeTable = ({
       document.head.appendChild(styleElement);
     }
     styleElement.textContent = css;
-  }, [columnWidths]);
+  }, [columnWidths, columnOrder]);
 
 
 
@@ -249,10 +344,10 @@ const BikeTable = ({
   // Применение фильтра статуса извне (от кликов по карточкам в header)
   useEffect(() => {
     if (statusFilter) {
-      setFilters(prev => ({ ...prev, status: [statusFilter] }));
+      setFilters(prev => ({ ...prev, condition_status: [statusFilter] }));
     } else {
       setFilters(prev => {
-        const { status: _, ...rest } = prev;
+        const { condition_status: _, ...rest } = prev;
         return rest;
       });
     }
@@ -265,9 +360,16 @@ const BikeTable = ({
     setCurrentPage(1);
   };
 
-  const hasActiveFilters = Object.values(filters).some(value => 
-    Array.isArray(value) ? value.length > 0 : value
-  );
+  const hasActiveFilters = Object.entries(filters).some(([key, value]) => {
+    if (!value) return false;
+    
+    // Специальная обработка для диапазона дат
+    if (key === 'last_maintenance_date' && typeof value === 'object' && !Array.isArray(value)) {
+      return value.from || value.to;
+    }
+    
+    return Array.isArray(value) ? value.length > 0 : value;
+  });
 
   const toggleColumnVisibility = (columnKey) => {
     const newVisibleColumns = visibleColumns.includes(columnKey)
@@ -288,14 +390,14 @@ const BikeTable = ({
     localStorage.setItem('bikeTablePageSize', newSize.toString());
   };
 
-  const handleStatusChange = async (bikeId, newStatus) => {
+  const handleStatusChange = async (bikeId, newStatus, field = 'condition_status') => {
     try {
       const response = await fetch(`/api/bikes/${bikeId}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({ [field]: newStatus }),
       });
 
       if (!response.ok) {
@@ -343,7 +445,25 @@ const BikeTable = ({
 
   const filteredBikes = bikes.filter((bike) => {
     return Object.entries(filters).every(([key, value]) => {
-      if (!value || value.length === 0) return true;
+      if (!value || (Array.isArray(value) && value.length === 0)) return true;
+      
+      // Специальная обработка для диапазона дат last_maintenance_date
+      if (key === 'last_maintenance_date' && typeof value === 'object' && !Array.isArray(value)) {
+        const bikeDate = bike[key] ? new Date(bike[key]) : null;
+        if (!bikeDate || isNaN(bikeDate.getTime())) {
+          // Если даты нет у велосипеда, показываем только если не указан фильтр
+          return !value.from && !value.to;
+        }
+        
+        const fromDate = value.from ? new Date(value.from) : null;
+        const toDate = value.to ? new Date(value.to) : null;
+        
+        if (fromDate && bikeDate < fromDate) return false;
+        if (toDate && bikeDate > toDate) return false;
+        
+        return true;
+      }
+      
       if (Array.isArray(value)) {
         return value.includes(bike[key]);
       } else {
@@ -380,20 +500,48 @@ const BikeTable = ({
 
 
   const columns = [
-    { key: "bike_number", label: "№" },
+    { key: "id", label: "ID" },
     { key: "model", label: "Модель" },
+    { key: "internal_article", label: "Внутр. артикул" },
+    { key: "brand_name", label: "Бренд" },
     { key: "model_year", label: "Год" },
     { key: "wheel_size", label: "Размер колеса" },
     { key: "frame_size", label: "Рама" },
     { key: "frame_number", label: "Номер рамы" },
     { key: "gender", label: "Пол" },
-    { key: "segment", label: "Сегмент" },
-    { key: "last_service_date", label: "Последнее ТО" },
+    { key: "price_segment", label: "Сегмент" },
+    { key: "last_maintenance_date", label: "Последнее ТО" },
+    { key: "condition_status", label: "Состояние" },
     { key: "notes", label: "Примечания" },
-    { key: "status", label: "Состояние" },
   ];
 
-  const visibleColumnsData = columns.filter(col => visibleColumns.includes(col.key));
+  // Получаем упорядоченные столбцы согласно columnOrder
+  const getOrderedColumns = () => {
+    if (columnOrder.length === 0) return columns;
+    
+    const orderedColumns = [];
+    const columnMap = new Map(columns.map(col => [col.key, col]));
+    
+    // Добавляем столбцы в порядке columnOrder
+    columnOrder.forEach(key => {
+      if (columnMap.has(key)) {
+        orderedColumns.push(columnMap.get(key));
+      }
+    });
+    
+    // Добавляем любые новые столбцы, которых нет в columnOrder
+    columns.forEach(col => {
+      if (!columnOrder.includes(col.key)) {
+        orderedColumns.push(col);
+      }
+    });
+    
+    return orderedColumns;
+  };
+
+  const orderedColumns = getOrderedColumns();
+
+  const visibleColumnsData = orderedColumns.filter(col => visibleColumns.includes(col.key));
 
   return (
     <>
@@ -403,7 +551,7 @@ const BikeTable = ({
         hasActiveFilters={hasActiveFilters}
         
         // Столбцы
-        availableColumns={columns}
+        availableColumns={orderedColumns}
         visibleColumns={visibleColumns}
         onColumnVisibilityChange={toggleColumnVisibility}
         
@@ -426,8 +574,16 @@ const BikeTable = ({
             {visibleColumnsData.map(({ key, label }) => (
               <th 
                 key={key} 
-                style={{ width: columnWidths[key] }}
+                data-column={key}
+                draggable
+                style={{ width: columnWidths[key], cursor: !isResizing.current ? 'move' : 'default' }}
                 onClick={() => handleSort(key)}
+                onDragStart={(e) => handleDragStart(e, key)}
+                onDragOver={(e) => handleDragOver(e, key)}
+                onDragEnter={(e) => handleDragEnter(e, key)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, key)}
+                onDragEnd={handleDragEnd}
               >
                 {label}{" "}
                 <span className="sort-arrow">
@@ -438,7 +594,7 @@ const BikeTable = ({
                 />
               </th>
             ))}
-            <th style={{ width: columnWidths.actions }}>
+            <th data-column="actions" style={{ width: columnWidths.actions }}>
               Действия
               <ColumnResizer 
                 onMouseDown={(e) => handleResizeStart(e, 'actions')} 
@@ -447,8 +603,14 @@ const BikeTable = ({
           </tr>
           <tr>
             {visibleColumnsData.map(({ key }) => (
-              <th key={key} style={{ width: columnWidths[key] }}>
-                {selectOptions[key] ? (
+              <th key={key} data-column={key} style={{ width: columnWidths[key] }}>
+                {key === 'last_maintenance_date' ? (
+                  <DateRangeFilter
+                    value={filters[key]}
+                    onChange={(value) => updateFilter(key, value)}
+                    anchorRef={(el) => (anchorRefs.current[key] = el)}
+                  />
+                ) : selectOptions[key] ? (
                   <div
                     ref={(el) => (anchorRefs.current[key] = el)}
                     onClick={() =>
@@ -473,25 +635,25 @@ const BikeTable = ({
                 )}
               </th>
             ))}
-            <th style={{ width: columnWidths.actions }}></th>
+            <th data-column="actions" style={{ width: columnWidths.actions }}></th>
           </tr>
         </thead>
         <tbody>
           {paginatedBikes.map((bike) => (
             <tr key={bike.id}>
               {visibleColumnsData.map(({ key }) => (
-                <td key={key} style={{ width: columnWidths[key] }}>
-                  {key === 'last_service_date' ? formatDate(bike[key]) :
-                   key === 'status' ? (
+                <td key={key} data-column={key} style={{ width: columnWidths[key] }}>
+                  {key === 'last_maintenance_date' ? formatDate(bike[key]) :
+                   key === 'condition_status' ? (
                      <BikeStatusPopover
                        bike={bike}
-                       onStatusChange={handleStatusChange}
+                       onStatusChange={(bikeId, newStatus) => handleStatusChange(bikeId, newStatus, 'condition_status')}
                        onCreateMaintenance={onCreateMaintenance}
                      />
                    ) : (bike[key] || "—")}
                 </td>
               ))}
-              <td style={{ width: columnWidths.actions }}>
+              <td data-column="actions" style={{ width: columnWidths.actions }}>
                 <BikeActionsMenu
                   bike={bike}
                   onEdit={handleBikeEdit}

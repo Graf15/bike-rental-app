@@ -17,11 +17,18 @@ const MaintenanceTable = ({ events, onUpdate }) => {
   const [columnWidths, setColumnWidths] = useState({});
   const [visibleColumns, setVisibleColumns] = useState([]);
   
+  // Состояние для порядка столбцов
+  const [columnOrder, setColumnOrder] = useState([]);
+  
   // Refs для ресайза
   const isResizing = useRef(false);
   const resizingColumn = useRef(null);
   const resizeStartX = useRef(0);
   const resizeStartWidth = useRef(0);
+  
+  // Refs для drag & drop
+  const draggedColumn = useRef(null);
+  const dragOverColumn = useRef(null);
   
   // Состояния для поповеров фильтров
   const [popoverInfo, setPopoverInfo] = useState({ key: null, visible: false });
@@ -68,11 +75,20 @@ const MaintenanceTable = ({ events, onUpdate }) => {
     const defaultVisible = [
       "id", "bike_number", "model", "repair_type", "priority", 
       "status", "scheduled_date", "estimated_duration", 
-      "actual_duration", "estimated_cost", "actual_cost", "manager_name", "actions"
+      "actual_duration", "estimated_cost", "actual_cost", "manager_name"
+    ];
+    
+    const defaultOrder = [
+      "id", "bike_number", "model", "repair_type", "priority", 
+      "status", "scheduled_date", "estimated_duration", 
+      "actual_duration", "estimated_cost", "actual_cost", "manager_name"
     ];
     
     const savedVisible = localStorage.getItem('maintenanceTableVisibleColumns');
     setVisibleColumns(savedVisible ? JSON.parse(savedVisible) : defaultVisible);
+    
+    const savedOrder = localStorage.getItem('maintenanceTableColumnOrder');
+    setColumnOrder(savedOrder ? JSON.parse(savedOrder) : defaultOrder);
   }, []);
 
   // Динамическое обновление CSS для ширин столбцов
@@ -86,29 +102,17 @@ const MaintenanceTable = ({ events, onUpdate }) => {
       .maintenance-table { width: ${totalWidth}px !important; }
     `;
     
-    visibleColumnsData.forEach((col, index) => {
-      const width = columnWidths[col.key] || 100;
+    // Создаем CSS правила для каждого столбца по data-column атрибуту
+    Object.entries(columnWidths).forEach(([columnKey, width]) => {
       css += `
-        .maintenance-table th:nth-child(${index + 1}),
-        .maintenance-table td:nth-child(${index + 1}) {
+        .maintenance-table th[data-column="${columnKey}"],
+        .maintenance-table td[data-column="${columnKey}"] {
           width: ${width}px !important;
           min-width: ${width}px !important;
           max-width: ${width}px !important;
         }
       `;
     });
-    
-    // Столбец действий
-    const actionsIndex = visibleColumnsData.length + 1;
-    const actionsWidth = columnWidths.actions || 150;
-    css += `
-      .maintenance-table th:nth-child(${actionsIndex}),
-      .maintenance-table td:nth-child(${actionsIndex}) {
-        width: ${actionsWidth}px !important;
-        min-width: ${actionsWidth}px !important;
-        max-width: ${actionsWidth}px !important;
-      }
-    `;
     
     const existingStyle = document.getElementById('maintenance-table-column-widths');
     if (existingStyle) {
@@ -196,6 +200,84 @@ const MaintenanceTable = ({ events, onUpdate }) => {
     document.body.style.cursor = '';
     document.body.style.userSelect = '';
   }, [handleResizeMove]);
+
+  // Функции для drag & drop столбцов
+  const handleDragStart = (e, columnKey) => {
+    if (isResizing.current) {
+      e.preventDefault();
+      return;
+    }
+    draggedColumn.current = columnKey;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', columnKey);
+    
+    // Добавляем CSS класс для визуальной обратной связи
+    setTimeout(() => {
+      e.target.classList.add('dragging');
+    }, 0);
+  };
+
+  const handleDragOver = (e, columnKey) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    dragOverColumn.current = columnKey;
+  };
+
+  const handleDragEnter = (e, columnKey) => {
+    e.preventDefault();
+    if (draggedColumn.current && draggedColumn.current !== columnKey) {
+      e.target.classList.add('drag-over');
+    }
+  };
+
+  const handleDragLeave = (e) => {
+    // Проверяем, действительно ли мы покидаем элемент
+    const rect = e.target.getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
+    
+    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+      e.target.classList.remove('drag-over');
+    }
+  };
+
+  const handleDrop = (e, targetColumnKey) => {
+    e.preventDefault();
+    e.target.classList.remove('drag-over');
+    
+    const sourceColumnKey = draggedColumn.current;
+    if (sourceColumnKey && sourceColumnKey !== targetColumnKey) {
+      const newOrder = [...columnOrder];
+      const sourceIndex = newOrder.indexOf(sourceColumnKey);
+      const targetIndex = newOrder.indexOf(targetColumnKey);
+      
+      // Перемещаем столбец
+      newOrder.splice(sourceIndex, 1);
+      newOrder.splice(targetIndex, 0, sourceColumnKey);
+      
+      setColumnOrder(newOrder);
+      localStorage.setItem('maintenanceTableColumnOrder', JSON.stringify(newOrder));
+    }
+    
+    draggedColumn.current = null;
+    dragOverColumn.current = null;
+    
+    // Очищаем все CSS классы
+    document.querySelectorAll('.maintenance-table th').forEach(th => {
+      th.classList.remove('dragging', 'drag-over');
+    });
+  };
+
+  const handleDragEnd = (e) => {
+    // Очищаем CSS классы
+    e.target.classList.remove('dragging');
+    document.querySelectorAll('.maintenance-table th').forEach(th => {
+      th.classList.remove('drag-over');
+    });
+    
+    draggedColumn.current = null;
+    dragOverColumn.current = null;
+  };
 
   // Очистка event listeners при unmount
   useEffect(() => {
@@ -321,6 +403,32 @@ const MaintenanceTable = ({ events, onUpdate }) => {
     { key: "manager_name", label: "Менеджер" },
   ];
 
+  // Получаем упорядоченные столбцы согласно columnOrder
+  const getOrderedColumns = () => {
+    if (columnOrder.length === 0) return columns;
+    
+    const orderedColumns = [];
+    const columnMap = new Map(columns.map(col => [col.key, col]));
+    
+    // Добавляем столбцы в порядке columnOrder
+    columnOrder.forEach(key => {
+      if (columnMap.has(key)) {
+        orderedColumns.push(columnMap.get(key));
+      }
+    });
+    
+    // Добавляем любые новые столбцы, которых нет в columnOrder
+    columns.forEach(col => {
+      if (!columnOrder.includes(col.key)) {
+        orderedColumns.push(col);
+      }
+    });
+    
+    return orderedColumns;
+  };
+
+  const orderedColumns = getOrderedColumns();
+
   return (
     <>
       <div className="table-summary">
@@ -343,7 +451,7 @@ const MaintenanceTable = ({ events, onUpdate }) => {
       <TableControls
         hasActiveFilters={hasActiveFilters}
         onClearFilters={clearAllFilters}
-        availableColumns={columns}
+        availableColumns={orderedColumns}
         visibleColumns={visibleColumns}
         onColumnVisibilityChange={toggleColumnVisibility}
         totalItems={sortedEvents.length}
@@ -358,8 +466,20 @@ const MaintenanceTable = ({ events, onUpdate }) => {
         <table className="maintenance-table">
           <thead>
             <tr>
-              {columns.filter(col => visibleColumns.includes(col.key)).map(({ key, label }) => (
-                <th key={key} onClick={() => handleSort(key)}>
+              {orderedColumns.filter(col => visibleColumns.includes(col.key)).map(({ key, label }) => (
+                <th 
+                  key={key}
+                  data-column={key}
+                  draggable
+                  onClick={() => handleSort(key)}
+                  onDragStart={(e) => handleDragStart(e, key)}
+                  onDragOver={(e) => handleDragOver(e, key)}
+                  onDragEnter={(e) => handleDragEnter(e, key)}
+                  onDragLeave={handleDragLeave}
+                  onDrop={(e) => handleDrop(e, key)}
+                  onDragEnd={handleDragEnd}
+                  style={{ cursor: isResizing.current ? 'col-resize' : 'move' }}
+                >
                   {label}{" "}
                   <span className="sort-arrow">
                     {sortColumn === key && (sortAsc ? "▲" : "▼")}
@@ -370,7 +490,7 @@ const MaintenanceTable = ({ events, onUpdate }) => {
                   />
                 </th>
               ))}
-              <th onClick={() => handleSort('actions')}>
+              <th data-column="actions" onClick={() => handleSort('actions')}>
                 Действия
                 <div
                   className="column-resizer"
@@ -379,8 +499,8 @@ const MaintenanceTable = ({ events, onUpdate }) => {
               </th>
             </tr>
             <tr className="filter-row">
-              {columns.filter(col => visibleColumns.includes(col.key)).map(({ key }) => (
-                <th key={key}>
+              {orderedColumns.filter(col => visibleColumns.includes(col.key)).map(({ key }) => (
+                <th key={key} data-column={key}>
                   {selectOptions[key] ? (
                     <div
                       ref={(el) => (anchorRefs.current[key] = el)}
@@ -406,19 +526,19 @@ const MaintenanceTable = ({ events, onUpdate }) => {
                   )}
                 </th>
             ))}
-            <th></th>
+            <th data-column="actions"></th>
           </tr>
           </thead>
           <tbody>
             {paginatedEvents.map((event) => (
               <tr key={event.id} className={event.is_overdue ? 'row-overdue' : ''}>
-                {columns.filter(col => visibleColumns.includes(col.key)).map(({ key }) => {
+                {orderedColumns.filter(col => visibleColumns.includes(col.key)).map(({ key }) => {
                   if (key === 'id') {
-                    return <td key={key}>{event.id}</td>;
+                    return <td key={key} data-column={key}>{event.id}</td>;
                   }
                   if (key === 'bike_number') {
                     return (
-                      <td key={key}>
+                      <td key={key} data-column={key}>
                         <div className="bike-info">
                           <span className="bike-number">{event.bike_number}</span>
                           {event.is_overdue && (
@@ -431,11 +551,11 @@ const MaintenanceTable = ({ events, onUpdate }) => {
                     );
                   }
                   if (key === 'model') {
-                    return <td key={key}>{event.model}</td>;
+                    return <td key={key} data-column={key}>{event.model}</td>;
                   }
                   if (key === 'repair_type') {
                     return (
-                      <td key={key}>
+                      <td key={key} data-column={key}>
                         <span className={`repair-type-badge repair-type-${event.repair_type}`}>
                           {getRepairTypeLabel(event.repair_type)}
                         </span>
@@ -444,7 +564,7 @@ const MaintenanceTable = ({ events, onUpdate }) => {
                   }
                   if (key === 'priority') {
                     return (
-                      <td key={key}>
+                      <td key={key} data-column={key}>
                         <div className="priority-cell">
                           <span className={`priority-badge ${getPriorityClass(event.priority)}`}>
                             {event.priority}
@@ -458,7 +578,7 @@ const MaintenanceTable = ({ events, onUpdate }) => {
                   }
                   if (key === 'status') {
                     return (
-                      <td key={key}>
+                      <td key={key} data-column={key}>
                         <span className={getStatusClass(event.status)}>
                           {event.status}
                         </span>
@@ -467,7 +587,7 @@ const MaintenanceTable = ({ events, onUpdate }) => {
                   }
                   if (key === 'scheduled_date') {
                     return (
-                      <td key={key}>
+                      <td key={key} data-column={key}>
                         <div className="date-cell">
                           {formatDate(event.scheduled_date)}
                           {event.days_until_planned !== null && (
@@ -488,11 +608,11 @@ const MaintenanceTable = ({ events, onUpdate }) => {
                     );
                   }
                   if (key === 'estimated_duration') {
-                    return <td key={key}>{formatDuration(event.estimated_duration)}</td>;
+                    return <td key={key} data-column={key}>{formatDuration(event.estimated_duration)}</td>;
                   }
                   if (key === 'actual_duration') {
                     return (
-                      <td key={key}>
+                      <td key={key} data-column={key}>
                         <span className={event.actual_duration > event.estimated_duration ? 'duration-exceeded' : ''}>
                           {formatDuration(event.actual_duration)}
                         </span>
@@ -500,11 +620,11 @@ const MaintenanceTable = ({ events, onUpdate }) => {
                     );
                   }
                   if (key === 'estimated_cost') {
-                    return <td key={key}>{formatCurrency(event.estimated_cost)}</td>;
+                    return <td key={key} data-column={key}>{formatCurrency(event.estimated_cost)}</td>;
                   }
                   if (key === 'actual_cost') {
                     return (
-                      <td key={key}>
+                      <td key={key} data-column={key}>
                         <span className={Number(event.actual_cost) > Number(event.estimated_cost) ? 'cost-exceeded' : ''}>
                           {formatCurrency(event.actual_cost)}
                         </span>
@@ -512,11 +632,11 @@ const MaintenanceTable = ({ events, onUpdate }) => {
                     );
                   }
                   if (key === 'manager_name') {
-                    return <td key={key}>{event.manager_name}</td>;
+                    return <td key={key} data-column={key}>{event.manager_name}</td>;
                   }
-                  return <td key={key}>{event[key] || "—"}</td>;
+                  return <td key={key} data-column={key}>{event[key] || "—"}</td>;
                 })}
-              <td>
+              <td data-column="actions">
                 <div className="action-buttons">
                   <button 
                     className="btn-status" 

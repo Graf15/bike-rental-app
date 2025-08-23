@@ -195,3 +195,55 @@
 .btn-delete:hover {
   background: #ffebee;
 }
+
+/* Стили для drag & drop столбцов */
+.maintenance-table th[draggable="true"] {
+  position: relative;
+  user-select: none;
+}
+
+.maintenance-table th[draggable="true"]:hover {
+  background-color: #f5f5f5;
+}
+
+.maintenance-table th[draggable="true"]:hover .column-resizer {
+  opacity: 1;
+}
+
+/* Визуальная обратная связь при перетаскивании */
+.maintenance-table th.drag-over {
+  background-color: #e3f2fd !important;
+  border-left: 3px solid #2196f3;
+}
+
+.maintenance-table th.dragging {
+  opacity: 0.5;
+  transform: rotate(2deg);
+}
+
+/* Курсор при наведении на заголовок */
+.maintenance-table th[draggable="true"]:not(.resizing):hover {
+  cursor: move;
+}
+
+/* Индикатор перетаскивания */
+.maintenance-table th[draggable="true"]::before {
+  content: "⋮⋮";
+  position: absolute;
+  left: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 12px;
+  color: #999;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.maintenance-table th[draggable="true"]:hover::before {
+  opacity: 1;
+}
+
+/* Убираем индикатор при ресайзе */
+.maintenance-table th[draggable="true"].resizing::before {
+  display: none;
+}

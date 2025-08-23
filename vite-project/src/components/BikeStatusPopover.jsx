@@ -17,7 +17,7 @@ const BikeStatusPopover = ({ bike, onStatusChange, onCreateMaintenance }) => {
     { value: "невозврат", label: "невозврат", color: "red" },
   ];
 
-  const currentStatus = statuses.find((s) => s.value === bike.status);
+  const currentStatus = statuses.find((s) => s.value === bike.condition_status);
 
   const getStatusBadgeClass = (status) => {
     const statusObj = statuses.find(s => s.value === status);
@@ -83,10 +83,10 @@ const BikeStatusPopover = ({ bike, onStatusChange, onCreateMaintenance }) => {
     <div className="status-popover-container">
       <button
         ref={triggerRef}
-        className={`${getStatusBadgeClass(bike.status)} clickable`}
+        className={`${getStatusBadgeClass(bike.condition_status)} clickable`}
         onClick={() => setIsOpen(!isOpen)}
       >
-        {currentStatus?.label || bike.status}
+        {currentStatus?.label || bike.condition_status}
         <span className="status-arrow">▼</span>
       </button>
 
@@ -107,7 +107,7 @@ const BikeStatusPopover = ({ bike, onStatusChange, onCreateMaintenance }) => {
               <button
                 key={status.value}
                 className={`status-option ${
-                  status.value === bike.status ? "current" : ""
+                  status.value === bike.condition_status ? "current" : ""
                 }`}
                 onClick={() => handleStatusClick(status.value)}
               >
@@ -115,14 +115,14 @@ const BikeStatusPopover = ({ bike, onStatusChange, onCreateMaintenance }) => {
                   className={`status-indicator status-${status.color}`}
                 ></span>
                 {status.label}
-                {status.value === bike.status && (
+                {status.value === bike.condition_status && (
                   <span className="current-mark">✓</span>
                 )}
               </button>
             ))}
           </div>
 
-          {bike.status !== "в ремонте" && (
+          {bike.condition_status !== "в ремонте" && (
             <>
               <div className="popover-divider"></div>
               <div className="popover-actions">

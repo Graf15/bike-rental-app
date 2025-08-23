@@ -1,5 +1,5 @@
 import express from "express";
-import db from "../db.js";
+import pool from "../db.js";
 
 const router = express.Router();
 
@@ -69,13 +69,13 @@ router.get("/", async (req, res) => {
     const offsetParamIndex = paramCount + 1;
     queryParams.push(limit, offset);
     
-    const result = await db.query(`
+    const result = await pool.query(`
       SELECT 
         me.*,
         b.id as bike_id,
-        b.name as bike_name,
+        b.internal_article as bike_number,
         b.model,
-        b.status as bike_status,
+        b.condition_status as bike_status,
         manager.name as manager_name,
         executor.name as executor_name,
         -- Расчет количества дней до планируемой даты
@@ -228,11 +228,11 @@ router.post("/", async (req, res) => {
       SELECT 
         me.*,
         b.id as bike_id,
-        b.name as bike_name,
+        b.internal_article as bike_number,
         b.model,
-        b.status as bike_status,
-        manager.username as manager_name,
-        executor.username as executor_name
+        b.condition_status as bike_status,
+        manager.name as manager_name,
+        executor.name as executor_name
       FROM maintenance_events me
       LEFT JOIN bikes b ON me.bike_id = b.id
       LEFT JOIN users manager ON me.manager_id_old = manager.id
@@ -331,11 +331,11 @@ router.patch("/:id", async (req, res) => {
       SELECT 
         me.*,
         b.id as bike_id,
-        b.name as bike_name,
+        b.internal_article as bike_number,
         b.model,
-        b.status as bike_status,
-        manager.username as manager_name,
-        executor.username as executor_name
+        b.condition_status as bike_status,
+        manager.name as manager_name,
+        executor.name as executor_name
       FROM maintenance_events me
       LEFT JOIN bikes b ON me.bike_id = b.id
       LEFT JOIN users manager ON me.manager_id_old = manager.id
@@ -412,7 +412,7 @@ router.get("/:id/parts", async (req, res) => {
   try {
     const { id } = req.params;
     
-    const result = await db.query(`
+    const result = await pool.query(`
       SELECT 
         mp.*,
         pm."название",
@@ -665,7 +665,7 @@ router.get("/:id/history", async (req, res) => {
   try {
     const { id } = req.params;
     
-    const result = await db.query(`
+    const result = await pool.query(`
       SELECT 
         rsh.*,
         u.name as changed_by_name
@@ -685,13 +685,13 @@ router.get("/:id/history", async (req, res) => {
 // GET /api/maintenance/weekly-schedule - получить расписание еженедельных ремонтов
 router.get("/weekly-schedule", async (req, res) => {
   try {
-    const result = await db.query(`
+    const result = await pool.query(`
       SELECT 
         ws.*,
         b.id as bike_id,
-        b.name as bike_name,
+        b.internal_article as bike_number,
         b.model,
-        b.status as bike_status,
+        b.condition_status as bike_status,
         CASE ws.day_of_week
           WHEN 1 THEN 'Понедельник'
           WHEN 2 THEN 'Вторник' 
@@ -704,7 +704,7 @@ router.get("/weekly-schedule", async (req, res) => {
       FROM weekly_repair_schedule ws
       LEFT JOIN bikes b ON ws.bike_id = b.id
       WHERE ws.is_active = true
-      ORDER BY ws.day_of_week, b.name
+      ORDER BY ws.day_of_week, b.internal_article
     `);
     
     res.json(result.rows);
@@ -755,7 +755,7 @@ router.post("/generate-weekly", async (req, res) => {
   try {
     const { target_date } = req.body; // Опциональная дата, по умолчанию следующий понедельник
     
-    const result = await db.query(
+    const result = await pool.query(
       "SELECT generate_weekly_repairs($1) as created_count",
       [target_date || null]
     );
@@ -786,7 +786,7 @@ router.get("/analytics/summary", async (req, res) => {
       queryParams = [date_from, date_to];
     }
     
-    const result = await db.query(`
+    const result = await pool.query(`
       SELECT 
         COUNT(*) as total_repairs,
         COUNT(CASE WHEN me.status = 'запланирован' THEN 1 END) as planned,
@@ -825,7 +825,7 @@ router.get("/analytics/bike-downtime/:bikeId", async (req, res) => {
       queryParams.push(date_from, date_to);
     }
     
-    const result = await db.query(`
+    const result = await pool.query(`
       SELECT 
         bsh.*,
         u.name as changed_by_name,
@@ -841,7 +841,7 @@ router.get("/analytics/bike-downtime/:bikeId", async (req, res) => {
     `, queryParams);
     
     // Вычисляем общее время простоя
-    const downtimeResult = await db.query(`
+    const downtimeResult = await pool.query(`
       SELECT 
         SUM(bsh.duration_in_previous_status) as total_downtime_minutes,
         COUNT(CASE WHEN bsh.new_status = 'в ремонте' THEN 1 END) as repair_periods
@@ -864,12 +864,12 @@ router.get("/analytics/bike-downtime/:bikeId", async (req, res) => {
 // GET /api/maintenance/parts-needs - получить потребности в запчастях из активных ремонтов
 router.get("/parts-needs", async (req, res) => {
   try {
-    const result = await db.query(`
+    const result = await pool.query(`
       SELECT 
         me.id as repair_id,
         me.bike_id,
         b.id as bike_id,
-        b.name as bike_name,
+        b.internal_article as bike_number,
         b.model,
         me.maintenance_type as repair_type_ru,
         me.repair_type,
@@ -919,16 +919,16 @@ router.get("/:id", async (req, res) => {
       return res.status(400).json({ error: "Неверный формат ID события" });
     }
     
-    const result = await db.query(
+    const result = await pool.query(
       `
       SELECT 
         me.*,
         b.id as bike_id,
-        b.name as bike_name,
+        b.internal_article as bike_number,
         b.model,
-        b.status as bike_status,
-        manager.username as manager_name,
-        executor.username as executor_name
+        b.condition_status as bike_status,
+        manager.name as manager_name,
+        executor.name as executor_name
       FROM maintenance_events me
       LEFT JOIN bikes b ON me.bike_id = b.id
       LEFT JOIN users manager ON me.manager_id_old = manager.id

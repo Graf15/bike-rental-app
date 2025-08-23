@@ -92,10 +92,10 @@ const Home = () => {
     const statusCounts = {};
     
     bikes.forEach(bike => {
-      if (statusCounts[bike.status]) {
-        statusCounts[bike.status]++;
+      if (statusCounts[bike.condition_status]) {
+        statusCounts[bike.condition_status]++;
       } else {
-        statusCounts[bike.status] = 1;
+        statusCounts[bike.condition_status] = 1;
       }
     });
 
