@@ -70,17 +70,22 @@ const MultiSelectPopover = ({
           minWidth: `${position.width}px`,
         }}
       >
-        {options.map((option) => (
-          <div
-            key={option}
-            className={`popover-option ${
-              selected.includes(option) ? "selected" : ""
-            }`}
-            onClick={() => toggleOption(option)}
-          >
-            {option} {selected.includes(option) && "✓"}
-          </div>
-        ))}
+        {options.map((option) => {
+          const optionValue = typeof option === 'object' ? option.value : option;
+          const optionLabel = typeof option === 'object' ? option.label : option;
+          
+          return (
+            <div
+              key={optionValue}
+              className={`popover-option ${
+                selected.includes(optionValue) ? "selected" : ""
+              }`}
+              onClick={() => toggleOption(optionValue)}
+            >
+              {optionLabel} {selected.includes(optionValue) && "✓"}
+            </div>
+          );
+        })}
       </div>
     </>
   );

@@ -3,8 +3,9 @@ import './DateRangeFilter.css';
 
 const DateRangeFilter = ({ value, onChange, anchorRef }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [tempDateFrom, setTempDateFrom] = useState(value?.from || '');
-  const [tempDateTo, setTempDateTo] = useState(value?.to || '');
+  const today = new Date().toISOString().split('T')[0]; // Текущая дата в формате YYYY-MM-DD
+  const [tempDateFrom, setTempDateFrom] = useState(value?.from || today);
+  const [tempDateTo, setTempDateTo] = useState(value?.to || today);
   const popoverRef = useRef(null);
   const internalAnchorRef = useRef(null);
 
@@ -49,8 +50,8 @@ const DateRangeFilter = ({ value, onChange, anchorRef }) => {
 
   const handleClose = () => {
     // Восстанавливаем значения при отмене
-    setTempDateFrom(value?.from || '');
-    setTempDateTo(value?.to || '');
+    setTempDateFrom(value?.from || today);
+    setTempDateTo(value?.to || today);
     setIsOpen(false);
   };
 

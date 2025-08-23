@@ -164,6 +164,12 @@
   font-weight: 500;
 }
 
+/* Выравнивание номера велосипеда по центру (переопределяем общий стиль) */
+.maintenance-table th[data-column="bike_number"],
+.maintenance-table td[data-column="bike_number"] {
+  text-align: center !important;
+}
+
 /* Кнопки действий */
 .action-buttons {
   display: flex;
@@ -198,8 +204,19 @@
 
 /* Стили для drag & drop столбцов */
 .maintenance-table th[draggable="true"] {
-  position: relative;
   user-select: none;
+}
+
+/* Создаем область для перетаскивания в заголовке */
+.maintenance-table th[draggable="true"] {
+  position: relative;
+}
+
+/* Делаем весь заголовок перетаскиваемым, кроме специальных элементов */
+.maintenance-table th[draggable="true"] .filter-select-box,
+.maintenance-table th[draggable="true"] .date-range-filter,
+.maintenance-table th[draggable="true"] input {
+  pointer-events: auto;
 }
 
 .maintenance-table th[draggable="true"]:hover {
@@ -226,24 +243,3 @@
   cursor: move;
 }
 
-/* Индикатор перетаскивания */
-.maintenance-table th[draggable="true"]::before {
-  content: "⋮⋮";
-  position: absolute;
-  left: 4px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 12px;
-  color: #999;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-
-.maintenance-table th[draggable="true"]:hover::before {
-  opacity: 1;
-}
-
-/* Убираем индикатор при ресайзе */
-.maintenance-table th[draggable="true"].resizing::before {
-  display: none;
-}

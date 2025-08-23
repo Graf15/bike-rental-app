@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import TableControls from "./TableControls";
 import MultiSelectPopover from "./MultiSelectPopover";
+import DateRangeFilter from "./DateRangeFilter";
 import "./MaintenanceTable.css";
 import "./BikeTable.css";
 
@@ -34,22 +35,68 @@ const MaintenanceTable = ({ events, onUpdate }) => {
   const [popoverInfo, setPopoverInfo] = useState({ key: null, visible: false });
   const anchorRefs = useRef({});
 
-  const statusOptions = ["запланирован", "в ремонте", "ожидает деталей", "ремонт выполнен"];
-  const repairTypeOptions = ["current", "weekly", "longterm"];
-  const priorityLabels = {
-    1: "Критический", 
-    2: "Высокий", 
-    3: "Средний", 
-    4: "Низкий", 
-    5: "Очень низкий"
+
+  // Метки для отображения
+  const statusLabels = {
+    "planned": "Запланирован",
+    "in_progress": "В ремонте", 
+    "completed": "Завершен"
+  };
+
+  const maintenanceTypeLabels = {
+    "current": "Текущий",
+    "weekly": "Еженедельный",
+    "longterm": "Долгосрочный"
+  };
+
+  const partsNeedLabels = {
+    "not_needed": "Не нужны",
+    "needed": "Требуются",
+    "ordered": "Заказаны",
+    "delivered": "Получены"
   };
 
   // Опции для выпадающих фильтров
   const selectOptions = {
-    repair_type: ["current", "weekly", "longterm"],
-    priority: ["1", "2", "3", "4", "5"],
-    status: ["запланирован", "в ремонте", "ожидает деталей", "ремонт выполнен"]
+    maintenance_type: ["current", "weekly", "longterm"],
+    status: ["planned", "in_progress", "completed"],
+    parts_need: ["not_needed", "needed", "ordered", "delivered"]
   };
+
+  // Поля для календарных фильтров
+  const dateRangeOptions = [
+    "scheduled_at",
+    "scheduled_for", 
+    "started_at",
+    "completed_at",
+    "tested_at",
+    "parts_needed_at",
+    "parts_ordered_at",
+    "parts_delivered_at",
+    "created_at"
+  ];
+
+  // Определение столбцов таблицы
+  const columns = useMemo(() => [
+    { key: "id", label: "ID" },
+    { key: "bike_number", label: "№ велосипеда" },
+    { key: "model", label: "Модель" },
+    { key: "maintenance_type", label: "Тип ТО" },
+    { key: "status", label: "Статус" },
+    { key: "parts_need", label: "Запчасти" },
+    { key: "scheduled_for", label: "План на" },
+    { key: "started_at", label: "Начат" },
+    { key: "completed_at", label: "Завершен" },
+    { key: "tested_at", label: "Обкатка" },
+    { key: "repair_hours", label: "Время ремонта" },
+    { key: "parts_wait_hours", label: "Ожидание запчастей" },
+    { key: "scheduled_user_name", label: "Кто запланировал" },
+    { key: "started_user_name", label: "Кто начал" },
+    { key: "completed_user_name", label: "Кто завершил" },
+    { key: "tested_user_name", label: "Кто тестировал" },
+    { key: "description", label: "Описание" },
+    { key: "notes", label: "Заметки" },
+  ], []);
 
   // Инициализация столбцов и их настроек
   useEffect(() => {
@@ -57,15 +104,19 @@ const MaintenanceTable = ({ events, onUpdate }) => {
       id: 60,
       bike_number: 100,
       model: 120,
-      repair_type: 100,
-      priority: 100,
+      maintenance_type: 100,
       status: 120,
-      scheduled_date: 120,
-      estimated_duration: 100,
-      actual_duration: 100,
-      estimated_cost: 110,
-      actual_cost: 110,
-      manager_name: 120,
+      parts_need: 120,
+      scheduled_for: 120,
+      started_at: 120,
+      completed_at: 120,
+      tested_at: 120,
+      repair_hours: 100,
+      parts_wait_hours: 120,
+      scheduled_user_name: 120,
+      started_user_name: 120,
+      completed_user_name: 120,
+      description: 150,
       actions: 150
     };
     
@@ -73,16 +124,13 @@ const MaintenanceTable = ({ events, onUpdate }) => {
     setColumnWidths(savedWidths ? JSON.parse(savedWidths) : defaultWidths);
     
     const defaultVisible = [
-      "id", "bike_number", "model", "repair_type", "priority", 
-      "status", "scheduled_date", "estimated_duration", 
-      "actual_duration", "estimated_cost", "actual_cost", "manager_name"
+      "id", "bike_number", "model", "maintenance_type", "status", 
+      "parts_need", "scheduled_for", "started_at", "completed_at", 
+      "repair_hours", "scheduled_user_name", "description"
     ];
     
-    const defaultOrder = [
-      "id", "bike_number", "model", "repair_type", "priority", 
-      "status", "scheduled_date", "estimated_duration", 
-      "actual_duration", "estimated_cost", "actual_cost", "manager_name"
-    ];
+    // Используем все ключи из columns как порядок по умолчанию
+    const defaultOrder = columns.map(col => col.key);
     
     const savedVisible = localStorage.getItem('maintenanceTableVisibleColumns');
     setVisibleColumns(savedVisible ? JSON.parse(savedVisible) : defaultVisible);
@@ -123,7 +171,7 @@ const MaintenanceTable = ({ events, onUpdate }) => {
       style.textContent = css;
       document.head.appendChild(style);
     }
-  }, [columnWidths, visibleColumns]);
+  }, [columnWidths, visibleColumns, columns]);
 
   const handleSort = (column) => {
     if (sortColumn === column) {
@@ -145,9 +193,19 @@ const MaintenanceTable = ({ events, onUpdate }) => {
     setCurrentPage(1);
   };
 
-  const hasActiveFilters = Object.values(filters).some(value => 
-    Array.isArray(value) ? value.length > 0 : value && value.trim() !== ''
-  );
+  const hasActiveFilters = Object.values(filters).some(value => {
+    if (Array.isArray(value)) {
+      return value.length > 0;
+    }
+    if (typeof value === 'object' && value !== null) {
+      // Для объектов дат (календарные фильтры)
+      return value.from || value.to;
+    }
+    if (typeof value === 'string') {
+      return value.trim() !== '';
+    }
+    return false;
+  });
 
   const toggleColumnVisibility = (columnKey) => {
     const newVisibleColumns = visibleColumns.includes(columnKey)
@@ -207,13 +265,25 @@ const MaintenanceTable = ({ events, onUpdate }) => {
       e.preventDefault();
       return;
     }
+    
+    // Проверяем, не кликнули ли мы на интерактивный элемент
+    const target = e.target;
+    const isInteractiveElement = target.matches('input, button, .filter-select-box, .date-range-filter') ||
+                                target.closest('input, button, .filter-select-box, .date-range-filter');
+    
+    if (isInteractiveElement) {
+      e.preventDefault();
+      return;
+    }
+    
     draggedColumn.current = columnKey;
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/html', columnKey);
     
     // Добавляем CSS класс для визуальной обратной связи
     setTimeout(() => {
-      e.target.classList.add('dragging');
+      const thElement = e.currentTarget.closest('th') || e.currentTarget;
+      thElement.classList.add('dragging');
     }, 0);
   };
 
@@ -226,24 +296,28 @@ const MaintenanceTable = ({ events, onUpdate }) => {
   const handleDragEnter = (e, columnKey) => {
     e.preventDefault();
     if (draggedColumn.current && draggedColumn.current !== columnKey) {
-      e.target.classList.add('drag-over');
+      // Ищем ближайший th элемент
+      const thElement = e.currentTarget.closest('th') || e.currentTarget;
+      thElement.classList.add('drag-over');
     }
   };
 
   const handleDragLeave = (e) => {
     // Проверяем, действительно ли мы покидаем элемент
-    const rect = e.target.getBoundingClientRect();
+    const thElement = e.currentTarget.closest('th') || e.currentTarget;
+    const rect = thElement.getBoundingClientRect();
     const x = e.clientX;
     const y = e.clientY;
     
     if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
-      e.target.classList.remove('drag-over');
+      thElement.classList.remove('drag-over');
     }
   };
 
   const handleDrop = (e, targetColumnKey) => {
     e.preventDefault();
-    e.target.classList.remove('drag-over');
+    const thElement = e.currentTarget.closest('th') || e.currentTarget;
+    thElement.classList.remove('drag-over');
     
     const sourceColumnKey = draggedColumn.current;
     if (sourceColumnKey && sourceColumnKey !== targetColumnKey) {
@@ -270,7 +344,8 @@ const MaintenanceTable = ({ events, onUpdate }) => {
 
   const handleDragEnd = (e) => {
     // Очищаем CSS классы
-    e.target.classList.remove('dragging');
+    const thElement = e.currentTarget.closest('th') || e.currentTarget;
+    thElement.classList.remove('dragging');
     document.querySelectorAll('.maintenance-table th').forEach(th => {
       th.classList.remove('drag-over');
     });
@@ -303,15 +378,35 @@ const MaintenanceTable = ({ events, onUpdate }) => {
     return Object.entries(filters).every(([key, value]) => {
       if (!value || value.length === 0) return true;
       
+      // Обработка диапазонов дат
+      if (dateRangeOptions.includes(key) && typeof value === 'object' && value !== null) {
+        // Если объект даты пустой или неполный, пропускаем фильтрацию
+        if (!value.from && !value.to) return true;
+        if (!event[key]) return false;
+        
+        const eventDate = new Date(event[key]);
+        
+        // Если указана только одна дата, используем ее как обе границы
+        const fromDate = new Date(value.from || value.to);
+        const toDate = new Date(value.to || value.from);
+        toDate.setHours(23, 59, 59, 999); // Включаем весь день "до"
+        
+        return eventDate >= fromDate && eventDate <= toDate;
+      }
+      
       // Обработка для массивов (выпадающие фильтры)
       if (Array.isArray(value)) {
         return value.includes(String(event[key]));
       }
       
-      // Текстовый поиск
-      return String(event[key] || "")
-        .toLowerCase()
-        .includes(value.toLowerCase());
+      // Текстовый поиск (только для строк)
+      if (typeof value === 'string') {
+        return String(event[key] || "")
+          .toLowerCase()
+          .includes(value.toLowerCase());
+      }
+      
+      return true;
     });
   });
 
@@ -337,71 +432,107 @@ const MaintenanceTable = ({ events, onUpdate }) => {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedEvents = sortedEvents.slice(startIndex, startIndex + itemsPerPage);
 
-  const formatDate = (dateString) => {
-    if (!dateString) return "";
-    return new Date(dateString).toLocaleDateString("ru-RU");
-  };
-
   const getStatusClass = (status) => {
     switch (status) {
-      case "запланирован":
-        return "status-badge status-badge-blue";
-      case "в ремонте":
-        return "status-badge status-badge-orange";
-      case "ожидает деталей":
+      case "planned":
         return "status-badge status-badge-purple";
-      case "ремонт выполнен":
+      case "in_progress":
+        return "status-badge status-badge-orange";
+      case "completed":
         return "status-badge status-badge-green";
       default:
         return "status-badge";
     }
   };
 
-  const getPriorityClass = (priority) => {
-    switch (priority) {
-      case 1: return "priority-critical";
-      case 2: return "priority-high";
-      case 3: return "priority-medium";
-      case 4: return "priority-low";
-      case 5: return "priority-very-low";
-      default: return "priority-medium";
+  const formatHours = (hours) => {
+    if (!hours) return "—";
+    const totalHours = Number(hours);
+    const days = Math.floor(totalHours / 24);
+    const remainingHours = totalHours % 24;
+    
+    if (days === 0) {
+      return `${remainingHours.toFixed(1)}ч`;
+    } else {
+      return `${days}д ${remainingHours.toFixed(1)}ч`;
     }
   };
 
-  const getRepairTypeLabel = (type) => {
+  const formatDateTime = (dateString) => {
+    if (!dateString) return "—";
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return "—";
+      
+      return date.toLocaleDateString("ru-RU", {
+        year: "numeric",
+        month: "2-digit", 
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit"
+      });
+    } catch {
+      return "—";
+    }
+  };
+
+  // Функция для получения переведенных опций для фильтров
+  const getTranslatedOptions = (key) => {
+    const options = selectOptions[key];
+    if (!options) return [];
+    
+    switch (key) {
+      case 'status':
+        return options.map(option => ({
+          value: option,
+          label: statusLabels[option] || option
+        }));
+      case 'maintenance_type':
+        return options.map(option => ({
+          value: option,
+          label: maintenanceTypeLabels[option] || option
+        }));
+      case 'parts_need':
+        return options.map(option => ({
+          value: option,
+          label: partsNeedLabels[option] || option
+        }));
+      default:
+        return options.map(option => ({
+          value: option,
+          label: option
+        }));
+    }
+  };
+
+  const getMaintenanceTypeClass = (type) => {
     switch (type) {
-      case "current": return "Текущий";
-      case "weekly": return "Еженедельный";
-      case "longterm": return "Долгосрочный";
-      default: return type;
+      case "current":
+        return "maintenance-type-badge maintenance-type-current";
+      case "weekly":
+        return "maintenance-type-badge maintenance-type-weekly";
+      case "longterm":
+        return "maintenance-type-badge maintenance-type-longterm";
+      default:
+        return "maintenance-type-badge";
     }
   };
 
-  const formatCurrency = (amount) => {
-    return amount ? `${Number(amount).toFixed(2)} ₽` : "0.00 ₽";
+  const getPartsNeedClass = (partsNeed) => {
+    switch (partsNeed) {
+      case "not_needed":
+        return "parts-need-badge parts-need-ok";
+      case "needed":
+        return "parts-need-badge parts-need-warning";
+      case "ordered":
+        return "parts-need-badge parts-need-info";
+      case "delivered":
+        return "parts-need-badge parts-need-success";
+      default:
+        return "parts-need-badge";
+    }
   };
 
-  const formatDuration = (minutes) => {
-    if (!minutes) return "";
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return hours > 0 ? `${hours}ч ${mins}м` : `${mins}м`;
-  };
-
-  const columns = [
-    { key: "id", label: "ID" },
-    { key: "bike_number", label: "№ велосипеда" },
-    { key: "model", label: "Модель" },
-    { key: "repair_type", label: "Категория" },
-    { key: "priority", label: "Приоритет" },
-    { key: "status", label: "Статус" },
-    { key: "scheduled_date", label: "Запланировано" },
-    { key: "estimated_duration", label: "План. время" },
-    { key: "actual_duration", label: "Факт. время" },
-    { key: "estimated_cost", label: "План. стоимость" },
-    { key: "actual_cost", label: "Факт. стоимость" },
-    { key: "manager_name", label: "Менеджер" },
-  ];
 
   // Получаем упорядоченные столбцы согласно columnOrder
   const getOrderedColumns = () => {
@@ -516,6 +647,12 @@ const MaintenanceTable = ({ events, onUpdate }) => {
                       {filters[key]?.length > 0 ? filters[key].join(", ") : "Все"}
                       <span className="arrow">▼</span>
                     </div>
+                  ) : dateRangeOptions.includes(key) ? (
+                    <DateRangeFilter
+                      value={filters[key] || {}}
+                      onChange={(dateRange) => updateFilter(key, dateRange)}
+                      placeholder="Выбрать даты"
+                    />
                   ) : (
                     <input
                       type="text"
@@ -553,26 +690,12 @@ const MaintenanceTable = ({ events, onUpdate }) => {
                   if (key === 'model') {
                     return <td key={key} data-column={key}>{event.model}</td>;
                   }
-                  if (key === 'repair_type') {
+                  if (key === 'maintenance_type') {
                     return (
                       <td key={key} data-column={key}>
-                        <span className={`repair-type-badge repair-type-${event.repair_type}`}>
-                          {getRepairTypeLabel(event.repair_type)}
+                        <span className={`maintenance-type-badge ${getMaintenanceTypeClass(event.maintenance_type)}`}>
+                          {maintenanceTypeLabels[event.maintenance_type]}
                         </span>
-                      </td>
-                    );
-                  }
-                  if (key === 'priority') {
-                    return (
-                      <td key={key} data-column={key}>
-                        <div className="priority-cell">
-                          <span className={`priority-badge ${getPriorityClass(event.priority)}`}>
-                            {event.priority}
-                          </span>
-                          <span className="priority-label">
-                            {priorityLabels[event.priority]}
-                          </span>
-                        </div>
                       </td>
                     );
                   }
@@ -580,59 +703,98 @@ const MaintenanceTable = ({ events, onUpdate }) => {
                     return (
                       <td key={key} data-column={key}>
                         <span className={getStatusClass(event.status)}>
-                          {event.status}
+                          {statusLabels[event.status]}
                         </span>
                       </td>
                     );
                   }
-                  if (key === 'scheduled_date') {
+                  if (key === 'parts_need') {
                     return (
                       <td key={key} data-column={key}>
-                        <div className="date-cell">
-                          {formatDate(event.scheduled_date)}
-                          {event.days_until_planned !== null && (
-                            <div className={`days-info ${
-                              event.days_until_planned < 0 ? 'overdue' : 
-                              event.days_until_planned <= 1 ? 'urgent' : ''
-                            }`}>
-                              {event.days_until_planned < 0 
-                                ? `${Math.abs(event.days_until_planned)} дн. назад`
-                                : event.days_until_planned === 0 
-                                ? 'Сегодня'
-                                : `через ${event.days_until_planned} дн.`
-                              }
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                    );
-                  }
-                  if (key === 'estimated_duration') {
-                    return <td key={key} data-column={key}>{formatDuration(event.estimated_duration)}</td>;
-                  }
-                  if (key === 'actual_duration') {
-                    return (
-                      <td key={key} data-column={key}>
-                        <span className={event.actual_duration > event.estimated_duration ? 'duration-exceeded' : ''}>
-                          {formatDuration(event.actual_duration)}
+                        <span className={`parts-need-badge ${getPartsNeedClass(event.parts_need)}`}>
+                          {partsNeedLabels[event.parts_need]}
                         </span>
                       </td>
                     );
                   }
-                  if (key === 'estimated_cost') {
-                    return <td key={key} data-column={key}>{formatCurrency(event.estimated_cost)}</td>;
+                  if (key === 'scheduled_at') {
+                    return <td key={key} data-column={key}>{formatDateTime(event.scheduled_at)}</td>;
                   }
-                  if (key === 'actual_cost') {
+                  if (key === 'scheduled_for') {
+                    return <td key={key} data-column={key}>{formatDateTime(event.scheduled_for)}</td>;
+                  }
+                  if (key === 'started_at') {
+                    return <td key={key} data-column={key}>{formatDateTime(event.started_at)}</td>;
+                  }
+                  if (key === 'completed_at') {
+                    return <td key={key} data-column={key}>{formatDateTime(event.completed_at)}</td>;
+                  }
+                  if (key === 'tested_at') {
+                    return <td key={key} data-column={key}>{formatDateTime(event.tested_at)}</td>;
+                  }
+                  if (key === 'parts_needed_at') {
+                    return <td key={key} data-column={key}>{formatDateTime(event.parts_needed_at)}</td>;
+                  }
+                  if (key === 'parts_ordered_at') {
+                    return <td key={key} data-column={key}>{formatDateTime(event.parts_ordered_at)}</td>;
+                  }
+                  if (key === 'parts_delivered_at') {
+                    return <td key={key} data-column={key}>{formatDateTime(event.parts_delivered_at)}</td>;
+                  }
+                  if (key === 'repair_hours') {
+                    return <td key={key} data-column={key}>{formatHours(event.repair_hours)}</td>;
+                  }
+                  if (key === 'parts_wait_hours') {
+                    return <td key={key} data-column={key}>{formatHours(event.parts_wait_hours)}</td>;
+                  }
+                  if (key === 'scheduled_user_name') {
+                    return <td key={key} data-column={key}>{event.scheduled_user_name || "—"}</td>;
+                  }
+                  if (key === 'scheduled_for_user_name') {
+                    return <td key={key} data-column={key}>{event.scheduled_for_user_name || "—"}</td>;
+                  }
+                  if (key === 'started_user_name') {
+                    return <td key={key} data-column={key}>{event.started_user_name || "—"}</td>;
+                  }
+                  if (key === 'completed_user_name') {
+                    return <td key={key} data-column={key}>{event.completed_user_name || "—"}</td>;
+                  }
+                  if (key === 'tested_user_name') {
+                    return <td key={key} data-column={key}>{event.tested_user_name || "—"}</td>;
+                  }
+                  if (key === 'description') {
                     return (
                       <td key={key} data-column={key}>
-                        <span className={Number(event.actual_cost) > Number(event.estimated_cost) ? 'cost-exceeded' : ''}>
-                          {formatCurrency(event.actual_cost)}
-                        </span>
+                        {event.description ? (
+                          <div className="description-cell" title={event.description}>
+                            {event.description.length > 50 ? 
+                              `${event.description.substring(0, 50)}...` : 
+                              event.description
+                            }
+                          </div>
+                        ) : "—"}
                       </td>
                     );
                   }
-                  if (key === 'manager_name') {
-                    return <td key={key} data-column={key}>{event.manager_name}</td>;
+                  if (key === 'notes') {
+                    return (
+                      <td key={key} data-column={key}>
+                        {event.notes ? (
+                          <div className="notes-cell" title={event.notes}>
+                            {event.notes.length > 50 ? 
+                              `${event.notes.substring(0, 50)}...` : 
+                              event.notes
+                            }
+                          </div>
+                        ) : "—"}
+                      </td>
+                    );
+                  }
+                  if (key === 'bike_status') {
+                    return <td key={key} data-column={key}>{event.bike_status || "—"}</td>;
+                  }
+                  if (key === 'created_at') {
+                    return <td key={key} data-column={key}>{formatDateTime(event.created_at)}</td>;
                   }
                   return <td key={key} data-column={key}>{event[key] || "—"}</td>;
                 })}
@@ -672,7 +834,7 @@ const MaintenanceTable = ({ events, onUpdate }) => {
         popoverInfo.key &&
         Array.isArray(selectOptions[popoverInfo.key]) && (
           <MultiSelectPopover
-            options={selectOptions[popoverInfo.key]}
+            options={getTranslatedOptions(popoverInfo.key)}
             selected={filters[popoverInfo.key] || []}
             onChange={(newSelection) =>
               updateFilter(popoverInfo.key, newSelection)

@@ -144,24 +144,6 @@
   border-color: #dee2e6;
 }
 
-.bike-info {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-}
-
-.bike-number {
-  font-weight: 600;
-  font-size: 16px;
-  color: #495057;
-}
-
-.bike-model {
-  color: #6c757d;
-  font-size: 14px;
-}
 
 /* Статусы используют централизованные стили из index.css */
 
