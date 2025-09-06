@@ -43,6 +43,20 @@
   color: var(--color-primary-green);
 }
 
+.day-stat.active-filter {
+  background: var(--color-primary-green) !important;
+  color: white !important;
+  font-weight: 600;
+  box-shadow: 0 2px 12px var(--color-primary-green-light) !important;
+  transform: scale(1.05);
+  border: 2px solid var(--color-primary-green-hover) !important;
+}
+
+.day-stat:hover {
+  transform: scale(1.02);
+  transition: all 0.2s ease;
+}
+
 .day-label {
   font-size: 12px;
   font-weight: 500;

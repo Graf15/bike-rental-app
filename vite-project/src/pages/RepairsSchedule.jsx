@@ -75,8 +75,7 @@ const RepairsSchedule = () => {
       gender: 80,
       price_segment: 120,
       condition_status: 120,
-      scheduled_day: 150,
-      actions: 200
+      scheduled_day: 150
     };
     
     const savedWidths = localStorage.getItem('repairsScheduleColumnWidths');
@@ -93,8 +92,7 @@ const RepairsSchedule = () => {
       "gender",
       "price_segment",
       "condition_status",
-      "scheduled_day",
-      "actions"
+      "scheduled_day"
     ];
     
     const defaultOrder = [
@@ -298,7 +296,7 @@ const RepairsSchedule = () => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          schedules: isActive ? [{ bike_id: bikeId, day_of_week: dayOfWeek, is_active: true }] : []
+          schedules: [{ bike_id: bikeId, day_of_week: dayOfWeek, is_active: isActive }]
         }),
       });
 
@@ -345,6 +343,11 @@ const RepairsSchedule = () => {
   const clearAllFilters = () => {
     setFilters({});
     setCurrentPage(1);
+  };
+
+  const handleDayStatClick = (dayLabel) => {
+    // Устанавливаем фильтр для столбца scheduled_day
+    updateFilter('scheduled_day', [dayLabel]);
   };
 
   const toggleColumnVisibility = (columnKey) => {
@@ -436,6 +439,8 @@ const RepairsSchedule = () => {
     count: schedule.filter(s => s.is_active && s.day_of_week === day.value).length
   }));
 
+  // Добавляем статистику для "Не запланировано"
+  const unscheduledCount = bikes.length - schedule.filter(s => s.is_active).length;
   const totalScheduled = schedule.filter(s => s.is_active).length;
 
   // Динамическое обновление CSS для ширин столбцов
@@ -500,35 +505,28 @@ const RepairsSchedule = () => {
     { key: "price_segment", label: "Сегмент", filterable: true, filterType: "select" },
     { key: "condition_status", label: "Состояние", filterable: true, filterType: "select" },
     { key: "scheduled_day", label: "Запланированный день", filterable: true, filterType: "select" },
-    { key: "actions", label: "Действия", filterable: false },
   ];
 
   // Получаем упорядоченные столбцы согласно columnOrder
   const getOrderedColumns = () => {
-    if (columnOrder.length === 0) return columns.filter(col => col.key !== 'actions');
+    if (columnOrder.length === 0) return columns;
     
     const orderedColumns = [];
     const columnMap = new Map(columns.map(col => [col.key, col]));
     
-    // Добавляем столбцы в порядке columnOrder (исключая actions)
+    // Добавляем столбцы в порядке columnOrder
     columnOrder.forEach(key => {
-      if (columnMap.has(key) && key !== 'actions') {
+      if (columnMap.has(key)) {
         orderedColumns.push(columnMap.get(key));
       }
     });
     
-    // Добавляем любые новые столбцы, которых нет в columnOrder (исключая actions)
+    // Добавляем любые новые столбцы, которых нет в columnOrder
     columns.forEach(col => {
-      if (!columnOrder.includes(col.key) && col.key !== 'actions') {
+      if (!columnOrder.includes(col.key)) {
         orderedColumns.push(col);
       }
     });
-    
-    // Добавляем actions в конец
-    const actionsColumn = columnMap.get('actions');
-    if (actionsColumn) {
-      orderedColumns.push(actionsColumn);
-    }
     
     return orderedColumns;
   };
@@ -560,11 +558,31 @@ const RepairsSchedule = () => {
             </div>
             <div className="day-stats">
               {weeklyStats.map(day => (
-                <div key={day.value} className={`day-stat ${day.count > 0 ? 'has-repairs' : ''}`}>
+                <div 
+                  key={day.value} 
+                  className={`day-stat ${day.count > 0 ? 'has-repairs' : ''} ${
+                    filters.scheduled_day?.includes(day.label) ? 'active-filter' : ''
+                  }`}
+                  onClick={() => handleDayStatClick(day.label)}
+                  style={{ cursor: 'pointer' }}
+                  title={`Фильтровать по ${day.label}`}
+                >
                   <span className="day-label">{day.short}</span>
                   <span className="day-count">{day.count}</span>
                 </div>
               ))}
+              {/* Добавляем "Не запланировано" */}
+              <div 
+                className={`day-stat ${unscheduledCount > 0 ? 'has-repairs' : ''} ${
+                  filters.scheduled_day?.includes('Не запланировано') ? 'active-filter' : ''
+                }`}
+                onClick={() => handleDayStatClick('Не запланировано')}
+                style={{ cursor: 'pointer' }}
+                title="Фильтровать незапланированные"
+              >
+                <span className="day-label">Нет</span>
+                <span className="day-count">{unscheduledCount}</span>
+              </div>
             </div>
           </div>
 
@@ -602,15 +620,15 @@ const RepairsSchedule = () => {
                 <th 
                   key={key}
                   data-column={key}
-                  draggable={key !== 'actions'}
+                  draggable={true}
                   onClick={() => handleSort(key)}
-                  onDragStart={(e) => key !== 'actions' ? handleDragStart(e, key) : e.preventDefault()}
-                  onDragOver={(e) => key !== 'actions' ? handleDragOver(e, key) : e.preventDefault()}
-                  onDragEnter={(e) => key !== 'actions' ? handleDragEnter(e, key) : e.preventDefault()}
-                  onDragLeave={key !== 'actions' ? handleDragLeave : undefined}
-                  onDrop={(e) => key !== 'actions' ? handleDrop(e, key) : e.preventDefault()}
-                  onDragEnd={key !== 'actions' ? handleDragEnd : undefined}
-                  style={{ cursor: key !== 'actions' && !isResizing.current ? 'move' : 'default' }}
+                  onDragStart={(e) => handleDragStart(e, key)}
+                  onDragOver={(e) => handleDragOver(e, key)}
+                  onDragEnter={(e) => handleDragEnter(e, key)}
+                  onDragLeave={handleDragLeave}
+                  onDrop={(e) => handleDrop(e, key)}
+                  onDragEnd={handleDragEnd}
+                  style={{ cursor: !isResizing.current ? 'move' : 'default' }}
                 >
                   {label}{" "}
                   <span className="sort-arrow">
@@ -714,48 +732,26 @@ const RepairsSchedule = () => {
                       );
                     }
                     if (key === 'scheduled_day') {
+                      const popoverKey = `schedule_${bike.id}`;
                       return (
                         <td key={key} data-column={key}>
-                          {bikeSchedule ? (
-                            <div>
-                              <span>
-                                {daysOfWeek.find(d => d.value === bikeSchedule.day_of_week)?.label}
-                              </span>
-                            </div>
-                          ) : (
-                            <span>Не запланировано</span>
-                          )}
-                        </td>
-                      );
-                    }
-                    if (key === 'actions') {
-                      return (
-                        <td key={key} data-column={key}>
-                          <div className="action-buttons">
-                            {bikeSchedule ? (
-                              <button 
-                                onClick={() => handleDayAssignment(bike.id, null, false)}
-                                title="Убрать из расписания"
-                              >
-                                ❌
-                              </button>
-                            ) : (
-                              <select
-                                onChange={(e) => {
-                                  if (e.target.value) {
-                                    handleDayAssignment(bike.id, parseInt(e.target.value), true);
-                                    e.target.value = ""; // Сброс селекта
-                                  }
-                                }}
-                              >
-                                <option value="">Добавить в день...</option>
-                                {daysOfWeek.map(day => (
-                                  <option key={day.value} value={day.value}>
-                                    {day.label}
-                                  </option>
-                                ))}
-                              </select>
-                            )}
+                          <div
+                            ref={(el) => (anchorRefs.current[popoverKey] = el)}
+                            onClick={() =>
+                              setPopoverInfo({
+                                key: popoverKey,
+                                visible: popoverInfo.key !== popoverKey || !popoverInfo.visible,
+                                bikeId: bike.id
+                              })
+                            }
+                            className="filter-select-box"
+                            style={{ cursor: 'pointer' }}
+                          >
+                            {bikeSchedule ? 
+                              daysOfWeek.find(d => d.value === bikeSchedule.day_of_week)?.label : 
+                              "Не запланировано"
+                            }
+                            <span className="arrow">▼</span>
                           </div>
                         </td>
                       );
@@ -779,6 +775,32 @@ const RepairsSchedule = () => {
             onChange={(newSelection) =>
               updateFilter(popoverInfo.key, newSelection)
             }
+            visible={popoverInfo.visible}
+            anchorRef={{ current: anchorRefs.current[popoverInfo.key] }}
+            onClose={() => setPopoverInfo({ key: null, visible: false })}
+          />
+        )}
+
+      {/* Поповер для выбора дня недели для расписания */}
+      {popoverInfo.visible &&
+        popoverInfo.key &&
+        popoverInfo.key.startsWith('schedule_') && (
+          <MultiSelectPopover
+            options={["Не запланировано", ...daysOfWeek.map(d => d.label)]}
+            selected={[]}  // Для single-select оставляем пустой массив
+            onChange={(newSelection) => {
+              if (newSelection.includes("Не запланировано")) {
+                // Убираем из расписания
+                handleDayAssignment(popoverInfo.bikeId, null, false);
+              } else if (newSelection.length > 0) {
+                // Назначаем на выбранный день
+                const selectedDay = daysOfWeek.find(d => d.label === newSelection[newSelection.length - 1]);
+                if (selectedDay) {
+                  handleDayAssignment(popoverInfo.bikeId, selectedDay.value, true);
+                }
+              }
+              setPopoverInfo({ key: null, visible: false });
+            }}
             visible={popoverInfo.visible}
             anchorRef={{ current: anchorRefs.current[popoverInfo.key] }}
             onClose={() => setPopoverInfo({ key: null, visible: false })}

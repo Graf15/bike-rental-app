@@ -12,6 +12,14 @@ const PORT = 3001;
 app.use(cors());
 app.use(express.json());
 
+// Middleware для логирования всех запросов
+app.use((req, res, next) => {
+  console.log(`=== ALL REQUESTS ===`);
+  console.log(`${req.method} ${req.url}`);
+  console.log(`Path: ${req.path}`);
+  next();
+});
+
 app.get("/", (req, res) => {
   res.send("Backend работает. Используйте /api/bikes");
 });

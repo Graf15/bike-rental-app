@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import BikeTable from "../components/BikeTable";
 import CreateMaintenanceModal from "../components/CreateMaintenanceModal";
+import CreateBikeModal from "../components/CreateBikeModal";
 import "./Home.css";
 
 const Home = () => {
@@ -10,6 +11,7 @@ const Home = () => {
   const [isMaintenanceModalOpen, setIsMaintenanceModalOpen] = useState(false);
   const [selectedBikeId, setSelectedBikeId] = useState(null);
   const [statusFilter, setStatusFilter] = useState(null);
+  const [isAddBikeModalOpen, setIsAddBikeModalOpen] = useState(false);
 
   // Загрузка данных о велосипедах при монтировании компонента
   const fetchBikes = async () => {
@@ -74,6 +76,38 @@ const Home = () => {
         bike.bike_number || bike.model
       } пока не реализовано`
     );
+  };
+
+  const handleOpenAddBikeModal = () => {
+    setIsAddBikeModalOpen(true);
+  };
+
+  const handleCloseAddBikeModal = () => {
+    setIsAddBikeModalOpen(false);
+  };
+
+  const handleCreateBike = async (bikeData) => {
+    try {
+      const response = await fetch("/api/bikes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(bikeData),
+      });
+
+      if (!response.ok) {
+        throw new Error("Ошибка при создании велосипеда");
+      }
+
+      // Обновляем список велосипедов
+      await fetchBikes();
+      
+      return response.json();
+    } catch (error) {
+      console.error("Ошибка создания велосипеда:", error);
+      throw error;
+    }
   };
 
   // Функция для получения статистики статусов с цветами
@@ -160,6 +194,14 @@ const Home = () => {
             обслуживание
           </p>
         </div>
+        <div className="header-right">
+          <button 
+            className="btn btn-primary-green"
+            onClick={handleOpenAddBikeModal}
+          >
+            + Добавить велосипед
+          </button>
+        </div>
         <div className="header-stats">
           {getStatusStats().map(({ status, count, color, label }) => (
             <div 
@@ -197,6 +239,12 @@ const Home = () => {
         onClose={handleCloseMaintenanceModal}
         onSubmit={handleCreateMaintenance}
         selectedBikeId={selectedBikeId}
+      />
+
+      <CreateBikeModal
+        isOpen={isAddBikeModalOpen}
+        onClose={handleCloseAddBikeModal}
+        onSubmit={handleCreateBike}
       />
     </div>
   );

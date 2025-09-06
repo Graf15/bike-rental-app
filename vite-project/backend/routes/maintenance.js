@@ -3,6 +3,16 @@ import pool from "../db.js";
 
 const router = express.Router();
 
+// Middleware для логирования всех запросов к maintenance endpoints
+router.use((req, res, next) => {
+  console.log(`=== MAINTENANCE REQUEST ===`);
+  console.log(`Method: ${req.method}`);
+  console.log(`Path: ${req.path}`);
+  console.log(`URL: ${req.url}`);
+  console.log(`Params:`, req.params);
+  next();
+});
+
 // GET /api/maintenance - получить все события обслуживания
 router.get("/", async (req, res) => {
   try {
@@ -257,8 +267,201 @@ router.post("/", async (req, res) => {
   }
 });
 
+// GET /api/maintenance/weekly-schedule - получить еженедельное расписание
+router.get("/weekly-schedule", async (req, res) => {
+  console.log("=== WEEKLY SCHEDULE ENDPOINT CALLED ===");
+  console.log("Request path:", req.path);
+  console.log("Request params:", req.params);
+  console.log("Request URL:", req.url);
+  
+  try {
+    const result = await pool.query(
+      `SELECT 
+        ws.*,
+        b.internal_article,
+        b.model
+      FROM weekly_repair_schedule ws
+      LEFT JOIN bikes b ON ws.bike_id = b.id
+      ORDER BY ws.day_of_week, b.internal_article`
+    );
+
+    console.log("Query result:", result.rows);
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Ошибка получения еженедельного расписания:", error);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
+// PUT /api/maintenance/weekly-schedule - обновить еженедельное расписание
+router.put("/weekly-schedule", async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    const { schedules } = req.body;
+
+    if (!Array.isArray(schedules)) {
+      return res.status(400).json({ error: "Неверный формат данных" });
+    }
+
+    // Если пустой массив, значит нужно удалить все активные расписания для указанного велосипеда
+    if (schedules.length === 0) {
+      return res.status(400).json({ error: "Не указан ID велосипеда" });
+    }
+
+    // Обрабатываем каждое расписание
+    for (const schedule of schedules) {
+      const { bike_id, day_of_week, is_active } = schedule;
+
+      if (!bike_id) {
+        throw new Error("Не указан ID велосипеда");
+      }
+
+      // Проверяем существование велосипеда
+      const bikeCheck = await client.query(
+        "SELECT id FROM bikes WHERE id = $1",
+        [bike_id]
+      );
+
+      if (bikeCheck.rows.length === 0) {
+        throw new Error(`Велосипед с ID ${bike_id} не найден`);
+      }
+
+      if (is_active && day_of_week) {
+        // Создаем или обновляем активное расписание
+        await client.query(
+          `INSERT INTO weekly_repair_schedule (bike_id, day_of_week, is_active, week_interval)
+           VALUES ($1, $2, $3, 1)
+           ON CONFLICT (bike_id) 
+           DO UPDATE SET day_of_week = $2, is_active = $3, updated_at = NOW()`,
+          [bike_id, day_of_week, true]
+        );
+      } else {
+        // Деактивируем расписание
+        await client.query(
+          "UPDATE weekly_repair_schedule SET is_active = false, updated_at = NOW() WHERE bike_id = $1",
+          [bike_id]
+        );
+      }
+    }
+
+    await client.query("COMMIT");
+    res.json({ message: "Расписание успешно обновлено" });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Ошибка обновления расписания:", error);
+    res.status(400).json({ error: error.message || "Ошибка при обновлении расписания" });
+  } finally {
+    client.release();
+  }
+});
+
+// POST /api/maintenance/generate-weekly - генерировать еженедельные ремонты
+router.post("/generate-weekly", async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    // Получаем активные еженедельные расписания
+    const schedulesResult = await client.query(
+      `SELECT ws.*, b.internal_article, b.model
+       FROM weekly_repair_schedule ws
+       JOIN bikes b ON ws.bike_id = b.id
+       WHERE ws.is_active = true
+       ORDER BY ws.day_of_week`
+    );
+
+    const schedules = schedulesResult.rows;
+
+    if (schedules.length === 0) {
+      return res.status(400).json({ error: "Нет активных еженедельных расписаний" });
+    }
+
+    // Получаем следующий понедельник
+    const today = new Date();
+    const nextMonday = new Date(today);
+    const daysUntilMonday = (8 - today.getDay()) % 7;
+    nextMonday.setDate(today.getDate() + (daysUntilMonday === 0 ? 7 : daysUntilMonday));
+    nextMonday.setHours(9, 0, 0, 0); // Устанавливаем время на 9:00
+
+    const createdEvents = [];
+
+    // Создаем события для каждого дня недели
+    for (const schedule of schedules) {
+      // Вычисляем дату для этого дня недели
+      const eventDate = new Date(nextMonday);
+      const daysToAdd = schedule.day_of_week - 1; // 1 = понедельник, поэтому -1
+      eventDate.setDate(nextMonday.getDate() + daysToAdd);
+
+      // Проверяем, есть ли уже запланированное событие в этот день для этого велосипеда
+      const existingEvent = await client.query(
+        `SELECT id FROM maintenance_events 
+         WHERE bike_id = $1 
+         AND DATE(scheduled_for) = DATE($2) 
+         AND status IN ('planned', 'in_progress')`,
+        [schedule.bike_id, eventDate]
+      );
+
+      if (existingEvent.rows.length > 0) {
+        console.log(`Пропускаем велосипед ${schedule.bike_id} - уже есть событие на ${eventDate.toDateString()}`);
+        continue;
+      }
+
+      // Создаем событие обслуживания
+      const newEvent = await client.query(
+        `INSERT INTO maintenance_events (
+          bike_id,
+          maintenance_type,
+          status,
+          scheduled_for,
+          description,
+          notes
+        ) VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING *`,
+        [
+          schedule.bike_id,
+          'routine', // Плановое обслуживание
+          'planned',
+          eventDate,
+          `Еженедельное ТО (${['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'][schedule.day_of_week - 1]})`,
+          `Автоматически созданное событие на основе еженедельного расписания`
+        ]
+      );
+
+      createdEvents.push({
+        ...newEvent.rows[0],
+        bike_article: schedule.internal_article,
+        bike_model: schedule.model
+      });
+    }
+
+    await client.query("COMMIT");
+
+    res.json({
+      message: `Создано ${createdEvents.length} событий обслуживания на неделю ${nextMonday.toLocaleDateString('ru-RU')}`,
+      events: createdEvents,
+      weekStart: nextMonday.toISOString()
+    });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Ошибка генерации еженедельных событий:", error);
+    res.status(400).json({ error: error.message || "Ошибка при генерации событий" });
+  } finally {
+    client.release();
+  }
+});
+
 // PATCH /api/maintenance/:id - обновить событие обслуживания
 router.patch("/:id", async (req, res) => {
+  console.log("=== PATCH /:id ENDPOINT CALLED ===");
+  console.log("Request path:", req.path);
+  console.log("Request params:", req.params);
+  console.log("Request URL:", req.url);
+  console.log("Param ID:", req.params.id);
+  
   const client = await pool.connect();
 
   try {
@@ -395,110 +598,6 @@ router.patch("/:id", async (req, res) => {
       .json({ error: error.message || "Ошибка при обновлении события" });
   } finally {
     client.release();
-  }
-});
-
-// DELETE /api/maintenance/:id - удалить событие обслуживания
-router.delete("/:id", async (req, res) => {
-  const client = await pool.connect();
-
-  try {
-    await client.query("BEGIN");
-
-    const { id } = req.params;
-
-    // Получаем информацию о событии перед удалением
-    const eventInfo = await client.query(
-      'SELECT bike_id, status FROM maintenance_events WHERE id = $1',
-      [id]
-    );
-
-    if (eventInfo.rows.length === 0) {
-      return res.status(404).json({ error: "Событие не найдено" });
-    }
-
-    // Удаляем событие
-    await client.query("DELETE FROM maintenance_events WHERE id = $1", [id]);
-
-    // Проверяем, есть ли еще активные ремонты для этого велосипеда
-    const activeRepairs = await client.query(
-      `SELECT id FROM maintenance_events 
-       WHERE bike_id = $1 AND status IN ('in_progress', 'planned')`,
-      [eventInfo.rows[0].bike_id]
-    );
-
-    // Если активных ремонтов нет, возвращаем велосипед в наличие
-    if (activeRepairs.rows.length === 0) {
-      await client.query("UPDATE bikes SET condition_status = $1 WHERE id = $2", [
-        "в наличии",
-        eventInfo.rows[0].bike_id,
-      ]);
-    }
-
-    await client.query("COMMIT");
-    res.json({ message: "Событие успешно удалено" });
-  } catch (error) {
-    await client.query("ROLLBACK");
-    console.error("Ошибка удаления события:", error);
-    res.status(500).json({ error: "Ошибка при удалении события" });
-  } finally {
-    client.release();
-  }
-});
-
-// GET /api/maintenance/:id - получить конкретное событие
-router.get("/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    if (!/^\d+$/.test(id)) {
-      return res.status(400).json({ error: "Неверный формат ID события" });
-    }
-    
-    const result = await pool.query(
-      `SELECT 
-        me.*,
-        b.internal_article as bike_number,
-        b.model,
-        b.condition_status as bike_status,
-        scheduled_user.name as scheduled_user_name,
-        scheduled_for_user.name as scheduled_for_user_name,
-        started_user.name as started_user_name,
-        completed_user.name as completed_user_name,
-        tested_user.name as tested_user_name,
-        
-        -- Расчетные поля времени
-        CASE 
-          WHEN me.completed_at IS NOT NULL AND me.started_at IS NOT NULL 
-          THEN EXTRACT(EPOCH FROM (me.completed_at - me.started_at)) / 3600 
-          ELSE NULL 
-        END as repair_hours,
-        
-        CASE 
-          WHEN me.parts_delivered_at IS NOT NULL AND me.parts_needed_at IS NOT NULL
-          THEN EXTRACT(EPOCH FROM (me.parts_delivered_at - me.parts_needed_at)) / 3600
-          ELSE NULL
-        END as parts_wait_hours
-        
-      FROM maintenance_events me
-      LEFT JOIN bikes b ON me.bike_id = b.id
-      LEFT JOIN users scheduled_user ON me.scheduled_user_id = scheduled_user.id
-      LEFT JOIN users scheduled_for_user ON me.scheduled_for_user_id = scheduled_for_user.id
-      LEFT JOIN users started_user ON me.started_user_id = started_user.id
-      LEFT JOIN users completed_user ON me.completed_user_id = completed_user.id
-      LEFT JOIN users tested_user ON me.tested_user_id = tested_user.id
-      WHERE me.id = $1`,
-      [id]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Событие не найдено" });
-    }
-
-    res.json(result.rows[0]);
-  } catch (error) {
-    console.error("Ошибка получения события:", error);
-    res.status(500).json({ error: "Ошибка сервера" });
   }
 });
 
