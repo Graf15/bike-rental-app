@@ -39,6 +39,7 @@ const RepairsSchedule = () => {
   
   // Состояния для поповеров фильтров (как в BikeTable)
   const [popoverInfo, setPopoverInfo] = useState({ key: null, visible: false });
+  const [tempScheduleSelection, setTempScheduleSelection] = useState([]);
   const anchorRefs = useRef({});
 
   // Опции для выпадающих фильтров
@@ -285,10 +286,10 @@ const RepairsSchedule = () => {
   }, [handleResizeMove, handleResizeEnd]);
 
   const getScheduleForBike = (bikeId) => {
-    return schedule.find(s => s.bike_id === bikeId && s.is_active) || null;
+    return schedule.filter(s => s.bike_id === bikeId && s.is_active);
   };
 
-  const handleDayAssignment = async (bikeId, dayOfWeek, isActive) => {
+  const handleDayAssignment = async (bikeId, selectedDays) => {
     try {
       const response = await fetch("/api/maintenance/weekly-schedule", {
         method: "PUT",
@@ -296,7 +297,8 @@ const RepairsSchedule = () => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          schedules: [{ bike_id: bikeId, day_of_week: dayOfWeek, is_active: isActive }]
+          bike_id: bikeId,
+          days_of_week: selectedDays || []
         }),
       });
 
@@ -331,7 +333,36 @@ const RepairsSchedule = () => {
       }
 
       const result = await response.json();
-      alert(result.message);
+      
+      // Формируем детальное сообщение
+      let detailMessage = result.message;
+      
+      if (result.skipped && result.skipped.length > 0) {
+        detailMessage += "\n\n📋 ПРОПУЩЕННЫЕ ВЕЛОСИПЕДЫ:";
+        result.skipped.forEach(bike => {
+          detailMessage += `\n• ${bike.internal_article} (${bike.model}) - ${bike.reason}`;
+          if (bike.existing_event) {
+            detailMessage += ` (${bike.existing_event.description})`;
+          }
+        });
+      }
+      
+      if (result.errors && result.errors.length > 0) {
+        detailMessage += "\n\n❌ ОШИБКИ:";
+        result.errors.forEach(error => {
+          detailMessage += `\n• ${error.internal_article} (${error.model}) - ${error.error}`;
+        });
+      }
+      
+      if (result.events && result.events.length > 0) {
+        detailMessage += "\n\n✅ СОЗДАННЫЕ СОБЫТИЯ:";
+        result.events.forEach(event => {
+          const eventDate = new Date(event.scheduled_for).toLocaleDateString('ru-RU');
+          detailMessage += `\n• ${event.bike_article} (${event.bike_model}) - ${eventDate}`;
+        });
+      }
+      
+      alert(detailMessage);
     } catch (err) {
       alert("Ошибка: " + err.message);
     } finally {
@@ -361,18 +392,25 @@ const RepairsSchedule = () => {
 
   // Фильтрация и сортировка (улучшенная версия как в BikeTable)
   const filteredBikes = bikes.filter((bike) => {
-    const bikeSchedule = getScheduleForBike(bike.id);
+    const bikeSchedules = getScheduleForBike(bike.id);
     
     return Object.entries(filters).every(([key, value]) => {
       if (!value || value.length === 0) return true;
       
       // Специальная обработка для scheduled_day
       if (key === 'scheduled_day') {
-        if (!bikeSchedule) {
+        if (bikeSchedules.length === 0) {
           return value.includes('Не запланировано');
         }
-        const dayLabel = daysOfWeek.find(d => d.value === bikeSchedule.day_of_week)?.label;
-        return Array.isArray(value) ? value.includes(dayLabel) : dayLabel === value;
+        
+        // Проверяем есть ли пересечение между запланированными днями и фильтром
+        const scheduledDayLabels = bikeSchedules.map(s => 
+          daysOfWeek.find(d => d.value === s.day_of_week)?.label
+        ).filter(Boolean);
+        
+        return Array.isArray(value) 
+          ? value.some(filterDay => scheduledDayLabels.includes(filterDay))
+          : scheduledDayLabels.includes(value);
       }
       
       // Обработка для всех select фильтров (массив)
@@ -398,10 +436,16 @@ const RepairsSchedule = () => {
     
     // Специальная обработка для scheduled_day
     if (sortColumn === 'scheduled_day') {
-      const scheduleA = getScheduleForBike(a.id);
-      const scheduleB = getScheduleForBike(b.id);
-      valA = scheduleA ? scheduleA.day_of_week : 999;
-      valB = scheduleB ? scheduleB.day_of_week : 999;
+      const schedulesA = getScheduleForBike(a.id);
+      const schedulesB = getScheduleForBike(b.id);
+      
+      // Для сортировки используем минимальный день недели, если есть расписания
+      valA = schedulesA.length > 0 
+        ? Math.min(...schedulesA.map(s => s.day_of_week))
+        : 999; // Незапланированные в конец
+      valB = schedulesB.length > 0 
+        ? Math.min(...schedulesB.map(s => s.day_of_week))
+        : 999; // Незапланированные в конец
     } else {
       valA = a[sortColumn];
       valB = b[sortColumn];
@@ -679,7 +723,7 @@ const RepairsSchedule = () => {
             {paginatedBikes.map((bike) => {
               const bikeSchedule = getScheduleForBike(bike.id);
               return (
-                <tr key={bike.id} className={bikeSchedule ? 'scheduled' : ''}>
+                <tr key={bike.id}>
                   {orderedColumns.filter(col => visibleColumns.includes(col.key)).map(({ key }) => {
                     const bikeSchedule = getScheduleForBike(bike.id);
                     
@@ -733,22 +777,41 @@ const RepairsSchedule = () => {
                     }
                     if (key === 'scheduled_day') {
                       const popoverKey = `schedule_${bike.id}`;
+                      const bikeSchedules = getScheduleForBike(bike.id);
+                      const scheduledDays = bikeSchedules.map(s => 
+                        daysOfWeek.find(d => d.value === s.day_of_week)?.label
+                      ).filter(Boolean);
+                      
                       return (
                         <td key={key} data-column={key}>
                           <div
                             ref={(el) => (anchorRefs.current[popoverKey] = el)}
-                            onClick={() =>
+                            onClick={() => {
+                              const isOpening = popoverInfo.key !== popoverKey || !popoverInfo.visible;
+                              if (isOpening) {
+                                // Инициализируем временный выбор текущим состоянием
+                                const bikeSchedules = getScheduleForBike(bike.id);
+                                if (bikeSchedules.length === 0) {
+                                  setTempScheduleSelection(["Не запланировано"]);
+                                } else {
+                                  const currentDays = bikeSchedules.map(s => 
+                                    daysOfWeek.find(d => d.value === s.day_of_week)?.label
+                                  ).filter(Boolean);
+                                  setTempScheduleSelection(currentDays);
+                                }
+                              }
+                              
                               setPopoverInfo({
                                 key: popoverKey,
-                                visible: popoverInfo.key !== popoverKey || !popoverInfo.visible,
+                                visible: isOpening,
                                 bikeId: bike.id
-                              })
-                            }
-                            className="filter-select-box"
+                              });
+                            }}
+                            className={`status-badge ${scheduledDays.length > 0 ? 'status-badge-green' : 'status-badge-orange'} clickable`}
                             style={{ cursor: 'pointer' }}
                           >
-                            {bikeSchedule ? 
-                              daysOfWeek.find(d => d.value === bikeSchedule.day_of_week)?.label : 
+                            {scheduledDays.length > 0 ? 
+                              scheduledDays.join(", ") : 
                               "Не запланировано"
                             }
                             <span className="arrow">▼</span>
@@ -787,23 +850,43 @@ const RepairsSchedule = () => {
         popoverInfo.key.startsWith('schedule_') && (
           <MultiSelectPopover
             options={["Не запланировано", ...daysOfWeek.map(d => d.label)]}
-            selected={[]}  // Для single-select оставляем пустой массив
+            selected={tempScheduleSelection}
             onChange={(newSelection) => {
-              if (newSelection.includes("Не запланировано")) {
-                // Убираем из расписания
-                handleDayAssignment(popoverInfo.bikeId, null, false);
-              } else if (newSelection.length > 0) {
-                // Назначаем на выбранный день
-                const selectedDay = daysOfWeek.find(d => d.label === newSelection[newSelection.length - 1]);
-                if (selectedDay) {
-                  handleDayAssignment(popoverInfo.bikeId, selectedDay.value, true);
-                }
+              const daysOnly = newSelection.filter(item => item !== "Не запланировано");
+              const hasNotScheduled = newSelection.includes("Не запланировано");
+              const hadNotScheduled = tempScheduleSelection.includes("Не запланировано");
+              
+              // Проверяем, кликнул ли пользователь на "Не запланировано"
+              if (hasNotScheduled && !hadNotScheduled) {
+                // Пользователь выбрал "Не запланировано" - очищаем все дни
+                setTempScheduleSelection(["Не запланировано"]);
+              } else if (daysOnly.length > 0) {
+                // Если выбраны дни недели, "Не запланировано" автоматически убирается
+                setTempScheduleSelection(daysOnly);
+              } else if (hasNotScheduled) {
+                // Если остается только "Не запланировано"
+                setTempScheduleSelection(["Не запланировано"]);
+              } else {
+                // Если ничего не выбрано
+                setTempScheduleSelection([]);
               }
-              setPopoverInfo({ key: null, visible: false });
             }}
             visible={popoverInfo.visible}
             anchorRef={{ current: anchorRefs.current[popoverInfo.key] }}
-            onClose={() => setPopoverInfo({ key: null, visible: false })}
+            onClose={() => {
+              // Применяем изменения при закрытии поповера
+              if (tempScheduleSelection.includes("Не запланировано") || tempScheduleSelection.length === 0) {
+                handleDayAssignment(popoverInfo.bikeId, []);
+              } else {
+                const selectedDayValues = tempScheduleSelection
+                  .map(label => daysOfWeek.find(d => d.label === label)?.value)
+                  .filter(Boolean);
+                handleDayAssignment(popoverInfo.bikeId, selectedDayValues);
+              }
+              
+              setPopoverInfo({ key: null, visible: false });
+              setTempScheduleSelection([]);
+            }}
           />
         )}
     </div>

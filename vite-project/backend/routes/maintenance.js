@@ -300,55 +300,54 @@ router.put("/weekly-schedule", async (req, res) => {
   try {
     await client.query("BEGIN");
 
-    const { schedules } = req.body;
+    const { bike_id, days_of_week } = req.body;
 
-    if (!Array.isArray(schedules)) {
-      return res.status(400).json({ error: "Неверный формат данных" });
-    }
-
-    // Если пустой массив, значит нужно удалить все активные расписания для указанного велосипеда
-    if (schedules.length === 0) {
+    if (!bike_id) {
       return res.status(400).json({ error: "Не указан ID велосипеда" });
     }
 
-    // Обрабатываем каждое расписание
-    for (const schedule of schedules) {
-      const { bike_id, day_of_week, is_active } = schedule;
+    if (!Array.isArray(days_of_week)) {
+      return res.status(400).json({ error: "Неверный формат данных для дней недели" });
+    }
 
-      if (!bike_id) {
-        throw new Error("Не указан ID велосипеда");
-      }
+    // Проверяем существование велосипеда
+    const bikeCheck = await client.query(
+      "SELECT id FROM bikes WHERE id = $1",
+      [bike_id]
+    );
 
-      // Проверяем существование велосипеда
-      const bikeCheck = await client.query(
-        "SELECT id FROM bikes WHERE id = $1",
-        [bike_id]
-      );
+    if (bikeCheck.rows.length === 0) {
+      throw new Error(`Велосипед с ID ${bike_id} не найден`);
+    }
 
-      if (bikeCheck.rows.length === 0) {
-        throw new Error(`Велосипед с ID ${bike_id} не найден`);
-      }
+    // Удаляем все существующие расписания для этого велосипеда
+    await client.query(
+      "DELETE FROM weekly_repair_schedule WHERE bike_id = $1",
+      [bike_id]
+    );
 
-      if (is_active && day_of_week) {
-        // Создаем или обновляем активное расписание
+    // Если массив дней не пустой, создаем новые расписания
+    if (days_of_week.length > 0) {
+      for (const day_of_week of days_of_week) {
+        // Проверяем что день недели валидный
+        if (day_of_week < 1 || day_of_week > 7) {
+          throw new Error(`Неверный день недели: ${day_of_week}`);
+        }
+
         await client.query(
           `INSERT INTO weekly_repair_schedule (bike_id, day_of_week, is_active, week_interval)
-           VALUES ($1, $2, $3, 1)
-           ON CONFLICT (bike_id) 
-           DO UPDATE SET day_of_week = $2, is_active = $3, updated_at = NOW()`,
-          [bike_id, day_of_week, true]
-        );
-      } else {
-        // Деактивируем расписание
-        await client.query(
-          "UPDATE weekly_repair_schedule SET is_active = false, updated_at = NOW() WHERE bike_id = $1",
-          [bike_id]
+           VALUES ($1, $2, true, 1)`,
+          [bike_id, day_of_week]
         );
       }
     }
 
     await client.query("COMMIT");
-    res.json({ message: "Расписание успешно обновлено" });
+    res.json({ 
+      message: "Расписание успешно обновлено",
+      bike_id,
+      days_of_week: days_of_week.length > 0 ? days_of_week : []
+    });
   } catch (error) {
     await client.query("ROLLBACK");
     console.error("Ошибка обновления расписания:", error);
@@ -388,62 +387,137 @@ router.post("/generate-weekly", async (req, res) => {
     nextMonday.setHours(9, 0, 0, 0); // Устанавливаем время на 9:00
 
     const createdEvents = [];
+    const skippedBikes = [];
+    const errors = [];
 
     // Создаем события для каждого дня недели
     for (const schedule of schedules) {
-      // Вычисляем дату для этого дня недели
-      const eventDate = new Date(nextMonday);
-      const daysToAdd = schedule.day_of_week - 1; // 1 = понедельник, поэтому -1
-      eventDate.setDate(nextMonday.getDate() + daysToAdd);
+      try {
+        // Вычисляем дату для этого дня недели
+        const eventDate = new Date(nextMonday);
+        const daysToAdd = schedule.day_of_week - 1; // 1 = понедельник, поэтому -1
+        eventDate.setDate(nextMonday.getDate() + daysToAdd);
 
-      // Проверяем, есть ли уже запланированное событие в этот день для этого велосипеда
-      const existingEvent = await client.query(
-        `SELECT id FROM maintenance_events 
-         WHERE bike_id = $1 
-         AND DATE(scheduled_for) = DATE($2) 
-         AND status IN ('planned', 'in_progress')`,
-        [schedule.bike_id, eventDate]
-      );
+        // Проверяем, есть ли уже запланированное событие в этот день для этого велосипеда
+        const existingEvent = await client.query(
+          `SELECT me.id, me.maintenance_type, me.status, me.scheduled_for, me.description
+           FROM maintenance_events me
+           WHERE me.bike_id = $1 
+           AND DATE(me.scheduled_for) = DATE($2) 
+           AND me.status IN ('planned', 'in_progress')`,
+          [schedule.bike_id, eventDate]
+        );
 
-      if (existingEvent.rows.length > 0) {
-        console.log(`Пропускаем велосипед ${schedule.bike_id} - уже есть событие на ${eventDate.toDateString()}`);
-        continue;
+        if (existingEvent.rows.length > 0) {
+          const existing = existingEvent.rows[0];
+          const dayName = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'][schedule.day_of_week - 1];
+          skippedBikes.push({
+            bike_id: schedule.bike_id,
+            internal_article: schedule.internal_article,
+            model: schedule.model,
+            planned_day: dayName,
+            planned_date: eventDate.toLocaleDateString('ru-RU'),
+            reason: existing.status === 'in_progress' 
+              ? 'в активном ремонте' 
+              : 'уже запланировано',
+            existing_event: {
+              type: existing.maintenance_type,
+              status: existing.status,
+              description: existing.description
+            }
+          });
+          continue;
+        }
+
+        // Проверяем есть ли незавершенные ремонты для этого велосипеда
+        const activeRepairs = await client.query(
+          `SELECT me.id, me.maintenance_type, me.status, me.scheduled_for, me.description
+           FROM maintenance_events me
+           WHERE me.bike_id = $1 
+           AND me.status = 'in_progress'`,
+          [schedule.bike_id]
+        );
+
+        if (activeRepairs.rows.length > 0) {
+          const activeRepair = activeRepairs.rows[0];
+          const dayName = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'][schedule.day_of_week - 1];
+          skippedBikes.push({
+            bike_id: schedule.bike_id,
+            internal_article: schedule.internal_article,
+            model: schedule.model,
+            planned_day: dayName,
+            planned_date: eventDate.toLocaleDateString('ru-RU'),
+            reason: 'незавершенный ремонт',
+            existing_event: {
+              type: activeRepair.maintenance_type,
+              status: activeRepair.status,
+              description: activeRepair.description
+            }
+          });
+          continue;
+        }
+
+        // Создаем событие обслуживания
+        const newEvent = await client.query(
+          `INSERT INTO maintenance_events (
+            bike_id,
+            maintenance_type,
+            status,
+            scheduled_for,
+            description,
+            notes
+          ) VALUES ($1, $2, $3, $4, $5, $6)
+          RETURNING *`,
+          [
+            schedule.bike_id,
+            'weekly', // Еженедельное обслуживание
+            'planned',
+            eventDate,
+            `Еженедельное ТО (${['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'][schedule.day_of_week - 1]})`,
+            `Автоматически созданное событие на основе еженедельного расписания`
+          ]
+        );
+
+        createdEvents.push({
+          ...newEvent.rows[0],
+          bike_article: schedule.internal_article,
+          bike_model: schedule.model
+        });
+      } catch (eventError) {
+        errors.push({
+          bike_id: schedule.bike_id,
+          internal_article: schedule.internal_article,
+          model: schedule.model,
+          error: eventError.message
+        });
       }
-
-      // Создаем событие обслуживания
-      const newEvent = await client.query(
-        `INSERT INTO maintenance_events (
-          bike_id,
-          maintenance_type,
-          status,
-          scheduled_for,
-          description,
-          notes
-        ) VALUES ($1, $2, $3, $4, $5, $6)
-        RETURNING *`,
-        [
-          schedule.bike_id,
-          'routine', // Плановое обслуживание
-          'planned',
-          eventDate,
-          `Еженедельное ТО (${['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'][schedule.day_of_week - 1]})`,
-          `Автоматически созданное событие на основе еженедельного расписания`
-        ]
-      );
-
-      createdEvents.push({
-        ...newEvent.rows[0],
-        bike_article: schedule.internal_article,
-        bike_model: schedule.model
-      });
     }
 
     await client.query("COMMIT");
 
+    // Формируем детальное сообщение
+    let message = `Создано ${createdEvents.length} событий обслуживания на неделю ${nextMonday.toLocaleDateString('ru-RU')}`;
+    
+    if (skippedBikes.length > 0) {
+      message += `\n\nПропущено велосипедов: ${skippedBikes.length}`;
+    }
+    
+    if (errors.length > 0) {
+      message += `\n\nОшибок при создании: ${errors.length}`;
+    }
+
     res.json({
-      message: `Создано ${createdEvents.length} событий обслуживания на неделю ${nextMonday.toLocaleDateString('ru-RU')}`,
+      message,
       events: createdEvents,
-      weekStart: nextMonday.toISOString()
+      skipped: skippedBikes,
+      errors: errors,
+      weekStart: nextMonday.toISOString(),
+      summary: {
+        created: createdEvents.length,
+        skipped: skippedBikes.length,
+        errors: errors.length,
+        total_scheduled: schedules.length
+      }
     });
   } catch (error) {
     await client.query("ROLLBACK");

@@ -69,14 +69,6 @@
   margin-top: 2px;
 }
 
-/* Специфичные стили для запланированных велосипедов */
-tr.scheduled {
-  background-color: #f0f9f0;
-}
-
-tr.scheduled:hover {
-  background-color: #e8f5e8;
-}
 
 
 /* Action Buttons */
@@ -167,29 +159,18 @@ tr.scheduled:hover {
   transform: rotate(2deg);
 }
 
-/* Курсор при наведении на заголовок */
-.repairs-schedule-page .schedule-table th[draggable="true"]:not(.resizing):hover {
-  cursor: move;
+/* Sticky заголовки как в главной таблице */
+.repairs-schedule-page .schedule-table thead tr:first-child th {
+  position: sticky;
+  top: -1px;
+  z-index: 12;
+  background: white;
 }
 
-/* Индикатор перетаскивания */
-.repairs-schedule-page .schedule-table th[draggable="true"]::before {
-  content: "⋮⋮";
-  position: absolute;
-  left: 4px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 12px;
-  color: #999;
-  opacity: 0;
-  transition: opacity 0.2s ease;
+.repairs-schedule-page .schedule-table thead tr:last-child th {
+  position: sticky;
+  top: 54px;
+  z-index: 11;
+  background: #f8f9fa;
 }
 
-.repairs-schedule-page .schedule-table th[draggable="true"]:hover::before {
-  opacity: 1;
-}
-
-/* Убираем индикатор при ресайзе */
-.repairs-schedule-page .schedule-table th[draggable="true"].resizing::before {
-  display: none;
-}

@@ -16,10 +16,31 @@ const MultiSelectPopover = ({
   useEffect(() => {
     if (visible && anchorRef?.current) {
       const rect = anchorRef.current.getBoundingClientRect();
+      const popoverHeight = 250; // примерная высота поповера
+      const popoverWidth = Math.max(rect.width, 200); // минимум 200px или ширина anchor
+      
+      let top = rect.bottom + 4;
+      let left = rect.left;
+      
+      // Проверяем, не выходит ли поповер за правый край экрана
+      if (left + popoverWidth > window.innerWidth) {
+        left = window.innerWidth - popoverWidth - 10;
+      }
+      
+      // Проверяем, не выходит ли поповер за нижний край экрана
+      if (top + popoverHeight > window.innerHeight) {
+        top = rect.top - popoverHeight - 4; // показываем сверху
+      }
+      
+      // Проверяем, не выходит ли поповер за верхний край экрана
+      if (top < 0) {
+        top = rect.bottom + 4; // возвращаем вниз, но с прокруткой
+      }
+      
       setPosition({
-        top: rect.bottom + 4,
-        left: rect.left,
-        width: rect.width,
+        top,
+        left,
+        width: popoverWidth,
       });
       setIsPositioned(true);
     } else {
