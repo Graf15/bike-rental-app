@@ -292,7 +292,6 @@ td {
 
 /* Стили для drag & drop столбцов */
 .bike-table th[draggable="true"] {
-  position: relative;
   user-select: none;
 }
 

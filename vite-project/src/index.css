@@ -484,6 +484,19 @@ tr:hover {
   gap: 16px;
 }
 
+.header-stats {
+  display: flex;
+  gap: 12px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.header-right-bottom {
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+}
+
 /* Универсальный контейнер для всех страниц */
 .page-container {
   min-height: 100vh;
@@ -517,11 +530,11 @@ tr:hover {
   max-width: 600px;
 }
 
-.header-stats {
-  display: flex;
-  gap: 12px;
-  flex-shrink: 0;
-  flex-wrap: wrap;
+
+
+.add-bike-btn {
+  min-width: 140px;
+  white-space: nowrap;
 }
 
 .stat-card {

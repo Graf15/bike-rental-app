@@ -136,7 +136,6 @@
 
 /* Стили для drag & drop столбцов */
 .repairs-schedule-page .schedule-table th[draggable="true"] {
-  position: relative;
   user-select: none;
 }
 
@@ -159,18 +158,4 @@
   transform: rotate(2deg);
 }
 
-/* Sticky заголовки как в главной таблице */
-.repairs-schedule-page .schedule-table thead tr:first-child th {
-  position: sticky;
-  top: -1px;
-  z-index: 12;
-  background: white;
-}
-
-.repairs-schedule-page .schedule-table thead tr:last-child th {
-  position: sticky;
-  top: 54px;
-  z-index: 11;
-  background: #f8f9fa;
-}
 

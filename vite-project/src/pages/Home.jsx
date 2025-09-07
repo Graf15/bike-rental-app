@@ -195,32 +195,35 @@ const Home = () => {
           </p>
         </div>
         <div className="header-right">
-          <button 
-            className="btn btn-primary-green"
-            onClick={handleOpenAddBikeModal}
-          >
-            + Добавить велосипед
-          </button>
-        </div>
-        <div className="header-stats">
-          {getStatusStats().map(({ status, count, color, label }) => (
-            <div 
-              key={status} 
-              className={`stat-card ${statusFilter === status ? 'active' : ''}`}
-              onClick={() => handleStatusClick(status)}
-            >
-              <div className="stat-content">
-                <span 
-                  className="status-indicator"
-                  style={{ backgroundColor: `var(--color-primary-${color})` }}
-                ></span>
-                <div className="stat-info">
-                  <div className="stat-number">{count}</div>
-                  <div className="stat-label">{label}</div>
+          <div className="header-stats">
+            {getStatusStats().map(({ status, count, color, label }) => (
+              <div 
+                key={status} 
+                className={`stat-card ${statusFilter === status ? 'active' : ''}`}
+                onClick={() => handleStatusClick(status)}
+              >
+                <div className="stat-content">
+                  <span 
+                    className="status-indicator"
+                    style={{ backgroundColor: `var(--color-primary-${color})` }}
+                  ></span>
+                  <div className="stat-info">
+                    <div className="stat-number">{count}</div>
+                    <div className="stat-label">{label}</div>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
+          
+          <div className="header-right-bottom">
+            <button 
+              className="btn btn-primary-green add-bike-btn"
+              onClick={handleOpenAddBikeModal}
+            >
+              + Добавить велосипед
+            </button>
+          </div>
         </div>
       </div>
 

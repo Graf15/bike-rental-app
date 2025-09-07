@@ -4,6 +4,7 @@ import BikeActionsMenu from "./BikeActionsMenu";
 import TableControls from "./TableControls";
 import MultiSelectPopover from "./MultiSelectPopover";
 import DateRangeFilter from "./DateRangeFilter";
+import { BIKE_OPTIONS } from "../constants/selectOptions";
 import "./BikeTable.css";
 
 // Функция для форматирования даты
@@ -111,50 +112,7 @@ const BikeTable = ({
   // Реф для контейнера таблицы
   const tableContainerRef = useRef(null);
 
-  const selectOptions = {
-    wheel_size: ["12", "16", "20", "24", "26", "27.5", "29"],
-    frame_size: [
-      "д20",
-      "д24",
-      "XS",
-      "S",
-      "M",
-      "L",
-      "XL",
-      "XXL",
-      "13",
-      "14",
-      "15",
-      "15,5",
-      "16",
-      "16,5",
-      "17",
-      "17,5",
-      "18",
-      "18,5",
-      "19",
-      "19,5",
-      "20",
-      "20,5",
-      "21",
-      "21,5",
-      "22",
-      "22,5",
-      "23",
-      "23,5",
-    ],
-    gender: ["женский", "мужской", "унисекс"],
-    price_segment: ["kids", "econom", "standart", "premium", "эл.вел'", "эл.самокат"],
-    condition_status: [
-      "в наличии",
-      "в прокате", 
-      "в ремонте",
-      "бронь",
-      "продан",
-      "украден",
-      "невозврат",
-    ],
-  };
+  const selectOptions = BIKE_OPTIONS;
 
   // Функции для ресайза столбцов
   const saveColumnWidths = useCallback((widths) => {

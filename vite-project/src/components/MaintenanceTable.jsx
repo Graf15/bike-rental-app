@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import TableControls from "./TableControls";
 import MultiSelectPopover from "./MultiSelectPopover";
 import DateRangeFilter from "./DateRangeFilter";
+import { BIKE_OPTIONS } from "../constants/selectOptions";
 import "./MaintenanceTable.css";
 import "./BikeTable.css";
 
@@ -60,7 +61,8 @@ const MaintenanceTable = ({ events, onUpdate }) => {
   const selectOptions = {
     maintenance_type: ["current", "weekly", "longterm"],
     status: ["planned", "in_progress", "completed"],
-    parts_need: ["not_needed", "needed", "ordered", "delivered"]
+    parts_need: ["not_needed", "needed", "ordered", "delivered"],
+    ...BIKE_OPTIONS
   };
 
   // Поля для календарных фильтров
@@ -79,8 +81,16 @@ const MaintenanceTable = ({ events, onUpdate }) => {
   // Определение столбцов таблицы
   const columns = useMemo(() => [
     { key: "id", label: "ID" },
-    { key: "bike_number", label: "№ велосипеда" },
+    { key: "internal_article", label: "Внутр. артикул" },
     { key: "model", label: "Модель" },
+    { key: "brand_name", label: "Бренд" },
+    { key: "model_year", label: "Год" },
+    { key: "wheel_size", label: "Размер колеса" },
+    { key: "frame_size", label: "Рама" },
+    { key: "frame_number", label: "Номер рамы" },
+    { key: "gender", label: "Пол" },
+    { key: "price_segment", label: "Сегмент" },
+    { key: "condition_status", label: "Состояние" },
     { key: "maintenance_type", label: "Тип ТО" },
     { key: "status", label: "Статус" },
     { key: "parts_need", label: "Запчасти" },
@@ -100,10 +110,28 @@ const MaintenanceTable = ({ events, onUpdate }) => {
 
   // Инициализация столбцов и их настроек
   useEffect(() => {
+    // Проверяем версию настроек для миграции
+    const settingsVersion = localStorage.getItem('maintenanceTableSettingsVersion');
+    if (settingsVersion !== '2.0') {
+      // Очищаем старые настройки при добавлении новых столбцов
+      localStorage.removeItem('maintenanceTableColumnOrder');
+      localStorage.removeItem('maintenanceTableVisibleColumns');
+      localStorage.removeItem('maintenanceTableColumnWidths');
+      localStorage.setItem('maintenanceTableSettingsVersion', '2.0');
+    }
+    
     const defaultWidths = {
       id: 60,
-      bike_number: 100,
+      internal_article: 120,
       model: 120,
+      brand_name: 100,
+      model_year: 80,
+      wheel_size: 100,
+      frame_size: 80,
+      frame_number: 120,
+      gender: 80,
+      price_segment: 120,
+      condition_status: 120,
       maintenance_type: 100,
       status: 120,
       parts_need: 120,
@@ -124,7 +152,7 @@ const MaintenanceTable = ({ events, onUpdate }) => {
     setColumnWidths(savedWidths ? JSON.parse(savedWidths) : defaultWidths);
     
     const defaultVisible = [
-      "id", "bike_number", "model", "maintenance_type", "status", 
+      "id", "internal_article", "model", "maintenance_type", "status", 
       "parts_need", "scheduled_for", "started_at", "completed_at", 
       "repair_hours", "scheduled_user_name", "description"
     ];
@@ -673,11 +701,11 @@ const MaintenanceTable = ({ events, onUpdate }) => {
                   if (key === 'id') {
                     return <td key={key} data-column={key}>{event.id}</td>;
                   }
-                  if (key === 'bike_number') {
+                  if (key === 'internal_article') {
                     return (
                       <td key={key} data-column={key}>
                         <div className="bike-info">
-                          <span className="bike-number">{event.bike_number}</span>
+                          <span className="bike-number">{event.internal_article}</span>
                           {event.is_overdue && (
                             <span className="overdue-badge" title="Просроченный ремонт">
                               ⚠️
@@ -689,6 +717,51 @@ const MaintenanceTable = ({ events, onUpdate }) => {
                   }
                   if (key === 'model') {
                     return <td key={key} data-column={key}>{event.model}</td>;
+                  }
+                  if (key === 'brand_name') {
+                    return <td key={key} data-column={key}>{event.brand_name || '—'}</td>;
+                  }
+                  if (key === 'model_year') {
+                    return <td key={key} data-column={key}>{event.model_year || '—'}</td>;
+                  }
+                  if (key === 'wheel_size') {
+                    return <td key={key} data-column={key}>{event.wheel_size ? event.wheel_size + '"' : '—'}</td>;
+                  }
+                  if (key === 'frame_size') {
+                    return <td key={key} data-column={key}>{event.frame_size || '—'}</td>;
+                  }
+                  if (key === 'frame_number') {
+                    return <td key={key} data-column={key}>{event.frame_number || '—'}</td>;
+                  }
+                  if (key === 'gender') {
+                    return <td key={key} data-column={key}>{event.gender || '—'}</td>;
+                  }
+                  if (key === 'price_segment') {
+                    return <td key={key} data-column={key}>{event.price_segment || '—'}</td>;
+                  }
+                  if (key === 'condition_status') {
+                    const getStatusBadgeClass = (status) => {
+                      const statusColorMap = {
+                        "в наличии": "green",
+                        "в прокате": "blue", 
+                        "в ремонте": "orange",
+                        "бронь": "purple",
+                        "продан": "red",
+                        "украден": "red",
+                        "невозврат": "red",
+                        "требует ремонта": "red"
+                      };
+                      const color = statusColorMap[status] || "green";
+                      return `status-badge status-badge-${color}`;
+                    };
+                    
+                    return (
+                      <td key={key} data-column={key}>
+                        <span className={getStatusBadgeClass(event.condition_status)}>
+                          {event.condition_status || '—'}
+                        </span>
+                      </td>
+                    );
                   }
                   if (key === 'maintenance_type') {
                     return (
@@ -789,9 +862,6 @@ const MaintenanceTable = ({ events, onUpdate }) => {
                         ) : "—"}
                       </td>
                     );
-                  }
-                  if (key === 'bike_status') {
-                    return <td key={key} data-column={key}>{event.bike_status || "—"}</td>;
                   }
                   if (key === 'created_at') {
                     return <td key={key} data-column={key}>{formatDateTime(event.created_at)}</td>;

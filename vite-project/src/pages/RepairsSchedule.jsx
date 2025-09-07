@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import TableControls from "../components/TableControls";
 import MultiSelectPopover from "../components/MultiSelectPopover";
+import { BIKE_OPTIONS, SCHEDULE_OPTIONS } from "../constants/selectOptions";
 import "./RepairsSchedule.css";
 import "../components/BikeTable.css";
 
@@ -44,12 +45,8 @@ const RepairsSchedule = () => {
 
   // Опции для выпадающих фильтров
   const selectOptions = {
-    wheel_size: ["12", "16", "20", "24", "26", "27.5", "29"],
-    frame_size: ["д20", "д24", "XS", "S", "M", "L", "XL", "XXL", "13", "14", "15", "15,5", "16", "16,5", "17", "17,5", "18", "18,5", "19", "19,5", "20", "20,5", "21", "21,5", "22", "22,5", "23", "23,5"],
-    gender: ["женский", "мужской", "унисекс"],
-    price_segment: ["kids", "econom", "standart", "premium", "эл.вел'", "эл.самокат"],
-    condition_status: ["в наличии", "в прокате", "в ремонте", "бронь", "продан", "украден", "невозврат"],
-    scheduled_day: ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье", "Не запланировано"]
+    ...BIKE_OPTIONS,
+    ...SCHEDULE_OPTIONS
   };
 
   const daysOfWeek = [
@@ -65,18 +62,31 @@ const RepairsSchedule = () => {
   useEffect(() => {
     fetchData();
     
+    // Проверяем версию настроек для миграции
+    const settingsVersion = localStorage.getItem('repairsScheduleSettingsVersion');
+    if (settingsVersion !== '2.0') {
+      // Очищаем старые настройки при добавлении новых столбцов
+      localStorage.removeItem('repairsScheduleColumnOrder');
+      localStorage.removeItem('repairsScheduleVisibleColumns');
+      localStorage.removeItem('repairsScheduleColumnWidths');
+      localStorage.setItem('repairsScheduleSettingsVersion', '2.0');
+    }
+    
     // Инициализация ширин столбцов
     const defaultWidths = {
       id: 60,
       internal_article: 120,
       model: 200,
+      brand_name: 100,
       model_year: 80,
       wheel_size: 100,
       frame_size: 80,
+      frame_number: 120,
       gender: 80,
       price_segment: 120,
       condition_status: 120,
-      scheduled_day: 150
+      scheduled_day: 150,
+      notes: 200
     };
     
     const savedWidths = localStorage.getItem('repairsScheduleColumnWidths');
@@ -100,20 +110,39 @@ const RepairsSchedule = () => {
       "id",
       "internal_article",
       "model", 
+      "brand_name",
       "model_year",
       "wheel_size",
       "frame_size",
+      "frame_number",
       "gender",
       "price_segment",
       "condition_status",
-      "scheduled_day"
+      "scheduled_day",
+      "notes"
     ];
     
     const savedVisible = localStorage.getItem('repairsScheduleVisibleColumns');
     setVisibleColumns(savedVisible ? JSON.parse(savedVisible) : defaultVisible);
     
     const savedOrder = localStorage.getItem('repairsScheduleColumnOrder');
-    setColumnOrder(savedOrder ? JSON.parse(savedOrder) : defaultOrder);
+    const parsedOrder = savedOrder ? JSON.parse(savedOrder) : defaultOrder;
+    
+    // Проверяем, что все столбцы из defaultOrder присутствуют в savedOrder
+    const allColumns = [
+      "id", "internal_article", "model", "brand_name", "model_year", 
+      "wheel_size", "frame_size", "frame_number", "gender", "price_segment", 
+      "condition_status", "scheduled_day", "notes"
+    ];
+    
+    // Если в savedOrder отсутствуют новые столбцы, добавляем их
+    const missingColumns = allColumns.filter(col => !parsedOrder.includes(col));
+    const updatedOrder = [...parsedOrder, ...missingColumns];
+    
+    setColumnOrder(updatedOrder);
+    if (missingColumns.length > 0) {
+      localStorage.setItem('repairsScheduleColumnOrder', JSON.stringify(updatedOrder));
+    }
   }, []);
 
   const fetchData = async () => {
@@ -495,13 +524,16 @@ const RepairsSchedule = () => {
       { key: "id", label: "ID", filterable: true },
       { key: "internal_article", label: "Внутр. артикул", filterable: true },
       { key: "model", label: "Модель", filterable: true },
+      { key: "brand_name", label: "Бренд", filterable: true },
       { key: "model_year", label: "Год", filterable: true },
       { key: "wheel_size", label: "Размер колеса", filterable: true, filterType: "select" },
       { key: "frame_size", label: "Рама", filterable: true, filterType: "select" },
+      { key: "frame_number", label: "Номер рамы", filterable: true },
       { key: "gender", label: "Пол", filterable: true, filterType: "select" },
       { key: "price_segment", label: "Сегмент", filterable: true, filterType: "select" },
       { key: "condition_status", label: "Состояние", filterable: true, filterType: "select" },
       { key: "scheduled_day", label: "Запланированный день", filterable: true, filterType: "select" },
+      { key: "notes", label: "Примечания", filterable: true },
       { key: "actions", label: "Действия", filterable: false },
     ];
     
@@ -542,34 +574,36 @@ const RepairsSchedule = () => {
     { key: "id", label: "ID", filterable: true },
     { key: "internal_article", label: "Внутр. артикул", filterable: true },
     { key: "model", label: "Модель", filterable: true },
+    { key: "brand_name", label: "Бренд", filterable: true },
     { key: "model_year", label: "Год", filterable: true },
     { key: "wheel_size", label: "Размер колеса", filterable: true, filterType: "select" },
     { key: "frame_size", label: "Рама", filterable: true, filterType: "select" },
+    { key: "frame_number", label: "Номер рамы", filterable: true },
     { key: "gender", label: "Пол", filterable: true, filterType: "select" },
     { key: "price_segment", label: "Сегмент", filterable: true, filterType: "select" },
     { key: "condition_status", label: "Состояние", filterable: true, filterType: "select" },
     { key: "scheduled_day", label: "Запланированный день", filterable: true, filterType: "select" },
+    { key: "notes", label: "Примечания", filterable: true },
   ];
 
   // Получаем упорядоченные столбцы согласно columnOrder
   const getOrderedColumns = () => {
     if (columnOrder.length === 0) return columns;
     
-    const orderedColumns = [];
     const columnMap = new Map(columns.map(col => [col.key, col]));
+    const orderedColumns = [];
     
-    // Добавляем столбцы в порядке columnOrder
+    // Добавляем столбцы в порядке columnOrder (только те, что существуют)
     columnOrder.forEach(key => {
       if (columnMap.has(key)) {
         orderedColumns.push(columnMap.get(key));
+        columnMap.delete(key); // Убираем из карты, чтобы избежать дубликатов
       }
     });
     
-    // Добавляем любые новые столбцы, которых нет в columnOrder
-    columns.forEach(col => {
-      if (!columnOrder.includes(col.key)) {
-        orderedColumns.push(col);
-      }
+    // Добавляем оставшиеся столбцы (новые, которых нет в columnOrder)
+    columnMap.forEach(col => {
+      orderedColumns.push(col);
     });
     
     return orderedColumns;
@@ -736,6 +770,9 @@ const RepairsSchedule = () => {
                     if (key === 'model') {
                       return <td key={key} data-column={key}>{bike.model}</td>;
                     }
+                    if (key === 'brand_name') {
+                      return <td key={key} data-column={key}>{bike.brand_name}</td>;
+                    }
                     if (key === 'model_year') {
                       return <td key={key} data-column={key}>{bike.model_year}</td>;
                     }
@@ -744,6 +781,9 @@ const RepairsSchedule = () => {
                     }
                     if (key === 'frame_size') {
                       return <td key={key} data-column={key}>{bike.frame_size}</td>;
+                    }
+                    if (key === 'frame_number') {
+                      return <td key={key} data-column={key}>{bike.frame_number || '—'}</td>;
                     }
                     if (key === 'gender') {
                       return <td key={key} data-column={key}>{bike.gender}</td>;
@@ -772,6 +812,15 @@ const RepairsSchedule = () => {
                           <span className={getStatusBadgeClass(bike.condition_status)}>
                             {bike.condition_status}
                           </span>
+                        </td>
+                      );
+                    }
+                    if (key === 'notes') {
+                      return (
+                        <td key={key} data-column={key}>
+                          {bike.notes && bike.notes.length > 30 
+                            ? bike.notes.substring(0, 30) + '...' 
+                            : bike.notes || '—'}
                         </td>
                       );
                     }

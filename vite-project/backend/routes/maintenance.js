@@ -82,9 +82,16 @@ router.get("/", async (req, res) => {
     const result = await pool.query(`
       SELECT 
         me.*,
-        b.internal_article as bike_number,
+        b.internal_article,
         b.model,
-        b.condition_status as bike_status,
+        br.name as brand_name,
+        b.model_year,
+        b.wheel_size,
+        b.frame_size,
+        b.frame_number,
+        b.gender,
+        b.price_segment,
+        b.condition_status,
         
         -- Информация об ответственных пользователях
         scheduled_user.name as scheduled_user_name,
@@ -121,6 +128,7 @@ router.get("/", async (req, res) => {
         
       FROM maintenance_events me
       LEFT JOIN bikes b ON me.bike_id = b.id
+      LEFT JOIN brands br ON b.brand_id = br.id
       LEFT JOIN users scheduled_user ON me.scheduled_user_id = scheduled_user.id
       LEFT JOIN users scheduled_for_user ON me.scheduled_for_user_id = scheduled_for_user.id
       LEFT JOIN users started_user ON me.started_user_id = started_user.id

@@ -1,5 +1,6 @@
 /* MaintenanceTable.css - специфичные стили только для таблицы обслуживания */
 
+
 /* Статистический блок над таблицей */
 .table-summary {
   margin-bottom: 16px;
@@ -207,10 +208,6 @@
   user-select: none;
 }
 
-/* Создаем область для перетаскивания в заголовке */
-.maintenance-table th[draggable="true"] {
-  position: relative;
-}
 
 /* Делаем весь заголовок перетаскиваемым, кроме специальных элементов */
 .maintenance-table th[draggable="true"] .filter-select-box,
