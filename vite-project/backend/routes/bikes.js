@@ -47,7 +47,11 @@ router.get("/:id", async (req, res) => {
 
 // POST /api/bikes - создать новый велосипед
 router.post("/", async (req, res) => {
+  const client = await pool.connect();
+  
   try {
+    await client.query('BEGIN');
+    
     const {
       model,
       internal_article,
@@ -70,10 +74,15 @@ router.post("/", async (req, res) => {
       has_documents,
       document_details,
       installed_components,
-      created_by
+      created_by,
+      exchange_rate_data
     } = req.body;
 
-    const result = await pool.query(`
+    // Преобразуем пустые строки в null для уникальных полей
+    const processedInternalArticle = internal_article && internal_article.trim() !== '' ? internal_article : null;
+
+    // Создаем велосипед
+    const bikeResult = await client.query(`
       INSERT INTO bikes (
         model, internal_article, brand_id, purchase_price_usd, purchase_price_uah,
         purchase_date, model_year, wheel_size, frame_size, frame_number, gender, price_segment,
@@ -84,17 +93,34 @@ router.post("/", async (req, res) => {
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22
       ) RETURNING *
     `, [
-      model, internal_article, brand_id, purchase_price_usd, purchase_price_uah,
+      model, processedInternalArticle, brand_id, purchase_price_usd, purchase_price_uah,
       purchase_date, model_year, wheel_size, frame_size, frame_number, gender, price_segment,
       supplier_article, supplier_website_link, photos || {}, last_maintenance_date,
       condition_status, notes, has_documents || false, document_details || {},
       installed_components || {}, created_by
     ]);
 
-    res.status(201).json(result.rows[0]);
+    // Если передан курс валют и дата покупки, сохраняем его
+    if (exchange_rate_data && purchase_date && exchange_rate_data.usd_to_uah) {
+      await client.query(`
+        INSERT INTO currency_rates (currency_code, rate_to_uah, date, created_at) 
+        VALUES ('USD', $1, $2, CURRENT_TIMESTAMP)
+        ON CONFLICT (currency_code, date) 
+        DO UPDATE SET 
+          rate_to_uah = EXCLUDED.rate_to_uah, 
+          created_at = CURRENT_TIMESTAMP
+      `, [exchange_rate_data.usd_to_uah, purchase_date]);
+    }
+
+    await client.query('COMMIT');
+    res.status(201).json(bikeResult.rows[0]);
+    
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error("Ошибка создания велосипеда:", error);
     res.status(500).json({ error: "Ошибка сервера" });
+  } finally {
+    client.release();
   }
 });
 
