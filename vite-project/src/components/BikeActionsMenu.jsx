@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from "react";
 import "./Popover.css";
 
-const BikeActionsMenu = ({ bike, onEdit, onCreateMaintenance, onDelete }) => {
+const BikeActionsMenu = ({ bike, onEdit, onCopy, onDelete }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [position, setPosition] = useState({ top: 0, left: 0 });
   const menuRef = useRef(null);
   const triggerRef = useRef(null);
 
@@ -27,13 +28,36 @@ const BikeActionsMenu = ({ bike, onEdit, onCreateMaintenance, onDelete }) => {
     };
   }, [isOpen]);
 
+  // Вычисляем позицию меню
+  useEffect(() => {
+    if (isOpen && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      const menuHeight = 120; // примерная высота меню
+      const menuWidth = 160;
+
+      let top = rect.bottom + 4;
+      let left = rect.right - menuWidth; // позиционируем справа от кнопки
+
+      // Проверяем, не выходит ли меню за пределы экрана
+      if (left < 10) {
+        left = rect.left;
+      }
+
+      if (top + menuHeight > window.innerHeight) {
+        top = rect.top - menuHeight - 4;
+      }
+
+      setPosition({ top, left });
+    }
+  }, [isOpen]);
+
   const handleAction = (action) => {
     switch (action) {
       case "edit":
         onEdit(bike);
         break;
-      case "maintenance":
-        onCreateMaintenance(bike.id);
+      case "copy":
+        onCopy(bike);
         break;
       case "delete":
         if (
@@ -46,12 +70,6 @@ const BikeActionsMenu = ({ bike, onEdit, onCreateMaintenance, onDelete }) => {
     setIsOpen(false);
   };
 
-  const canCreateMaintenance = ![
-    "в ремонте",
-    "продан",
-    "украден",
-    "невозврат",
-  ].includes(bike.status);
 
   return (
     <div className="actions-menu-container">
@@ -65,19 +83,20 @@ const BikeActionsMenu = ({ bike, onEdit, onCreateMaintenance, onDelete }) => {
       </button>
 
       {isOpen && (
-        <div ref={menuRef} className="actions-menu">
+        <div
+          ref={menuRef}
+          className="actions-menu"
+          style={{
+            top: `${position.top}px`,
+            left: `${position.left}px`
+          }}>
           <button className="menu-item" onClick={() => handleAction("edit")}>
             ✏️ Редактировать
           </button>
 
-          {canCreateMaintenance && (
-            <button
-              className="menu-item"
-              onClick={() => handleAction("maintenance")}
-            >
-              🔧 Отправить в ремонт
-            </button>
-          )}
+          <button className="menu-item" onClick={() => handleAction("copy")}>
+            📋 Копировать
+          </button>
 
           <div className="menu-divider"></div>
 

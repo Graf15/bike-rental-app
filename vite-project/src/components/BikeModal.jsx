@@ -3,7 +3,7 @@ import { BIKE_OPTIONS } from '../constants/selectOptions';
 import AddBrandModal from './AddBrandModal';
 import './Modal.css';
 
-const CreateBikeModal = ({ isOpen, onClose, onSubmit }) => {
+const BikeModal = ({ isOpen, onClose, onSubmit, mode = 'create', bikeData = null }) => {
   const [formData, setFormData] = useState({
     model: '',
     internal_article: '',
@@ -48,6 +48,44 @@ const CreateBikeModal = ({ isOpen, onClose, onSubmit }) => {
       fetchBrands();
     }
   }, [isOpen]);
+
+  // Предзаполнение формы при редактировании или копировании
+  useEffect(() => {
+    if ((mode === 'edit' || (mode === 'create' && bikeData)) && bikeData && isOpen) {
+      setFormData({
+        model: bikeData.model || '',
+        internal_article: bikeData.internal_article || '',
+        brand_id: bikeData.brand_id?.toString() || '',
+        purchase_price_usd: bikeData.purchase_price_usd || '',
+        purchase_price_uah: bikeData.purchase_price_uah || '',
+        supplier_exchange_rate: '',
+        purchase_date: bikeData.purchase_date ? new Date(bikeData.purchase_date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        model_year: bikeData.model_year || '',
+        wheel_size: bikeData.wheel_size || '',
+        frame_size: bikeData.frame_size || '',
+        frame_number: bikeData.frame_number || '',
+        gender: bikeData.gender || '',
+        price_segment: bikeData.price_segment || '',
+        supplier_article: bikeData.supplier_article || '',
+        supplier_website_link: bikeData.supplier_website_link || '',
+        condition_status: bikeData.condition_status || 'в наличии',
+        notes: bikeData.notes || '',
+        photos: bikeData.photos || { urls: [], main: 0 },
+        has_documents: bikeData.has_documents || false,
+        document_details: bikeData.document_details ? {
+          ...bikeData.document_details,
+          invoice_date: bikeData.document_details.invoice_date ?
+            new Date(bikeData.document_details.invoice_date).toISOString().split('T')[0] :
+            bikeData.document_details.invoice_date || '',
+          documents: bikeData.document_details.documents || []
+        } : {
+          invoice_date: '',
+          invoice_price_uah: '',
+          documents: []
+        }
+      });
+    }
+  }, [mode, bikeData, isOpen]);
 
   const fetchBrands = async () => {
     try {
@@ -180,7 +218,7 @@ const CreateBikeModal = ({ isOpen, onClose, onSubmit }) => {
       setExchangeRate(null);
       setLastChangedCurrency(null);
     } catch (error) {
-      setError(error.message || 'Ошибка при создании велосипеда');
+      setError(error.message || (mode === 'edit' ? 'Ошибка при обновлении велосипеда' : 'Ошибка при создании велосипеда'));
     } finally {
       setLoading(false);
     }
@@ -206,8 +244,8 @@ const CreateBikeModal = ({ isOpen, onClose, onSubmit }) => {
     setFormData(prev => ({
       ...prev,
       photos: {
-        ...prev.photos,
-        urls: [...prev.photos.urls, '']
+        ...(prev.photos || { urls: [], main: 0 }),
+        urls: [...(prev.photos?.urls || []), '']
       }
     }));
   };
@@ -216,20 +254,22 @@ const CreateBikeModal = ({ isOpen, onClose, onSubmit }) => {
     setFormData(prev => ({
       ...prev,
       photos: {
-        ...prev.photos,
-        urls: prev.photos.urls.map((existingUrl, i) => i === index ? url : existingUrl)
+        ...(prev.photos || { urls: [], main: 0 }),
+        urls: (prev.photos?.urls || []).map((existingUrl, i) => i === index ? url : existingUrl)
       }
     }));
   };
 
   const removePhotoUrl = (index) => {
     setFormData(prev => {
-      const newUrls = prev.photos.urls.filter((_, i) => i !== index);
+      const currentUrls = prev.photos?.urls || [];
+      const newUrls = currentUrls.filter((_, i) => i !== index);
+      const currentMain = prev.photos?.main || 0;
       return {
         ...prev,
         photos: {
           urls: newUrls,
-          main: prev.photos.main >= newUrls.length ? 0 : prev.photos.main
+          main: currentMain >= newUrls.length ? 0 : currentMain
         }
       };
     });
@@ -239,7 +279,7 @@ const CreateBikeModal = ({ isOpen, onClose, onSubmit }) => {
     setFormData(prev => ({
       ...prev,
       photos: {
-        ...prev.photos,
+        ...(prev.photos || { urls: [], main: 0 }),
         main: index
       }
     }));
@@ -273,7 +313,7 @@ const CreateBikeModal = ({ isOpen, onClose, onSubmit }) => {
       ...prev,
       document_details: {
         ...prev.document_details,
-        documents: [...prev.document_details.documents, {
+        documents: [...(prev.document_details?.documents || []), {
           type: 'invoice',
           url: '',
           description: ''
@@ -287,7 +327,7 @@ const CreateBikeModal = ({ isOpen, onClose, onSubmit }) => {
       ...prev,
       document_details: {
         ...prev.document_details,
-        documents: prev.document_details.documents.map((doc, i) => 
+        documents: (prev.document_details?.documents || []).map((doc, i) =>
           i === index ? { ...doc, [field]: value } : doc
         )
       }
@@ -299,7 +339,7 @@ const CreateBikeModal = ({ isOpen, onClose, onSubmit }) => {
       ...prev,
       document_details: {
         ...prev.document_details,
-        documents: prev.document_details.documents.filter((_, i) => i !== index)
+        documents: (prev.document_details?.documents || []).filter((_, i) => i !== index)
       }
     }));
   };
@@ -424,10 +464,10 @@ const CreateBikeModal = ({ isOpen, onClose, onSubmit }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay" onClick={handleClose}>
+    <div className="modal-overlay">
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>Добавить новый велосипед</h2>
+          <h2>{mode === 'edit' ? 'Редактировать велосипед' : 'Добавить новый велосипед'}</h2>
           <button className="modal-close" onClick={handleClose}>
             ✕
           </button>
@@ -685,7 +725,7 @@ const CreateBikeModal = ({ isOpen, onClose, onSubmit }) => {
                     <label>Дата накладной</label>
                     <input
                       type="date"
-                      value={formData.document_details.invoice_date}
+                      value={formData.document_details?.invoice_date || ''}
                       onChange={(e) => updateDocumentDetails('invoice_date', e.target.value)}
                     />
                   </div>
@@ -693,7 +733,7 @@ const CreateBikeModal = ({ isOpen, onClose, onSubmit }) => {
                     <label>Цена по накладной (UAH)</label>
                     <input
                       type="number"
-                      value={formData.document_details.invoice_price_uah}
+                      value={formData.document_details?.invoice_price_uah || ''}
                       onChange={(e) => updateDocumentDetails('invoice_price_uah', e.target.value)}
                       step="0.01"
                       min="0"
@@ -704,7 +744,7 @@ const CreateBikeModal = ({ isOpen, onClose, onSubmit }) => {
 
                 <div className="documents-list">
                   <h4>Документы</h4>
-                  {formData.document_details.documents.map((doc, index) => (
+                  {(formData.document_details?.documents || []).map((doc, index) => (
                     <div key={index} className="document-input-group">
                       <div className="form-row">
                         <div className="form-group">
@@ -810,7 +850,7 @@ const CreateBikeModal = ({ isOpen, onClose, onSubmit }) => {
           <div className="form-section">
             <h3>Фотографии</h3>
             <div className="photos-section">
-              {formData.photos.urls.map((url, index) => (
+              {(formData.photos?.urls || []).map((url, index) => (
                 <div key={index} className="photo-input-group">
                   <div className="input-with-button">
                     <input
@@ -841,7 +881,7 @@ const CreateBikeModal = ({ isOpen, onClose, onSubmit }) => {
                           <input
                             type="radio"
                             name="main_photo"
-                            checked={formData.photos.main === index}
+                            checked={(formData.photos?.main || 0) === index}
                             onChange={() => setMainPhoto(index)}
                           />
                           Основное фото
@@ -876,7 +916,7 @@ const CreateBikeModal = ({ isOpen, onClose, onSubmit }) => {
               className="btn btn-primary-green"
               disabled={loading}
             >
-              {loading ? 'Создание...' : 'Создать велосипед'}
+              {loading ? (mode === 'edit' ? 'Сохранение...' : 'Создание...') : (mode === 'edit' ? 'Сохранить изменения' : 'Создать велосипед')}
             </button>
           </div>
         </form>
@@ -893,4 +933,4 @@ const CreateBikeModal = ({ isOpen, onClose, onSubmit }) => {
   );
 };
 
-export default CreateBikeModal;
+export default BikeModal;

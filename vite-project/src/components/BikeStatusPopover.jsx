@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import "./Popover.css";
 
-const BikeStatusPopover = ({ bike, onStatusChange, onCreateMaintenance }) => {
+const BikeStatusPopover = ({ bike, onStatusChange }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const popoverRef = useRef(null);
@@ -69,13 +69,8 @@ const BikeStatusPopover = ({ bike, onStatusChange, onCreateMaintenance }) => {
   }, [isOpen]);
 
   const handleStatusClick = (newStatus) => {
-    if (newStatus === "в ремонте") {
-      // Открываем модальное окно создания ремонта
-      onCreateMaintenance(bike.id);
-    } else {
-      // Просто меняем статус
-      onStatusChange(bike.id, newStatus);
-    }
+    // Просто меняем статус
+    onStatusChange(bike.id, newStatus);
     setIsOpen(false);
   };
 
@@ -122,22 +117,6 @@ const BikeStatusPopover = ({ bike, onStatusChange, onCreateMaintenance }) => {
             ))}
           </div>
 
-          {bike.condition_status !== "в ремонте" && (
-            <>
-              <div className="popover-divider"></div>
-              <div className="popover-actions">
-                <button
-                  className="action-button maintenance-action"
-                  onClick={() => {
-                    onCreateMaintenance(bike.id);
-                    setIsOpen(false);
-                  }}
-                >
-                  🔧 Отправить в ремонт
-                </button>
-              </div>
-            </>
-          )}
         </div>
       )}
     </div>

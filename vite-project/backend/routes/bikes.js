@@ -170,6 +170,85 @@ router.patch("/:id", async (req, res) => {
   }
 });
 
+// PUT /api/bikes/:id - полное обновление велосипеда по ID
+router.put("/:id", async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const { id } = req.params;
+    const {
+      model,
+      internal_article,
+      brand_id,
+      purchase_price_usd,
+      purchase_price_uah,
+      purchase_date,
+      model_year,
+      wheel_size,
+      frame_size,
+      frame_number,
+      gender,
+      price_segment,
+      supplier_article,
+      supplier_website_link,
+      photos,
+      condition_status,
+      notes,
+      has_documents,
+      document_details,
+      exchange_rate_data
+    } = req.body;
+
+    // Преобразуем пустые строки в null для уникальных полей
+    const processedInternalArticle = internal_article && internal_article.trim() !== '' ? internal_article : null;
+
+    // Обновляем велосипед
+    const bikeResult = await client.query(`
+      UPDATE bikes SET
+        model = $1, internal_article = $2, brand_id = $3, purchase_price_usd = $4, purchase_price_uah = $5,
+        purchase_date = $6, model_year = $7, wheel_size = $8, frame_size = $9, frame_number = $10,
+        gender = $11, price_segment = $12, supplier_article = $13, supplier_website_link = $14,
+        photos = $15, condition_status = $16, notes = $17, has_documents = $18,
+        document_details = $19, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $20
+      RETURNING *
+    `, [
+      model, processedInternalArticle, brand_id, purchase_price_usd, purchase_price_uah,
+      purchase_date, model_year, wheel_size, frame_size, frame_number, gender, price_segment,
+      supplier_article, supplier_website_link, photos || {}, condition_status, notes,
+      has_documents || false, document_details || {}, id
+    ]);
+
+    if (bikeResult.rows.length === 0) {
+      return res.status(404).json({ error: "Велосипед не найден" });
+    }
+
+    // Если передан курс валют и дата покупки, сохраняем его
+    if (exchange_rate_data && purchase_date && exchange_rate_data.usd_to_uah) {
+      await client.query(`
+        INSERT INTO currency_rates (currency_code, rate_to_uah, date, created_at)
+        VALUES ('USD', $1, $2, CURRENT_TIMESTAMP)
+        ON CONFLICT (currency_code, date)
+        DO UPDATE SET
+          rate_to_uah = EXCLUDED.rate_to_uah,
+          created_at = CURRENT_TIMESTAMP
+      `, [exchange_rate_data.usd_to_uah, purchase_date]);
+    }
+
+    await client.query('COMMIT');
+    res.json(bikeResult.rows[0]);
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error("Ошибка обновления велосипеда:", error);
+    res.status(500).json({ error: "Ошибка сервера" });
+  } finally {
+    client.release();
+  }
+});
+
 // DELETE /api/bikes/:id - удалить велосипед
 router.delete("/:id", async (req, res) => {
   const client = await pool.connect();
@@ -191,7 +270,7 @@ router.delete("/:id", async (req, res) => {
     
     // Проверяем, есть ли активные события обслуживания
     const activeMaintenanceCheck = await client.query(
-      'SELECT id FROM maintenance_events WHERE bike_id = $1 AND repair_status IN ($2, $3, $4)',
+      'SELECT id FROM maintenance_events WHERE bike_id = $1 AND status IN ($2, $3, $4)',
       [id, 'в ремонте', 'ожидает деталей', 'запланирован']
     );
     

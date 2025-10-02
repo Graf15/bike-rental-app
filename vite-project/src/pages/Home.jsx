@@ -1,17 +1,16 @@
 import React, { useEffect, useState } from "react";
 import BikeTable from "../components/BikeTable";
-import CreateMaintenanceModal from "../components/CreateMaintenanceModal";
-import CreateBikeModal from "../components/CreateBikeModal";
+import BikeModal from "../components/BikeModal";
 import "./Home.css";
 
 const Home = () => {
   const [bikes, setBikes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [isMaintenanceModalOpen, setIsMaintenanceModalOpen] = useState(false);
-  const [selectedBikeId, setSelectedBikeId] = useState(null);
   const [statusFilter, setStatusFilter] = useState(null);
   const [isAddBikeModalOpen, setIsAddBikeModalOpen] = useState(false);
+  const [isEditBikeModalOpen, setIsEditBikeModalOpen] = useState(false);
+  const [editingBike, setEditingBike] = useState(null);
 
   // Загрузка данных о велосипедах при монтировании компонента
   const fetchBikes = async () => {
@@ -35,47 +34,22 @@ const Home = () => {
     fetchBikes();
   }, []);
 
-  const handleCreateMaintenance = async (maintenanceData) => {
-    try {
-      const response = await fetch("/api/maintenance", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(maintenanceData),
-      });
-
-      if (!response.ok) {
-        throw new Error("Ошибка при создании события обслуживания");
-      }
-
-      // Обновляем список велосипедов, чтобы отразить изменения статуса
-      await fetchBikes();
-
-      return response.json();
-    } catch (error) {
-      console.error("Ошибка создания ремонта:", error);
-      throw error;
-    }
-  };
-
-  const handleOpenMaintenanceModal = (bikeId = null) => {
-    setSelectedBikeId(bikeId);
-    setIsMaintenanceModalOpen(true);
-  };
-
-  const handleCloseMaintenanceModal = () => {
-    setIsMaintenanceModalOpen(false);
-    setSelectedBikeId(null);
-  };
 
   const handleBikeEdit = (bike) => {
-    // Пока что просто показываем alert, позже можно реализовать модальное окно редактирования
-    alert(
-      `Редактирование велосипеда ${
-        bike.bike_number || bike.model
-      } пока не реализовано`
-    );
+    setEditingBike(bike);
+    setIsEditBikeModalOpen(true);
+  };
+
+  const handleBikeCopy = (bike) => {
+    // Создаем копию данных велосипеда с префиксом (КОПИЯ)
+    const copiedBike = {
+      ...bike,
+      model: `(КОПИЯ) ${bike.model}`,
+      internal_article: '', // Очищаем артикул чтобы избежать дублирования
+      frame_number: '', // Очищаем номер рамы чтобы избежать дублирования
+    };
+    setEditingBike(copiedBike);
+    setIsAddBikeModalOpen(true); // Открываем в режиме создания
   };
 
   const handleOpenAddBikeModal = () => {
@@ -84,6 +58,12 @@ const Home = () => {
 
   const handleCloseAddBikeModal = () => {
     setIsAddBikeModalOpen(false);
+    setEditingBike(null); // Очищаем данные при закрытии
+  };
+
+  const handleCloseEditBikeModal = () => {
+    setIsEditBikeModalOpen(false);
+    setEditingBike(null);
   };
 
   const handleCreateBike = async (bikeData) => {
@@ -102,11 +82,53 @@ const Home = () => {
 
       // Обновляем список велосипедов
       await fetchBikes();
-      
+
       return response.json();
     } catch (error) {
       console.error("Ошибка создания велосипеда:", error);
       throw error;
+    }
+  };
+
+  const handleUpdateBike = async (bikeData) => {
+    try {
+      const response = await fetch(`/api/bikes/${editingBike.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(bikeData),
+      });
+
+      if (!response.ok) {
+        throw new Error("Ошибка при обновлении велосипеда");
+      }
+
+      // Обновляем список велосипедов
+      await fetchBikes();
+
+      return response.json();
+    } catch (error) {
+      console.error("Ошибка обновления велосипеда:", error);
+      throw error;
+    }
+  };
+
+  const handleBikeDelete = async (bikeId) => {
+    try {
+      const response = await fetch(`/api/bikes/${bikeId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("Ошибка при удалении велосипеда");
+      }
+
+      // Обновляем список велосипедов
+      await fetchBikes();
+    } catch (error) {
+      console.error("Ошибка удаления велосипеда:", error);
+      alert("Ошибка: " + error.message);
     }
   };
 
@@ -231,23 +253,28 @@ const Home = () => {
         <BikeTable
           bikes={bikes}
           onBikeUpdate={fetchBikes}
-          onCreateMaintenance={handleOpenMaintenanceModal}
           onBikeEdit={handleBikeEdit}
+          onBikeCopy={handleBikeCopy}
+          onBikeDelete={handleBikeDelete}
           statusFilter={statusFilter}
         />
       </div>
 
-      <CreateMaintenanceModal
-        isOpen={isMaintenanceModalOpen}
-        onClose={handleCloseMaintenanceModal}
-        onSubmit={handleCreateMaintenance}
-        selectedBikeId={selectedBikeId}
-      />
 
-      <CreateBikeModal
+      <BikeModal
         isOpen={isAddBikeModalOpen}
         onClose={handleCloseAddBikeModal}
         onSubmit={handleCreateBike}
+        mode="create"
+        bikeData={editingBike} // Передаем данные для копирования
+      />
+
+      <BikeModal
+        isOpen={isEditBikeModalOpen}
+        onClose={handleCloseEditBikeModal}
+        onSubmit={handleUpdateBike}
+        mode="edit"
+        bikeData={editingBike}
       />
     </div>
   );

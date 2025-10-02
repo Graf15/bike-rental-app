@@ -40,8 +40,8 @@ const ColumnResizer = ({ onMouseDown }) => {
 const BikeTable = ({
   bikes,
   onBikeUpdate,
-  onCreateMaintenance,
   onBikeEdit,
+  onBikeCopy,
   onBikeDelete,
   statusFilter,
 }) => {
@@ -381,23 +381,24 @@ const BikeTable = ({
   };
 
   const handleBikeDelete = async (bikeId) => {
-    try {
-      const response = await fetch(`/api/bikes/${bikeId}`, {
-        method: "DELETE",
-      });
+    if (onBikeDelete) {
+      onBikeDelete(bikeId);
+    } else if (onBikeUpdate) {
+      // Fallback если onBikeDelete не передан
+      try {
+        const response = await fetch(`/api/bikes/${bikeId}`, {
+          method: "DELETE",
+        });
 
-      if (!response.ok) {
-        throw new Error("Ошибка при удалении велосипеда");
-      }
+        if (!response.ok) {
+          throw new Error("Ошибка при удалении велосипеда");
+        }
 
-      if (onBikeDelete) {
-        onBikeDelete(bikeId);
-      } else if (onBikeUpdate) {
         onBikeUpdate();
+      } catch (error) {
+        console.error("Ошибка удаления велосипеда:", error);
+        alert("Ошибка при удалении велосипеда");
       }
-    } catch (error) {
-      console.error("Ошибка удаления велосипеда:", error);
-      alert("Ошибка при удалении велосипеда");
     }
   };
 
@@ -606,7 +607,6 @@ const BikeTable = ({
                      <BikeStatusPopover
                        bike={bike}
                        onStatusChange={(bikeId, newStatus) => handleStatusChange(bikeId, newStatus, 'condition_status')}
-                       onCreateMaintenance={onCreateMaintenance}
                      />
                    ) : (bike[key] || "—")}
                 </td>
@@ -615,7 +615,7 @@ const BikeTable = ({
                 <BikeActionsMenu
                   bike={bike}
                   onEdit={handleBikeEdit}
-                  onCreateMaintenance={onCreateMaintenance}
+                  onCopy={onBikeCopy}
                   onDelete={handleBikeDelete}
                 />
               </td>
