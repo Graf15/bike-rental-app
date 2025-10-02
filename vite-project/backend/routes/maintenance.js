@@ -275,6 +275,93 @@ router.post("/", async (req, res) => {
   }
 });
 
+// PUT /api/maintenance/:id - обновить событие обслуживания
+router.put("/:id", async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    const { id } = req.params;
+    const {
+      bike_id,
+      maintenance_type,
+      status,
+      scheduled_for,
+      scheduled_for_user_id,
+      description,
+      notes,
+      parts_need
+    } = req.body;
+
+    // Проверяем существование события
+    const eventCheck = await client.query(
+      "SELECT id FROM maintenance_events WHERE id = $1",
+      [id]
+    );
+
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ error: "Событие обслуживания не найдено" });
+    }
+
+    // Обновляем событие
+    const result = await client.query(`
+      UPDATE maintenance_events SET
+        bike_id = $1,
+        maintenance_type = $2,
+        status = $3,
+        scheduled_for = $4,
+        scheduled_for_user_id = $5,
+        description = $6,
+        notes = $7,
+        parts_need = $8
+      WHERE id = $9
+      RETURNING id
+    `, [
+      bike_id,
+      maintenance_type,
+      status,
+      scheduled_for,
+      scheduled_for_user_id,
+      description,
+      notes,
+      parts_need,
+      id
+    ]);
+
+    await client.query("COMMIT");
+
+    // Возвращаем обновленное событие с расширенной информацией
+    const updatedEvent = await pool.query(`
+      SELECT
+        me.*,
+        b.internal_article as bike_number,
+        b.model,
+        b.condition_status as bike_status,
+        scheduled_user.name as scheduled_user_name,
+        scheduled_for_user.name as scheduled_for_user_name,
+        started_user.name as started_user_name
+      FROM maintenance_events me
+      LEFT JOIN bikes b ON me.bike_id = b.id
+      LEFT JOIN users scheduled_user ON me.scheduled_user_id = scheduled_user.id
+      LEFT JOIN users scheduled_for_user ON me.scheduled_for_user_id = scheduled_for_user.id
+      LEFT JOIN users started_user ON me.started_user_id = started_user.id
+      WHERE me.id = $1`,
+      [id]
+    );
+
+    res.json(updatedEvent.rows[0]);
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Ошибка обновления события обслуживания:", error);
+    res
+      .status(400)
+      .json({ error: error.message || "Ошибка при обновлении события" });
+  } finally {
+    client.release();
+  }
+});
+
 // GET /api/maintenance/weekly-schedule - получить еженедельное расписание
 router.get("/weekly-schedule", async (req, res) => {
   console.log("=== WEEKLY SCHEDULE ENDPOINT CALLED ===");

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import MaintenanceTable from "../components/MaintenanceTable";
-import CreateMaintenanceModal from "../components/CreateMaintenanceModal";
+import MaintenanceEventModal from "../components/MaintenanceEventModal";
 import "./Maintenance.css";
 
 const Maintenance = () => {
@@ -9,6 +9,8 @@ const Maintenance = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState(null);
   const [statusChangeModal, setStatusChangeModal] = useState({ open: false, eventId: null, currentStatus: null });
 
   useEffect(() => {
@@ -54,6 +56,29 @@ const Maintenance = () => {
     }
   };
 
+  const handleEditMaintenance = async (maintenanceData) => {
+    try {
+      const response = await fetch(`/api/maintenance/${editingEvent.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(maintenanceData),
+      });
+
+      if (!response.ok) {
+        throw new Error("Ошибка при обновлении события обслуживания");
+      }
+
+      // Перезагружаем данные
+      await fetchMaintenanceEvents();
+      return response.json();
+    } catch (error) {
+      console.error("Ошибка обновления ремонта:", error);
+      throw error;
+    }
+  };
+
   const handleMaintenanceAction = async (action, eventId, eventData) => {
     try {
       switch (action) {
@@ -67,8 +92,8 @@ const Maintenance = () => {
           break;
           
         case 'edit':
-          // TODO: Implement edit modal
-          alert('Редактирование будет реализовано в следующей версии');
+          setEditingEvent(eventData);
+          setIsEditModalOpen(true);
           break;
           
         case 'delete':
@@ -141,10 +166,22 @@ const Maintenance = () => {
         onUpdate={handleMaintenanceAction}
       />
 
-      <CreateMaintenanceModal
+      <MaintenanceEventModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleCreateMaintenance}
+        mode="create"
+      />
+
+      <MaintenanceEventModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setEditingEvent(null);
+        }}
+        onSubmit={handleEditMaintenance}
+        mode="edit"
+        eventData={editingEvent}
       />
 
       {statusChangeModal.open && (

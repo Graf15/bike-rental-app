@@ -7,9 +7,13 @@ const router = express.Router();
 router.get("/", async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT 
+      SELECT
         pm.*,
-        COALESCE(ps."количество_на_складе", 0) as "количество_на_складе"
+        COALESCE(ps.quantity, 0) as quantity,
+        ps.min_stock,
+        ps.max_stock,
+        ps.warehouse_location,
+        ps.notes as stock_notes
       FROM part_models pm
       LEFT JOIN part_stock ps ON pm.id = ps.part_model_id
       ORDER BY pm.id
@@ -27,9 +31,13 @@ router.get("/:id", async (req, res) => {
     const { id } = req.params;
     const result = await pool.query(
       `
-      SELECT 
+      SELECT
         pm.*,
-        COALESCE(ps."количество_на_складе", 0) as "количество_на_складе"
+        COALESCE(ps.quantity, 0) as quantity,
+        ps.min_stock,
+        ps.max_stock,
+        ps.warehouse_location,
+        ps.notes as stock_notes
       FROM part_models pm
       LEFT JOIN part_stock ps ON pm.id = ps.part_model_id
       WHERE pm.id = $1
@@ -54,10 +62,19 @@ router.post("/", async (req, res) => {
 
   try {
     const {
-      название,
-      описание,
-      совместимые_с,
-      количество_на_складе = 0,
+      name,
+      category,
+      brand,
+      model,
+      description,
+      unit_price = 0,
+      supplier,
+      part_number,
+      quantity = 0,
+      min_stock = 5,
+      max_stock = 100,
+      warehouse_location,
+      notes
     } = req.body;
 
     await client.query("BEGIN");
@@ -65,11 +82,11 @@ router.post("/", async (req, res) => {
     // Создаем модель запчасти
     const partResult = await client.query(
       `
-      INSERT INTO part_models ("название", "описание", "совместимые_с")
-      VALUES ($1, $2, $3)
+      INSERT INTO part_models (name, category, brand, model, description, unit_price, supplier, part_number)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *
     `,
-      [название, описание, совместимые_с]
+      [name, category, brand, model, description, unit_price, supplier, part_number]
     );
 
     const partId = partResult.rows[0].id;
@@ -77,20 +94,24 @@ router.post("/", async (req, res) => {
     // Создаем запись на складе
     await client.query(
       `
-      INSERT INTO part_stock (part_model_id, "количество_на_складе")
-      VALUES ($1, $2)
+      INSERT INTO part_stock (part_model_id, quantity, min_stock, max_stock, warehouse_location, notes)
+      VALUES ($1, $2, $3, $4, $5, $6)
     `,
-      [partId, количество_на_складе]
+      [partId, quantity, min_stock, max_stock, warehouse_location, notes]
     );
 
     await client.query("COMMIT");
 
     // Возвращаем созданную запчасть с количеством на складе
-    const result = await pool.query(
+    const result = await client.query(
       `
-      SELECT 
+      SELECT
         pm.*,
-        ps."количество_на_складе"
+        ps.quantity,
+        ps.min_stock,
+        ps.max_stock,
+        ps.warehouse_location,
+        ps.notes as stock_notes
       FROM part_models pm
       LEFT JOIN part_stock ps ON pm.id = ps.part_model_id
       WHERE pm.id = $1
@@ -114,20 +135,34 @@ router.put("/:id", async (req, res) => {
 
   try {
     const { id } = req.params;
-    const { название, описание, совместимые_с, количество_на_складе } =
-      req.body;
+    const {
+      name,
+      category,
+      brand,
+      model,
+      description,
+      unit_price,
+      supplier,
+      part_number,
+      quantity,
+      min_stock,
+      max_stock,
+      warehouse_location,
+      notes
+    } = req.body;
 
     await client.query("BEGIN");
 
     // Обновляем модель запчасти
     const partResult = await client.query(
       `
-      UPDATE part_models 
-      SET "название" = $1, "описание" = $2, "совместимые_с" = $3, updated_at = now()
-      WHERE id = $4
+      UPDATE part_models
+      SET name = $1, category = $2, brand = $3, model = $4, description = $5,
+          unit_price = $6, supplier = $7, part_number = $8, updated_at = now()
+      WHERE id = $9
       RETURNING *
     `,
-      [название, описание, совместимые_с, id]
+      [name, category, brand, model, description, unit_price, supplier, part_number, id]
     );
 
     if (partResult.rows.length === 0) {
@@ -135,27 +170,35 @@ router.put("/:id", async (req, res) => {
       return res.status(404).json({ error: "Запчасть не найдена" });
     }
 
-    // Обновляем количество на складе (или создаем запись если её нет)
-    if (количество_на_складе !== undefined) {
-      await client.query(
-        `
-        INSERT INTO part_stock (part_model_id, "количество_на_складе")
-        VALUES ($1, $2)
-        ON CONFLICT (part_model_id)
-        DO UPDATE SET "количество_на_складе" = $2, updated_at = now()
-      `,
-        [id, количество_на_складе]
-      );
-    }
+    // Обновляем информацию на складе (или создаем запись если её нет)
+    await client.query(
+      `
+      INSERT INTO part_stock (part_model_id, quantity, min_stock, max_stock, warehouse_location, notes)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      ON CONFLICT (part_model_id)
+      DO UPDATE SET
+        quantity = COALESCE($2, part_stock.quantity),
+        min_stock = COALESCE($3, part_stock.min_stock),
+        max_stock = COALESCE($4, part_stock.max_stock),
+        warehouse_location = COALESCE($5, part_stock.warehouse_location),
+        notes = COALESCE($6, part_stock.notes),
+        last_updated = now()
+    `,
+      [id, quantity, min_stock, max_stock, warehouse_location, notes]
+    );
 
     await client.query("COMMIT");
 
     // Возвращаем обновленную запчасть
-    const result = await pool.query(
+    const result = await client.query(
       `
-      SELECT 
+      SELECT
         pm.*,
-        COALESCE(ps."количество_на_складе", 0) as "количество_на_складе"
+        COALESCE(ps.quantity, 0) as quantity,
+        ps.min_stock,
+        ps.max_stock,
+        ps.warehouse_location,
+        ps.notes as stock_notes
       FROM part_models pm
       LEFT JOIN part_stock ps ON pm.id = ps.part_model_id
       WHERE pm.id = $1
@@ -199,7 +242,7 @@ router.delete("/:id", async (req, res) => {
 router.patch("/:id/stock", async (req, res) => {
   try {
     const { id } = req.params;
-    const { количество_на_складе } = req.body;
+    const { quantity } = req.body;
 
     // Проверяем, существует ли запчасть
     const partCheck = await pool.query(
@@ -213,20 +256,24 @@ router.patch("/:id/stock", async (req, res) => {
     // Обновляем или создаем запись на складе
     await pool.query(
       `
-      INSERT INTO part_stock (part_model_id, "количество_на_складе")
+      INSERT INTO part_stock (part_model_id, quantity)
       VALUES ($1, $2)
       ON CONFLICT (part_model_id)
-      DO UPDATE SET "количество_на_складе" = $2, updated_at = now()
+      DO UPDATE SET quantity = $2, last_updated = now()
     `,
-      [id, количество_на_складе]
+      [id, quantity]
     );
 
     // Возвращаем обновленную информацию
     const result = await pool.query(
       `
-      SELECT 
+      SELECT
         pm.*,
-        ps."количество_на_складе"
+        ps.quantity,
+        ps.min_stock,
+        ps.max_stock,
+        ps.warehouse_location,
+        ps.notes as stock_notes
       FROM part_models pm
       LEFT JOIN part_stock ps ON pm.id = ps.part_model_id
       WHERE pm.id = $1
@@ -248,18 +295,17 @@ router.get("/:id/usage", async (req, res) => {
 
     const result = await pool.query(
       `
-      SELECT 
+      SELECT
         mp.*,
-        me.дата_начала,
-        me.статус_ремонта,
+        me.started_at,
+        me.status,
         b.id as bike_id,
-        b.name as bike_name,
         b.model as bike_model
       FROM maintenance_parts mp
-      JOIN maintenance_events me ON mp.событие_id = me.id
+      JOIN maintenance_events me ON mp."событие_id" = me.id
       JOIN bikes b ON me.bike_id = b.id
-      WHERE mp.деталь_id = $1
-      ORDER BY me.дата_начала DESC
+      WHERE mp.part_model_id = $1
+      ORDER BY me.started_at DESC
     `,
       [id]
     );
