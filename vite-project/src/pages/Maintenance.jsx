@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import MaintenanceTable from "../components/MaintenanceTable";
 import CreateMaintenanceModal from "../components/CreateMaintenanceModal";
-import WeeklyScheduleManager from "../components/WeeklyScheduleManager";
 import "./Maintenance.css";
 
 const Maintenance = () => {
@@ -9,7 +9,6 @@ const Maintenance = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [statusChangeModal, setStatusChangeModal] = useState({ open: false, eventId: null, currentStatus: null });
 
   useEffect(() => {
@@ -125,12 +124,12 @@ const Maintenance = () => {
       <div className="page-header">
         <h1>Обслуживание велосипедов</h1>
         <div className="page-actions">
-          <button 
-            className="btn btn-secondary-green" 
-            onClick={() => setIsScheduleModalOpen(true)}
+          <Link
+            to="/repairs-schedule"
+            className="btn btn-secondary-green"
           >
             📅 Еженедельное расписание
-          </button>
+          </Link>
           <button className="btn-primary" onClick={() => setIsModalOpen(true)}>
             + Добавить событие
           </button>
@@ -147,17 +146,7 @@ const Maintenance = () => {
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleCreateMaintenance}
       />
-      
-      {isScheduleModalOpen && (
-        <WeeklyScheduleManager
-          onClose={() => setIsScheduleModalOpen(false)}
-          onSave={() => {
-            setIsScheduleModalOpen(false);
-            fetchMaintenanceEvents(); // Refresh to show any new weekly repairs
-          }}
-        />
-      )}
-      
+
       {statusChangeModal.open && (
         <StatusChangeModal
           isOpen={statusChangeModal.open}
