@@ -27,6 +27,12 @@ const Layout = ({ children }) => {
       description: "База клиентов",
     },
     {
+      path: "/tariffs",
+      icon: "💰",
+      label: "Тарифы",
+      description: "Тарифы аренды",
+    },
+    {
       path: "/maintenance",
       icon: "🔧",
       label: "Обслуживание",

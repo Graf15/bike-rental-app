@@ -1,0 +1,7 @@
+/* Специфичные стили таблицы тарифов — основные в BikeTable.css */
+
+/* Ячейки с ценами — моноширный шрифт для выравнивания чисел */
+.tariffs-table td[data-column^="price_"] {
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}

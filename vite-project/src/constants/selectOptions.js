@@ -43,6 +43,14 @@ export const RENTAL_OPTIONS = {
   ],
 };
 
+// Опции для тарифов
+export const TARIFF_OPTIONS = {
+  is_active: [
+    { value: true,  label: "Активен"  },
+    { value: false, label: "Отключён" },
+  ],
+};
+
 // Опции для расписания ремонтов
 export const SCHEDULE_OPTIONS = {
   scheduled_day: ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье", "Не запланировано"]

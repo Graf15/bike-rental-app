@@ -54,4 +54,24 @@ router.put("/:id", async (req, res) => {
   }
 });
 
+// DELETE /api/tariffs/:id
+router.delete("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const used = await pool.query(
+      "SELECT COUNT(*) FROM rental_items WHERE tariff_id = $1",
+      [id]
+    );
+    if (parseInt(used.rows[0].count) > 0) {
+      return res.status(400).json({ error: "Тариф используется в договорах, удаление невозможно" });
+    }
+    const result = await pool.query("DELETE FROM tariffs WHERE id = $1 RETURNING id", [id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: "Тариф не найден" });
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Ошибка при удалении тарифа:", err);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
 export default router;
