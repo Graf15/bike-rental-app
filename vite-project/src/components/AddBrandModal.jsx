@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import './Modal.css';
 
 const AddBrandModal = ({ isOpen, onClose, onBrandAdded }) => {
+  const mouseDownOnOverlay = useRef(false);
   const [formData, setFormData] = useState({
     name: '',
     country: '',
@@ -80,7 +81,7 @@ const AddBrandModal = ({ isOpen, onClose, onBrandAdded }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay" onClick={handleClose}>
+    <div className="modal-overlay" onMouseDown={(e) => { mouseDownOnOverlay.current = e.target === e.currentTarget; }} onMouseUp={(e) => { if (mouseDownOnOverlay.current && e.target === e.currentTarget) handleClose(); }}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>Добавить новый бренд</h2>

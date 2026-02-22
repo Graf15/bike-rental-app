@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import "./Modal.css";
 import "./CustomerModal.css";
 
@@ -19,6 +19,7 @@ const CustomerModal = ({ customer, onClose, onSave }) => {
   const [form, setForm] = useState(INITIAL_FORM);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const mouseDownOnOverlay = useRef(false);
 
   const isEdit = !!(customer && customer.id);
 
@@ -83,7 +84,7 @@ const CustomerModal = ({ customer, onClose, onSave }) => {
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onMouseDown={(e) => { mouseDownOnOverlay.current = e.target === e.currentTarget; }} onMouseUp={(e) => { if (mouseDownOnOverlay.current && e.target === e.currentTarget) onClose(); }}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>{isEdit ? "Редактировать клиента" : "Добавить клиента"}</h2>

@@ -10,6 +10,7 @@ import currencyRouter from "./routes/currency.js";
 import customersRouter from "./routes/customers.js";
 import rentalsRouter from "./routes/rentals.js";
 import tariffsRouter from "./routes/tariffs.js";
+import calculateRouter from "./routes/calculate.js";
 import equipmentRouter from "./routes/equipment.js";
 
 const app = express();
@@ -40,6 +41,7 @@ app.use("/api/currency", currencyRouter);
 app.use("/api/customers", customersRouter);
 app.use("/api/rentals", rentalsRouter);
 app.use("/api/tariffs", tariffsRouter);
+app.use("/api/calculate", calculateRouter);
 app.use("/api/equipment", equipmentRouter);
 
 app.listen(PORT, () => {

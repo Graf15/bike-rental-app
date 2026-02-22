@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import "./PartsRequests.css";
 
 const PartsRequests = () => {
@@ -451,6 +451,7 @@ const PartsRequests = () => {
 
 // Компонент модального окна для создания заказа
 const CreateRequestModal = ({ onClose, onSubmit }) => {
+  const mouseDownOnOverlay = useRef(false);
   const [formData, setFormData] = useState({
     part_model_id: "",
     количество_нужно: 1,
@@ -499,7 +500,7 @@ const CreateRequestModal = ({ onClose, onSubmit }) => {
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onMouseDown={(e) => { mouseDownOnOverlay.current = e.target === e.currentTarget; }} onMouseUp={(e) => { if (mouseDownOnOverlay.current && e.target === e.currentTarget) onClose(); }}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>Создать заказ запчасти</h2>

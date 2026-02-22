@@ -40,6 +40,7 @@ const RentalModal = ({ onClose, onSave }) => {
   const [items, setItems] = useState([{ ...INITIAL_ITEM }]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const mouseDownOnOverlay = useRef(false);
 
   const [customers, setCustomers] = useState([]);
   const [users, setUsers] = useState([]);
@@ -181,7 +182,7 @@ const RentalModal = ({ onClose, onSave }) => {
   const availableBikes = bikes.filter(b => b.condition_status === "в наличии");
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onMouseDown={(e) => { mouseDownOnOverlay.current = e.target === e.currentTarget; }} onMouseUp={(e) => { if (mouseDownOnOverlay.current && e.target === e.currentTarget) onClose(); }}>
       <div className="modal-content" style={{ maxWidth: 920 }} onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h2>Создать договор проката</h2>

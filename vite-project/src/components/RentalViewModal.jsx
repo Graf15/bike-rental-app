@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import "./Modal.css";
 
 const formatDate = (dateString) => {
@@ -31,6 +31,7 @@ const RentalViewModal = ({ rental: initialRental, onClose, onUpdate }) => {
   const [error, setError] = useState(null);
   const [users, setUsers] = useState([]);
   const [saving, setSaving] = useState(false);
+  const mouseDownOnOverlay = useRef(false);
 
   const [showCompletionForm, setShowCompletionForm] = useState(false);
   const [completionForm, setCompletionForm] = useState({ total_price: "", received_by: "", notes_return: "" });
@@ -138,7 +139,7 @@ const RentalViewModal = ({ rental: initialRental, onClose, onUpdate }) => {
 
   if (loading) {
     return (
-      <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-overlay" onMouseDown={(e) => { mouseDownOnOverlay.current = e.target === e.currentTarget; }} onMouseUp={(e) => { if (mouseDownOnOverlay.current && e.target === e.currentTarget) onClose(); }}>
         <div className="modal-content" onClick={e => e.stopPropagation()}
           style={{ maxWidth: 860, minHeight: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <div style={{ color: "#6b7280" }}>Загрузка договора...</div>
@@ -149,7 +150,7 @@ const RentalViewModal = ({ rental: initialRental, onClose, onUpdate }) => {
 
   if (!rental) {
     return (
-      <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-overlay" onMouseDown={(e) => { mouseDownOnOverlay.current = e.target === e.currentTarget; }} onMouseUp={(e) => { if (mouseDownOnOverlay.current && e.target === e.currentTarget) onClose(); }}>
         <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 860 }}>
           <div className="modal-header"><h2>Ошибка</h2><button className="modal-close" onClick={onClose}>✕</button></div>
           <div className="modal-body"><div className="error-message">{error || "Договор не найден"}</div></div>
@@ -168,7 +169,7 @@ const RentalViewModal = ({ rental: initialRental, onClose, onUpdate }) => {
   const activeItems = rental.items?.filter(i => i.status === "active") || [];
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onMouseDown={(e) => { mouseDownOnOverlay.current = e.target === e.currentTarget; }} onMouseUp={(e) => { if (mouseDownOnOverlay.current && e.target === e.currentTarget) onClose(); }}>
       <div className="modal-content" style={{ maxWidth: 860 }} onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
