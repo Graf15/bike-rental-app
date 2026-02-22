@@ -1,0 +1,24 @@
+/* Цветовая маркировка строк по статусу */
+.rental-row--overdue td {
+  background-color: var(--color-primary-red-light-background);
+}
+.rental-row--overdue:hover td {
+  background-color: #fecaca !important;
+}
+.rental-row--no_show td {
+  background-color: var(--color-primary-red-light-background);
+}
+.rental-row--active td {
+  background-color: var(--color-primary-green-light-background);
+}
+.rental-row--active:hover td {
+  background-color: var(--color-primary-green-light) !important;
+}
+
+/* Курсор при двойном клике */
+.rental-row {
+  cursor: default;
+}
+.rental-row:hover td {
+  cursor: pointer;
+}

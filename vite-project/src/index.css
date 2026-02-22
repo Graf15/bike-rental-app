@@ -539,6 +539,12 @@ tr:hover {
   box-shadow: 0 1px 4px var(--color-primary-green-light);
 }
 
+/* Метка обязательного поля — используется во всех формах */
+.required-label::after {
+  content: " *";
+  color: var(--color-primary-red);
+}
+
 /* Отображение курса валют */
 .exchange-rate-info {
   font-size: 12px;

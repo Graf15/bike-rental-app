@@ -7,6 +7,8 @@ import Parts from "./pages/Parts";
 import Maintenance from "./pages/Maintenance";
 import PartsRequests from "./pages/PartsRequests";
 import RepairsSchedule from "./pages/RepairsSchedule";
+import Customers from "./pages/Customers";
+import Rentals from "./pages/Rentals";
 import "./App.css";
 
 function App() {
@@ -16,24 +18,8 @@ function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           {/* Будущие страницы */}
-          <Route
-            path="/rentals"
-            element={
-              <div>
-                <h1>Управление арендой</h1>
-                <p>Страница в разработке...ntc</p>
-              </div>
-            }
-          />
-          <Route
-            path="/customers"
-            element={
-              <div>
-                <h1>База клиентов</h1>
-                <p>Страница в разработке...</p>
-              </div>
-            }
-          />
+          <Route path="/rentals" element={<Rentals />} />
+          <Route path="/customers" element={<Customers />} />
           <Route path="/maintenance" element={<Maintenance />} />
           <Route path="/parts" element={<Parts />} />
           <Route path="/parts-requests" element={<PartsRequests />} />

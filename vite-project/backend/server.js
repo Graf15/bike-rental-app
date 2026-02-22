@@ -7,6 +7,10 @@ import partsRouter from "./routes/parts.js";
 import purchaseRequestsRouter from "./routes/purchase-requests.js";
 import brandsRouter from "./routes/brands.js";
 import currencyRouter from "./routes/currency.js";
+import customersRouter from "./routes/customers.js";
+import rentalsRouter from "./routes/rentals.js";
+import tariffsRouter from "./routes/tariffs.js";
+import equipmentRouter from "./routes/equipment.js";
 
 const app = express();
 const PORT = 3001;
@@ -33,6 +37,10 @@ app.use("/api/parts", partsRouter);
 app.use("/api/purchase-requests", purchaseRequestsRouter);
 app.use("/api/brands", brandsRouter);
 app.use("/api/currency", currencyRouter);
+app.use("/api/customers", customersRouter);
+app.use("/api/rentals", rentalsRouter);
+app.use("/api/tariffs", tariffsRouter);
+app.use("/api/equipment", equipmentRouter);
 
 app.listen(PORT, () => {
   console.log(`Сервер запущен на http://localhost:${PORT}`);

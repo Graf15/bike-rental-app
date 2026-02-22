@@ -1,0 +1,34 @@
+/* Бейдж неявок */
+.no-show-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 0 6px;
+  border: 1px solid;
+}
+
+.no-show-badge.warning {
+  color: var(--color-primary-orange);
+  border-color: var(--color-primary-orange);
+  background-color: var(--color-primary-orange-light-background);
+}
+
+.no-show-badge.danger {
+  color: var(--color-primary-red);
+  border-color: var(--color-primary-red);
+  background-color: var(--color-primary-red-light-background);
+}
+
+/* Строки с ограничениями */
+.row-restricted td {
+  background-color: var(--color-primary-orange-light-background);
+}
+
+.row-restricted:hover td {
+  background-color: var(--color-primary-orange-light) !important;
+}

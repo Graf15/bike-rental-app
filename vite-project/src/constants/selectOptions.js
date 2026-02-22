@@ -16,6 +16,33 @@ export const BIKE_OPTIONS = {
   ]
 };
 
+// Опции для клиентов
+export const CUSTOMER_OPTIONS = {
+  gender: ["мужской", "женский"],
+  status: [
+    { value: "active",     label: "Активен" },
+    { value: "no_booking", label: "Запрет брони" },
+    { value: "no_rental",  label: "Запрет выдачи" },
+  ],
+};
+
+// Опции для договоров проката
+export const RENTAL_OPTIONS = {
+  status: [
+    { value: "booked",    label: "Забронирован" },
+    { value: "active",    label: "Активен" },
+    { value: "completed", label: "Завершён" },
+    { value: "cancelled", label: "Отменён" },
+    { value: "no_show",   label: "Не явился" },
+    { value: "overdue",   label: "Просрочен" },
+  ],
+  deposit_type: [
+    { value: "none",     label: "Без залога" },
+    { value: "money",    label: "Денежный" },
+    { value: "document", label: "Документ" },
+  ],
+};
+
 // Опции для расписания ремонтов
 export const SCHEDULE_OPTIONS = {
   scheduled_day: ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье", "Не запланировано"]

@@ -54,15 +54,13 @@ const BikeActionsMenu = ({ bike, onEdit, onCopy, onDelete }) => {
   const handleAction = (action) => {
     switch (action) {
       case "edit":
-        onEdit(bike);
+        if (onEdit) onEdit(bike);
         break;
       case "copy":
-        onCopy(bike);
+        if (onCopy) onCopy(bike);
         break;
       case "delete":
-        if (
-          window.confirm(`Удалить велосипед ${bike.bike_number || bike.model}?`)
-        ) {
+        if (onDelete && window.confirm(`Удалить ${bike.bike_number || bike.model}?`)) {
           onDelete(bike.id);
         }
         break;
@@ -90,22 +88,28 @@ const BikeActionsMenu = ({ bike, onEdit, onCopy, onDelete }) => {
             top: `${position.top}px`,
             left: `${position.left}px`
           }}>
-          <button className="menu-item" onClick={() => handleAction("edit")}>
-            ✏️ Редактировать
-          </button>
+          {onEdit && (
+            <button className="menu-item" onClick={() => handleAction("edit")}>
+              ✏️ Редактировать
+            </button>
+          )}
 
-          <button className="menu-item" onClick={() => handleAction("copy")}>
-            📋 Копировать
-          </button>
+          {onCopy && (
+            <button className="menu-item" onClick={() => handleAction("copy")}>
+              📋 Копировать
+            </button>
+          )}
 
-          <div className="menu-divider"></div>
+          {(onEdit || onCopy) && <div className="menu-divider"></div>}
 
-          <button
-            className="menu-item danger"
-            onClick={() => handleAction("delete")}
-          >
-            🗑️ Удалить
-          </button>
+          {onDelete && (
+            <button
+              className="menu-item danger"
+              onClick={() => handleAction("delete")}
+            >
+              🗑️ Удалить
+            </button>
+          )}
         </div>
       )}
     </div>
