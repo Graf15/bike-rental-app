@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import "./Modal.css";
 
 const INITIAL_FORM = {
@@ -22,35 +22,43 @@ const INITIAL_ITEM = {
   prepaid: false,
 };
 
-const TARIFF_TYPES = [
-  { value: "hourly", label: "Почасово" },
-  { value: "day",    label: "День (до закрытия)" },
-  { value: "24h",    label: "Сутки (24ч)" },
-  { value: "week",   label: "Неделя" },
-];
-
 const DEPOSIT_TYPES = [
   { value: "none",     label: "Без залога" },
   { value: "money",    label: "Денежный залог" },
   { value: "document", label: "Документ" },
 ];
 
+const QUICK_DURATIONS = [
+  { label: "1ч",     minutes: 60 },
+  { label: "2ч",     minutes: 120 },
+  { label: "3ч",     minutes: 180 },
+  { label: "Сутки",  minutes: 1440 },
+  { label: "Неделя", minutes: 10080 },
+  { label: "2 нед",  minutes: 20160 },
+];
+
+const toLocalStr = (date) => {
+  const pad = n => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
 const RentalModal = ({ onClose, onSave }) => {
-  const [form, setForm] = useState(INITIAL_FORM);
-  const [items, setItems] = useState([{ ...INITIAL_ITEM }]);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
-  const mouseDownOnOverlay = useRef(false);
+  const [form, setForm]         = useState(INITIAL_FORM);
+  const [items, setItems]       = useState([{ ...INITIAL_ITEM }]);
+  const [saving, setSaving]     = useState(false);
+  const [error, setError]       = useState(null);
+  const [dateError, setDateError] = useState(null);
+  const mouseDownOnOverlay      = useRef(false);
 
   const [customers, setCustomers] = useState([]);
-  const [users, setUsers] = useState([]);
-  const [bikes, setBikes] = useState([]);
-  const [tariffs, setTariffs] = useState([]);
+  const [users, setUsers]         = useState([]);
+  const [bikes, setBikes]         = useState([]);
+  const [tariffs, setTariffs]     = useState([]);
   const [equipment, setEquipment] = useState([]);
 
-  const [customerSearch, setCustomerSearch] = useState("");
+  const [customerSearch, setCustomerSearch]   = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [showDropdown, setShowDropdown] = useState(false);
+  const [showDropdown, setShowDropdown]         = useState(false);
   const dropdownRef = useRef(null);
 
   useEffect(() => {
@@ -79,6 +87,43 @@ const RentalModal = ({ onClose, onSave }) => {
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
+  // ── Расчёт цены ─────────────────────────────────────────────────────────────
+
+  const fetchPrice = useCallback(async (tariff_id, start_time, end_time) => {
+    if (!tariff_id || !start_time || !end_time) return null;
+    const start = new Date(start_time);
+    const end   = new Date(end_time);
+    if (isNaN(start) || isNaN(end) || end <= start) return null;
+    try {
+      const r = await fetch("/api/calculate/price", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tariff_id, start_time, end_time }),
+      });
+      if (!r.ok) return null;
+      return await r.json();
+    } catch { return null; }
+  }, []);
+
+  const recalcAll = useCallback(async (startTime, endTime, currentItems) => {
+    if (!startTime || !endTime) return;
+    const start = new Date(startTime);
+    const end   = new Date(endTime);
+    if (isNaN(start) || isNaN(end) || end <= start) return;
+
+    const updated = await Promise.all(
+      currentItems.map(async (item) => {
+        if (!item.tariff_id) return item;
+        const result = await fetchPrice(item.tariff_id, startTime, endTime);
+        if (!result || result.price == null) return item;
+        return { ...item, price: result.price, tariff_type: result.type || item.tariff_type };
+      })
+    );
+    setItems(updated);
+  }, [fetchPrice]);
+
+  // ── Клиент ──────────────────────────────────────────────────────────────────
+
   const filteredCustomers = customerSearch.length >= 2
     ? customers.filter(c =>
         `${c.last_name} ${c.first_name} ${c.middle_name || ""} ${c.phone}`
@@ -99,44 +144,71 @@ const RentalModal = ({ onClose, onSave }) => {
     setCustomerSearch("");
   };
 
+  // ── Даты ────────────────────────────────────────────────────────────────────
+
+  const handleDateChange = (e) => {
+    const { name, value } = e.target;
+    const newStart = name === "booked_start" ? value : form.booked_start;
+    const newEnd   = name === "booked_end"   ? value : form.booked_end;
+    setForm(prev => ({ ...prev, [name]: value }));
+
+    if (newStart && newEnd) {
+      if (new Date(newEnd) <= new Date(newStart)) {
+        setDateError("Время окончания должно быть позже времени начала");
+        return;
+      }
+    }
+    setDateError(null);
+    recalcAll(newStart, newEnd, items);
+  };
+
+  const applyQuickDuration = (minutes) => {
+    if (!form.booked_start) return;
+    const endDate = new Date(new Date(form.booked_start).getTime() + minutes * 60000);
+    const endStr  = toLocalStr(endDate);
+    setForm(prev => ({ ...prev, booked_end: endStr }));
+    setDateError(null);
+    recalcAll(form.booked_start, endStr, items);
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm(prev => ({ ...prev, [name]: value }));
   };
 
-  const calcPrice = (tariffId, tariffType, tariffsList) => {
-    const tariff = tariffsList.find(t => String(t.id) === String(tariffId));
-    if (!tariff) return "";
-    const map = {
-      hourly: tariff.price_first_hour,
-      day:    tariff.price_day,
-      "24h":  tariff.price_24h,
-      week:   tariff.price_week,
-    };
-    return map[tariffType] ?? "";
+  // ── Позиции ─────────────────────────────────────────────────────────────────
+
+  const handleItemChange = async (index, field, value) => {
+    const newItems = items.map((item, i) =>
+      i === index ? { ...item, [field]: value } : item
+    );
+
+    if (field === "tariff_id" && value && form.booked_start && form.booked_end && !dateError) {
+      const result = await fetchPrice(value, form.booked_start, form.booked_end);
+      if (result && result.price != null) {
+        newItems[index] = {
+          ...newItems[index],
+          price: result.price,
+          tariff_type: result.type || newItems[index].tariff_type,
+        };
+      }
+    }
+
+    setItems(newItems);
   };
 
-  const handleItemChange = (index, field, value) => {
-    setItems(prev => {
-      const next = [...prev];
-      next[index] = { ...next[index], [field]: value };
-      if (field === "tariff_id") {
-        next[index].price = calcPrice(value, next[index].tariff_type, tariffs);
-      }
-      if (field === "tariff_type") {
-        next[index].price = calcPrice(next[index].tariff_id, value, tariffs);
-      }
-      return next;
-    });
-  };
-
-  const addItem = (type) => setItems(prev => [...prev, { ...INITIAL_ITEM, item_type: type }]);
+  const addItem    = (type) => setItems(prev => [...prev, { ...INITIAL_ITEM, item_type: type }]);
   const removeItem = (index) => setItems(prev => prev.filter((_, i) => i !== index));
+
+  const totalPrice = items.reduce((sum, i) => sum + (parseFloat(i.price) || 0), 0);
+
+  // ── Отправка ─────────────────────────────────────────────────────────────────
 
   const handleSubmit = async () => {
     setError(null);
     if (!form.customer_id) { setError("Выберите клиента"); return; }
     if (items.length === 0) { setError("Добавьте хотя бы одну позицию"); return; }
+    if (dateError) { setError(dateError); return; }
     if (items.some(i => i.item_type === "bike" && !i.bike_id)) {
       setError("Выберите велосипед для каждой позиции типа «Велосипед»"); return;
     }
@@ -152,10 +224,10 @@ const RentalModal = ({ onClose, onSave }) => {
         issued_by: form.issued_by ? parseInt(form.issued_by) : null,
         items: items.map(i => ({
           ...i,
-          bike_id: i.bike_id ? parseInt(i.bike_id) : null,
-          equipment_model_id: i.equipment_model_id ? parseInt(i.equipment_model_id) : null,
-          tariff_id: i.tariff_id ? parseInt(i.tariff_id) : null,
-          price: i.price !== "" ? parseFloat(i.price) : null,
+          bike_id:             i.bike_id             ? parseInt(i.bike_id)             : null,
+          equipment_model_id:  i.equipment_model_id  ? parseInt(i.equipment_model_id)  : null,
+          tariff_id:           i.tariff_id            ? parseInt(i.tariff_id)           : null,
+          price:               i.price !== ""         ? parseFloat(i.price)             : null,
         })),
       };
 
@@ -181,8 +253,14 @@ const RentalModal = ({ onClose, onSave }) => {
 
   const availableBikes = bikes.filter(b => b.condition_status === "в наличии");
 
+  // ── Рендер ───────────────────────────────────────────────────────────────────
+
   return (
-    <div className="modal-overlay" onMouseDown={(e) => { mouseDownOnOverlay.current = e.target === e.currentTarget; }} onMouseUp={(e) => { if (mouseDownOnOverlay.current && e.target === e.currentTarget) onClose(); }}>
+    <div
+      className="modal-overlay"
+      onMouseDown={(e) => { mouseDownOnOverlay.current = e.target === e.currentTarget; }}
+      onMouseUp={(e)   => { if (mouseDownOnOverlay.current && e.target === e.currentTarget) onClose(); }}
+    >
       <div className="modal-content" style={{ maxWidth: 920 }} onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h2>Создать договор проката</h2>
@@ -253,12 +331,17 @@ const RentalModal = ({ onClose, onSave }) => {
                 <div style={{
                   marginTop: 10, padding: "10px 14px",
                   background: "#f0fdf4", border: "1px solid #10b981",
-                  borderRadius: 6, display: "flex", alignItems: "center", gap: 12
+                  borderRadius: 6, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap"
                 }}>
                   <span style={{ fontWeight: 500, color: "#065f46" }}>
                     {selectedCustomer.last_name} {selectedCustomer.first_name} {selectedCustomer.middle_name || ""}
                   </span>
                   <span style={{ color: "#047857" }}>{selectedCustomer.phone}</span>
+                  {selectedCustomer.is_veteran && (
+                    <span style={{ color: "var(--color-primary-blue)", fontSize: 13, fontWeight: 500 }}>
+                      🎖 УБД — скидка −20% на 1 велосипед
+                    </span>
+                  )}
                   {selectedCustomer.no_show_count > 0 && (
                     <span style={{ color: "var(--color-primary-orange)", fontSize: 13, fontWeight: 500 }}>
                       ⚠ Неявок: {selectedCustomer.no_show_count}
@@ -269,6 +352,21 @@ const RentalModal = ({ onClose, onSave }) => {
                       ⛔ {selectedCustomer.status === "no_booking" ? "Запрет брони" : "Запрет выдачи"}
                     </span>
                   )}
+                  {(() => {
+                    if (!selectedCustomer.birth_date) return null;
+                    const bd = new Date(selectedCustomer.birth_date);
+                    const today = new Date();
+                    const bday = new Date(today.getFullYear(), bd.getMonth(), bd.getDate());
+                    const diffDays = Math.floor((today - bday) / 86400000);
+                    if (diffDays >= 0 && diffDays <= 7) {
+                      return (
+                        <span style={{ color: "#7c3aed", fontSize: 13, fontWeight: 500 }}>
+                          🎂 Именинник — скидка −50% на 1 велосипед!
+                        </span>
+                      );
+                    }
+                    return null;
+                  })()}
                   <button
                     type="button"
                     onClick={clearCustomer}
@@ -293,7 +391,7 @@ const RentalModal = ({ onClose, onSave }) => {
                     type="datetime-local"
                     name="booked_start"
                     value={form.booked_start}
-                    onChange={handleChange}
+                    onChange={handleDateChange}
                   />
                 </div>
                 <div className="form-group">
@@ -303,8 +401,14 @@ const RentalModal = ({ onClose, onSave }) => {
                     type="datetime-local"
                     name="booked_end"
                     value={form.booked_end}
-                    onChange={handleChange}
+                    onChange={handleDateChange}
+                    style={dateError ? { borderColor: "var(--color-primary-red)" } : {}}
                   />
+                  {dateError && (
+                    <span style={{ color: "var(--color-primary-red)", fontSize: 12, marginTop: 4, display: "block" }}>
+                      {dateError}
+                    </span>
+                  )}
                 </div>
                 <div className="form-group">
                   <label>Выдал</label>
@@ -314,11 +418,40 @@ const RentalModal = ({ onClose, onSave }) => {
                   </select>
                 </div>
               </div>
+
+              {/* Быстрый выбор длительности */}
+              <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 8, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 12, color: "#6b7280", marginRight: 2 }}>Быстро:</span>
+                {QUICK_DURATIONS.map(({ label, minutes }) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => applyQuickDuration(minutes)}
+                    disabled={!form.booked_start}
+                    style={{
+                      padding: "3px 10px", fontSize: 12, borderRadius: 4, cursor: "pointer",
+                      border: "1px solid #d1d5db", background: form.booked_start ? "#f9fafb" : "#f3f4f6",
+                      color: form.booked_start ? "#374151" : "#9ca3af",
+                      transition: "background 0.15s",
+                    }}
+                    onMouseEnter={e => { if (form.booked_start) e.currentTarget.style.background = "#e5e7eb"; }}
+                    onMouseLeave={e => { if (form.booked_start) e.currentTarget.style.background = "#f9fafb"; }}
+                    title={!form.booked_start ? "Сначала введите время начала" : `Установить конец: начало + ${label}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Позиции */}
             <div className="form-section">
               <h3>Позиции договора</h3>
+              {!form.booked_start && (
+                <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 8 }}>
+                  Введите время начала и окончания — цена рассчитается автоматически
+                </div>
+              )}
               {items.length === 0 && (
                 <div style={{ color: "#6b7280", textAlign: "center", padding: "16px 0", fontSize: 14 }}>
                   Добавьте хотя бы одну позицию
@@ -385,19 +518,13 @@ const RentalModal = ({ onClose, onSave }) => {
                     </select>
                   </div>
 
-                  <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
-                    <label style={{ fontSize: 12 }}>Тип</label>
-                    <select
-                      className="form-select"
-                      value={item.tariff_type}
-                      onChange={e => handleItemChange(index, "tariff_type", e.target.value)}
-                    >
-                      {TARIFF_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                    </select>
-                  </div>
-
-                  <div className="form-group" style={{ width: 90, marginBottom: 0, flexShrink: 0 }}>
-                    <label style={{ fontSize: 12 }}>Цена (грн)</label>
+                  <div className="form-group" style={{ width: 100, marginBottom: 0, flexShrink: 0 }}>
+                    <label style={{ fontSize: 12 }}>
+                      Цена (грн)
+                      {item.tariff_id && form.booked_start && form.booked_end && !dateError && (
+                        <span style={{ color: "#059669", marginLeft: 4, fontWeight: 400 }}>авто</span>
+                      )}
+                    </label>
                     <input
                       className="form-input"
                       type="number"
@@ -420,13 +547,19 @@ const RentalModal = ({ onClose, onSave }) => {
                   >✕</button>
                 </div>
               ))}
-              <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+
+              <div style={{ display: "flex", gap: 8, marginTop: 4, alignItems: "center" }}>
                 <button type="button" className="btn btn-secondary-green btn-primary-small" onClick={() => addItem("bike")}>
                   + Велосипед
                 </button>
                 <button type="button" className="btn btn-secondary-green btn-primary-small" onClick={() => addItem("equipment")}>
                   + Оборудование
                 </button>
+                {items.length > 0 && totalPrice > 0 && (
+                  <span style={{ marginLeft: "auto", fontWeight: 600, color: "#374151", fontSize: 14 }}>
+                    Итого: {totalPrice} ₴
+                  </span>
+                )}
               </div>
             </div>
 
