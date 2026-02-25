@@ -9,7 +9,7 @@ export const BIKE_OPTIONS = {
     "22", "22,5", "23", "23,5"
   ],
   gender: ["женский", "унисекс"],
-  price_segment: ["kids", "econom", "standart", "premium", "эл.вел", "эл.самокат"],
+  tariff_name: ["kids", "econom", "standart", "premium", "эл.вел", "эл.самокат"],
   condition_status: [
     "в наличии", "в прокате", "в ремонте", "бронь", "продан", 
     "украден", "невозврат", "требует ремонта"

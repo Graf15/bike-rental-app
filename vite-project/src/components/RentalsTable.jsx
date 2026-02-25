@@ -231,7 +231,7 @@ const RentalsTable = ({ rentals, onRentalUpdate, onRentalEdit, onRentalDelete, o
             <tr>
               {visibleColumnsData.map(({ key, label }) => (
                 <th key={key} data-column={key} draggable
-                  style={{ width: columnWidths[key], cursor: !isResizing.current ? "move" : "default" }}
+                  style={{ width: columnWidths[key] }}
                   onClick={() => handleSort(key)}
                   onDragStart={(e) => handleDragStart(e, key)}
                   onDragOver={handleDragOver}

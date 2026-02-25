@@ -235,8 +235,4 @@
   transform: rotate(2deg);
 }
 
-/* Курсор при наведении на заголовок */
-.maintenance-table th[draggable="true"]:not(.resizing):hover {
-  cursor: move;
-}
 

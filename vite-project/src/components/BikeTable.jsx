@@ -61,8 +61,8 @@ const BikeTable = ({
   const [visibleColumns, setVisibleColumns] = useState(() => {
     const saved = localStorage.getItem('bikeTableVisibleColumns');
     return saved ? JSON.parse(saved) : [
-      'id', 'model', 'internal_article', 'brand_name', 'model_year', 'wheel_size', 
-      'frame_size', 'frame_number', 'gender', 'price_segment', 'last_maintenance_date', 'condition_status', 'notes'
+      'id', 'model', 'internal_article', 'brand_name', 'model_year', 'wheel_size',
+      'frame_size', 'frame_number', 'gender', 'tariff_name', 'last_maintenance_date', 'condition_status', 'notes'
     ];
   });
 
@@ -77,7 +77,7 @@ const BikeTable = ({
     frame_size: 80,
     frame_number: 120,
     gender: 80,
-    price_segment: 120,
+    tariff_name: 120,
     last_maintenance_date: 140,
     condition_status: 120,
     notes: 150,
@@ -94,8 +94,8 @@ const BikeTable = ({
   const [columnOrder, setColumnOrder] = useState(() => {
     const saved = localStorage.getItem('bikeTableColumnOrder');
     return saved ? JSON.parse(saved) : [
-      'id', 'model', 'internal_article', 'brand_name', 'model_year', 'wheel_size', 
-      'frame_size', 'frame_number', 'gender', 'price_segment', 'last_maintenance_date', 'condition_status', 'notes'
+      'id', 'model', 'internal_article', 'brand_name', 'model_year', 'wheel_size',
+      'frame_size', 'frame_number', 'gender', 'tariff_name', 'last_maintenance_date', 'condition_status', 'notes'
     ];
   });
 
@@ -468,7 +468,7 @@ const BikeTable = ({
     { key: "frame_size", label: "Рама" },
     { key: "frame_number", label: "Номер рамы" },
     { key: "gender", label: "Пол" },
-    { key: "price_segment", label: "Сегмент" },
+    { key: "tariff_name", label: "Тариф" },
     { key: "last_maintenance_date", label: "Последнее ТО" },
     { key: "condition_status", label: "Состояние" },
     { key: "notes", label: "Примечания" },
@@ -535,7 +535,7 @@ const BikeTable = ({
                 key={key} 
                 data-column={key}
                 draggable
-                style={{ width: columnWidths[key], cursor: !isResizing.current ? 'move' : 'default' }}
+                style={{ width: columnWidths[key] }}
                 onClick={() => handleSort(key)}
                 onDragStart={(e) => handleDragStart(e, key)}
                 onDragOver={(e) => handleDragOver(e, key)}
@@ -599,7 +599,7 @@ const BikeTable = ({
         </thead>
         <tbody>
           {paginatedBikes.map((bike) => (
-            <tr key={bike.id}>
+            <tr key={bike.id} onDoubleClick={() => onBikeEdit && onBikeEdit(bike)} style={{ cursor: "pointer" }}>
               {visibleColumnsData.map(({ key }) => (
                 <td key={key} data-column={key} style={{ width: columnWidths[key] }}>
                   {key === 'last_maintenance_date' ? formatDate(bike[key]) :

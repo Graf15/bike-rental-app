@@ -7,11 +7,13 @@ const router = express.Router();
 router.get("/", async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT 
+      SELECT
         b.*,
-        br.name as brand_name
+        br.name as brand_name,
+        t.name as tariff_name
       FROM bikes b
       LEFT JOIN brands br ON b.brand_id = br.id
+      LEFT JOIN tariffs t ON b.tariff_id = t.id
       ORDER BY b.id
     `);
     res.json(result.rows);
@@ -26,11 +28,13 @@ router.get("/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query(`
-      SELECT 
+      SELECT
         b.*,
-        br.name as brand_name
+        br.name as brand_name,
+        t.name as tariff_name
       FROM bikes b
       LEFT JOIN brands br ON b.brand_id = br.id
+      LEFT JOIN tariffs t ON b.tariff_id = t.id
       WHERE b.id = $1
     `, [id]);
     
@@ -64,7 +68,7 @@ router.post("/", async (req, res) => {
       frame_size,
       frame_number,
       gender,
-      price_segment,
+      tariff_id,
       supplier_article,
       supplier_website_link,
       photos,
@@ -85,16 +89,16 @@ router.post("/", async (req, res) => {
     const bikeResult = await client.query(`
       INSERT INTO bikes (
         model, internal_article, brand_id, purchase_price_usd, purchase_price_uah,
-        purchase_date, model_year, wheel_size, frame_size, frame_number, gender, price_segment,
+        purchase_date, model_year, wheel_size, frame_size, frame_number, gender, tariff_id,
         supplier_article, supplier_website_link, photos, last_maintenance_date,
-        condition_status, notes, has_documents, document_details, 
+        condition_status, notes, has_documents, document_details,
         installed_components, created_by
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22
       ) RETURNING *
     `, [
       model, processedInternalArticle, brand_id, purchase_price_usd, purchase_price_uah,
-      purchase_date, model_year, wheel_size, frame_size, frame_number, gender, price_segment,
+      purchase_date, model_year, wheel_size, frame_size, frame_number, gender, tariff_id || null,
       supplier_article, supplier_website_link, photos || {}, last_maintenance_date,
       condition_status, notes, has_documents || false, document_details || {},
       installed_components || {}, created_by
@@ -190,7 +194,7 @@ router.put("/:id", async (req, res) => {
       frame_size,
       frame_number,
       gender,
-      price_segment,
+      tariff_id,
       supplier_article,
       supplier_website_link,
       photos,
@@ -209,14 +213,14 @@ router.put("/:id", async (req, res) => {
       UPDATE bikes SET
         model = $1, internal_article = $2, brand_id = $3, purchase_price_usd = $4, purchase_price_uah = $5,
         purchase_date = $6, model_year = $7, wheel_size = $8, frame_size = $9, frame_number = $10,
-        gender = $11, price_segment = $12, supplier_article = $13, supplier_website_link = $14,
+        gender = $11, tariff_id = $12, supplier_article = $13, supplier_website_link = $14,
         photos = $15, condition_status = $16, notes = $17, has_documents = $18,
         document_details = $19, updated_at = CURRENT_TIMESTAMP
       WHERE id = $20
       RETURNING *
     `, [
       model, processedInternalArticle, brand_id, purchase_price_usd, purchase_price_uah,
-      purchase_date, model_year, wheel_size, frame_size, frame_number, gender, price_segment,
+      purchase_date, model_year, wheel_size, frame_size, frame_number, gender, tariff_id || null,
       supplier_article, supplier_website_link, photos || {}, condition_status, notes,
       has_documents || false, document_details || {}, id
     ]);

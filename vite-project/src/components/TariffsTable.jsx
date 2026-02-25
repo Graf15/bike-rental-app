@@ -321,7 +321,7 @@ const TariffsTable = ({ tariffs, onEdit, onDelete, onToggleActive }) => {
                   key={key}
                   data-column={key}
                   draggable
-                  style={{ width: columnWidths[key], cursor: !isResizing.current ? "move" : "default" }}
+                  style={{ width: columnWidths[key] }}
                   onClick={() => handleSort(key)}
                   onDragStart={(e) => handleDragStart(e, key)}
                   onDragOver={(e) => handleDragOver(e, key)}

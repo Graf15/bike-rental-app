@@ -89,7 +89,7 @@ const MaintenanceTable = ({ events, onUpdate }) => {
     { key: "frame_size", label: "Рама" },
     { key: "frame_number", label: "Номер рамы" },
     { key: "gender", label: "Пол" },
-    { key: "price_segment", label: "Сегмент" },
+    { key: "tariff_name", label: "Тариф" },
     { key: "condition_status", label: "Состояние" },
     { key: "maintenance_type", label: "Тип ТО" },
     { key: "status", label: "Статус" },
@@ -130,7 +130,7 @@ const MaintenanceTable = ({ events, onUpdate }) => {
       frame_size: 80,
       frame_number: 120,
       gender: 80,
-      price_segment: 120,
+      tariff_name: 120,
       condition_status: 120,
       maintenance_type: 100,
       status: 120,
@@ -637,7 +637,7 @@ const MaintenanceTable = ({ events, onUpdate }) => {
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, key)}
                   onDragEnd={handleDragEnd}
-                  style={{ cursor: isResizing.current ? 'col-resize' : 'move' }}
+                  style={{}}
                 >
                   {label}{" "}
                   <span className="sort-arrow">
@@ -696,7 +696,7 @@ const MaintenanceTable = ({ events, onUpdate }) => {
           </thead>
           <tbody>
             {paginatedEvents.map((event) => (
-              <tr key={event.id} className={event.is_overdue ? 'row-overdue' : ''}>
+              <tr key={event.id} className={event.is_overdue ? 'row-overdue' : ''} onDoubleClick={() => onUpdate && onUpdate('edit', event.id, event)} style={{ cursor: "pointer" }}>
                 {orderedColumns.filter(col => visibleColumns.includes(col.key)).map(({ key }) => {
                   if (key === 'id') {
                     return <td key={key} data-column={key}>{event.id}</td>;
@@ -736,8 +736,8 @@ const MaintenanceTable = ({ events, onUpdate }) => {
                   if (key === 'gender') {
                     return <td key={key} data-column={key}>{event.gender || '—'}</td>;
                   }
-                  if (key === 'price_segment') {
-                    return <td key={key} data-column={key}>{event.price_segment || '—'}</td>;
+                  if (key === 'tariff_name') {
+                    return <td key={key} data-column={key}>{event.tariff_name || '—'}</td>;
                   }
                   if (key === 'condition_status') {
                     const getStatusBadgeClass = (status) => {

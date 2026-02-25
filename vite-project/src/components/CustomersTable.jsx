@@ -345,7 +345,7 @@ const CustomersTable = ({ customers, onCustomerUpdate, onCustomerEdit, onCustome
                   key={key}
                   data-column={key}
                   draggable
-                  style={{ width: columnWidths[key], cursor: !isResizing.current ? "move" : "default" }}
+                  style={{ width: columnWidths[key] }}
                   onClick={() => handleSort(key)}
                   onDragStart={(e) => handleDragStart(e, key)}
                   onDragOver={(e) => handleDragOver(e, key)}
@@ -391,7 +391,7 @@ const CustomersTable = ({ customers, onCustomerUpdate, onCustomerEdit, onCustome
           </thead>
           <tbody>
             {paginatedCustomers.map((customer) => (
-              <tr key={customer.id} className={customer.status !== "active" ? "row-restricted" : ""}>
+              <tr key={customer.id} className={customer.status !== "active" ? "row-restricted" : ""} onDoubleClick={() => onCustomerEdit && onCustomerEdit(customer)} style={{ cursor: "pointer" }}>
                 {visibleColumnsData.map(({ key }) => (
                   <td key={key} data-column={key} style={{ width: columnWidths[key] }}>
                     {renderCell(customer, key)}

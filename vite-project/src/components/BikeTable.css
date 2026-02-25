@@ -6,9 +6,8 @@
   overflow: auto;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
-  scroll-behavior: smooth; 
+  scroll-behavior: smooth;
 }
-
 
 /* Красивый скроллбар для таблицы */
 .table-container::-webkit-scrollbar {
@@ -22,7 +21,11 @@
 }
 
 .table-container::-webkit-scrollbar-thumb {
-  background: linear-gradient(135deg, var(--color-primary-green) 0%, var(--color-primary-green-hover) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--color-primary-green) 0%,
+    var(--color-primary-green-hover) 100%
+  );
   border-radius: 10px;
   border: 2px solid #ffffff;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
@@ -30,7 +33,11 @@
 }
 
 .table-container::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(135deg, var(--color-primary-green-hover) 0%, var(--color-primary-green) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--color-primary-green-hover) 0%,
+    var(--color-primary-green) 100%
+  );
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
   transform: scale(1.05);
 }
@@ -50,21 +57,30 @@ div[style*="position: fixed"][style*="bottom: 0"]::-webkit-scrollbar-track {
 }
 
 div[style*="position: fixed"][style*="bottom: 0"]::-webkit-scrollbar-thumb {
-  background: linear-gradient(135deg, var(--color-primary-green) 0%, var(--color-primary-green-hover) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--color-primary-green) 0%,
+    var(--color-primary-green-hover) 100%
+  );
   border-radius: 8px;
   border: 2px solid #ffffff;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 div[style*="position: fixed"][style*="bottom: 0"]::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(135deg, var(--color-primary-green-hover) 0%, var(--color-primary-green) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--color-primary-green-hover) 0%,
+    var(--color-primary-green) 100%
+  );
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 table {
   border-collapse: collapse;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
   font-size: 14px;
   table-layout: fixed;
   width: auto !important;
@@ -147,10 +163,6 @@ th:hover {
   background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
 }
 
-
-
-
-
 tr:nth-child(even) {
   background-color: #f9fafb;
 }
@@ -162,8 +174,6 @@ tr:hover {
 td {
   color: #374151;
 }
-
-
 
 .filter-select-box {
   border: 1px solid #d1d5db;
@@ -192,7 +202,6 @@ td {
   transition: transform 0.2s ease;
 }
 
-
 .filter-select-box:hover .arrow {
   color: var(--color-primary-green);
 }
@@ -200,7 +209,6 @@ td {
 /* Стили поповера */
 
 .popover-overlay {
-
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.15);
@@ -215,7 +223,8 @@ td {
   padding: 8px;
   max-height: 300px;
   overflow-y: auto;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1),
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.1),
     0 10px 10px -5px rgba(0, 0, 0, 0.04);
   z-index: 1201;
 }
@@ -274,7 +283,11 @@ td {
 }
 
 .popover-option.selected {
-  background: linear-gradient(135deg, var(--color-primary-green-lighter) 0%, var(--color-primary-green-light) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--color-primary-green-lighter) 0%,
+    var(--color-primary-green-light) 100%
+  );
   font-weight: 600;
   color: var(--color-primary-green);
   border: 1px solid var(--color-primary-green);
@@ -286,7 +299,11 @@ td {
 }
 
 .popover-option.selected:hover {
-  background: linear-gradient(135deg, var(--color-primary-green-light) 0%, var(--color-primary-green-light) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--color-primary-green-light) 0%,
+    var(--color-primary-green-light) 100%
+  );
   transform: translateX(2px);
 }
 
@@ -314,10 +331,6 @@ td {
   transform: rotate(2deg);
 }
 
-/* Курсор при наведении на заголовок */
-.bike-table th[draggable="true"]:not(.resizing):hover {
-  cursor: move;
-}
 
 /* Индикатор перетаскивания */
 .bike-table th[draggable="true"]::before {

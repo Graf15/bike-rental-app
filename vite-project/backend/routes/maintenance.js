@@ -90,7 +90,7 @@ router.get("/", async (req, res) => {
         b.frame_size,
         b.frame_number,
         b.gender,
-        b.price_segment,
+        t.name as tariff_name,
         b.condition_status,
         
         -- Информация об ответственных пользователях
@@ -129,6 +129,7 @@ router.get("/", async (req, res) => {
       FROM maintenance_events me
       LEFT JOIN bikes b ON me.bike_id = b.id
       LEFT JOIN brands br ON b.brand_id = br.id
+      LEFT JOIN tariffs t ON b.tariff_id = t.id
       LEFT JOIN users scheduled_user ON me.scheduled_user_id = scheduled_user.id
       LEFT JOIN users scheduled_for_user ON me.scheduled_for_user_id = scheduled_for_user.id
       LEFT JOIN users started_user ON me.started_user_id = started_user.id

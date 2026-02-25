@@ -83,7 +83,7 @@ const RepairsSchedule = () => {
       frame_size: 80,
       frame_number: 120,
       gender: 80,
-      price_segment: 120,
+      tariff_name: 120,
       condition_status: 120,
       scheduled_day: 150,
       notes: 200
@@ -101,22 +101,22 @@ const RepairsSchedule = () => {
       "wheel_size",
       "frame_size",
       "gender",
-      "price_segment",
+      "tariff_name",
       "condition_status",
       "scheduled_day"
     ];
-    
+
     const defaultOrder = [
       "id",
       "internal_article",
-      "model", 
+      "model",
       "brand_name",
       "model_year",
       "wheel_size",
       "frame_size",
       "frame_number",
       "gender",
-      "price_segment",
+      "tariff_name",
       "condition_status",
       "scheduled_day",
       "notes"
@@ -131,7 +131,7 @@ const RepairsSchedule = () => {
     // Проверяем, что все столбцы из defaultOrder присутствуют в savedOrder
     const allColumns = [
       "id", "internal_article", "model", "brand_name", "model_year", 
-      "wheel_size", "frame_size", "frame_number", "gender", "price_segment", 
+      "wheel_size", "frame_size", "frame_number", "gender", "tariff_name",
       "condition_status", "scheduled_day", "notes"
     ];
     
@@ -530,7 +530,7 @@ const RepairsSchedule = () => {
       { key: "frame_size", label: "Рама", filterable: true, filterType: "select" },
       { key: "frame_number", label: "Номер рамы", filterable: true },
       { key: "gender", label: "Пол", filterable: true, filterType: "select" },
-      { key: "price_segment", label: "Сегмент", filterable: true, filterType: "select" },
+      { key: "tariff_name", label: "Тариф", filterable: true, filterType: "select" },
       { key: "condition_status", label: "Состояние", filterable: true, filterType: "select" },
       { key: "scheduled_day", label: "Запланированный день", filterable: true, filterType: "select" },
       { key: "notes", label: "Примечания", filterable: true },
@@ -580,7 +580,7 @@ const RepairsSchedule = () => {
     { key: "frame_size", label: "Рама", filterable: true, filterType: "select" },
     { key: "frame_number", label: "Номер рамы", filterable: true },
     { key: "gender", label: "Пол", filterable: true, filterType: "select" },
-    { key: "price_segment", label: "Сегмент", filterable: true, filterType: "select" },
+    { key: "tariff_name", label: "Тариф", filterable: true, filterType: "select" },
     { key: "condition_status", label: "Состояние", filterable: true, filterType: "select" },
     { key: "scheduled_day", label: "Запланированный день", filterable: true, filterType: "select" },
     { key: "notes", label: "Примечания", filterable: true },
@@ -706,7 +706,7 @@ const RepairsSchedule = () => {
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, key)}
                   onDragEnd={handleDragEnd}
-                  style={{ cursor: !isResizing.current ? 'move' : 'default' }}
+                  style={{}}
                 >
                   {label}{" "}
                   <span className="sort-arrow">
@@ -788,8 +788,8 @@ const RepairsSchedule = () => {
                     if (key === 'gender') {
                       return <td key={key} data-column={key}>{bike.gender}</td>;
                     }
-                    if (key === 'price_segment') {
-                      return <td key={key} data-column={key}>{bike.price_segment}</td>;
+                    if (key === 'tariff_name') {
+                      return <td key={key} data-column={key}>{bike.tariff_name || '—'}</td>;
                     }
                     if (key === 'condition_status') {
                       // Маппинг статусов на цвета

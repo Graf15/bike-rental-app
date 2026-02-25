@@ -17,7 +17,7 @@ const BikeModal = ({ isOpen, onClose, onSubmit, mode = 'create', bikeData = null
     frame_size: '',
     frame_number: '',
     gender: '',
-    price_segment: '',
+    tariff_id: '',
     supplier_article: '',
     supplier_website_link: '',
     condition_status: 'в наличии',
@@ -32,6 +32,7 @@ const BikeModal = ({ isOpen, onClose, onSubmit, mode = 'create', bikeData = null
   });
 
   const [brands, setBrands] = useState([]);
+  const [tariffs, setTariffs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [isAddBrandModalOpen, setIsAddBrandModalOpen] = useState(false);
@@ -42,10 +43,11 @@ const BikeModal = ({ isOpen, onClose, onSubmit, mode = 'create', bikeData = null
   // Опции для выпадающих списков
   const selectOptions = BIKE_OPTIONS;
 
-  // Загружаем список брендов при открытии модального окна
+  // Загружаем список брендов и тарифов при открытии модального окна
   useEffect(() => {
     if (isOpen) {
       fetchBrands();
+      fetchTariffs();
     }
   }, [isOpen]);
 
@@ -65,7 +67,7 @@ const BikeModal = ({ isOpen, onClose, onSubmit, mode = 'create', bikeData = null
         frame_size: bikeData.frame_size || '',
         frame_number: bikeData.frame_number || '',
         gender: bikeData.gender || '',
-        price_segment: bikeData.price_segment || '',
+        tariff_id: bikeData.tariff_id?.toString() || '',
         supplier_article: bikeData.supplier_article || '',
         supplier_website_link: bikeData.supplier_website_link || '',
         condition_status: bikeData.condition_status || 'в наличии',
@@ -96,6 +98,18 @@ const BikeModal = ({ isOpen, onClose, onSubmit, mode = 'create', bikeData = null
       }
     } catch (error) {
       console.error('Ошибка загрузки брендов:', error);
+    }
+  };
+
+  const fetchTariffs = async () => {
+    try {
+      const response = await fetch('/api/tariffs');
+      if (response.ok) {
+        const data = await response.json();
+        setTariffs(data.filter(t => t.is_active));
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки тарифов:', error);
     }
   };
 
@@ -202,7 +216,7 @@ const BikeModal = ({ isOpen, onClose, onSubmit, mode = 'create', bikeData = null
         frame_size: '',
         frame_number: '',
         gender: '',
-        price_segment: '',
+        tariff_id: '',
         supplier_article: '',
         supplier_website_link: '',
         condition_status: 'в наличии',
@@ -602,16 +616,16 @@ const BikeModal = ({ isOpen, onClose, onSubmit, mode = 'create', bikeData = null
                 </select>
               </div>
               <div className="form-group">
-                <label>Ценовой сегмент</label>
+                <label>Тариф</label>
                 <select
-                  name="price_segment"
-                  value={formData.price_segment}
+                  name="tariff_id"
+                  value={formData.tariff_id}
                   onChange={handleChange}
                 >
-                  <option value="">Выберите сегмент</option>
-                  {selectOptions.price_segment.map(segment => (
-                    <option key={segment} value={segment}>
-                      {segment}
+                  <option value="">Выберите тариф</option>
+                  {tariffs.map(tariff => (
+                    <option key={tariff.id} value={tariff.id}>
+                      {tariff.name}
                     </option>
                   ))}
                 </select>
