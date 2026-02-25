@@ -19,6 +19,7 @@ const INITIAL_ITEM = {
   tariff_id: "",
   tariff_type: "hourly",
   price: "",
+  quantity: 1,
   prepaid: false,
 };
 
@@ -44,7 +45,7 @@ const toLocalStr = (date) => {
 
 const RentalModal = ({ onClose, onSave }) => {
   const [form, setForm]           = useState(INITIAL_FORM);
-  const [items, setItems]         = useState([{ ...INITIAL_ITEM }]);
+  const [items, setItems]         = useState([]);
   const [saving, setSaving]       = useState(false);
   const [error, setError]         = useState(null);
   const [dateError, setDateError] = useState(null);
@@ -56,12 +57,17 @@ const RentalModal = ({ onClose, onSave }) => {
   const [tariffs, setTariffs]     = useState([]);
   const [equipment, setEquipment] = useState([]);
 
-  // Поиск велосипеда
+  // Поиск велосипеда / оборудования
   const [addBikeSearch, setAddBikeSearch]   = useState("");
   const [addBikeActive, setAddBikeActive]   = useState(false);
   const [addBikeFocused, setAddBikeFocused] = useState(-1);
   const [dropUp, setDropUp]                 = useState(false);
   const addBikeInputRef                     = useRef(null);
+
+  // Попап количества при добавлении оборудования
+  const [qtyPopup, setQtyPopup]   = useState(null); // { eq }
+  const [qtyValue, setQtyValue]   = useState(1);
+  const qtyInputRef               = useRef(null);
 
   // Поиск клиента
   const [customerSearch, setCustomerSearch]     = useState("");
@@ -85,6 +91,10 @@ const RentalModal = ({ onClose, onSave }) => {
       setTariffs(Array.isArray(t) ? t.filter(x => x.is_active) : []);
       setEquipment(Array.isArray(e) ? e : []);
     }).catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    setTimeout(() => customerInputRef.current?.focus(), 50);
   }, []);
 
   useEffect(() => {
@@ -146,6 +156,7 @@ const RentalModal = ({ onClose, onSave }) => {
     setCustomerSearch(`${customer.last_name} ${customer.first_name}${customer.middle_name ? " " + customer.middle_name : ""}`);
     setShowDropdown(false);
     setCustomerFocused(-1);
+    setTimeout(() => addBikeInputRef.current?.focus(), 50);
   };
 
   const clearCustomer = () => {
@@ -235,40 +246,41 @@ const RentalModal = ({ onClose, onSave }) => {
 
   const availableBikes = bikes.filter(b => b.condition_status === "в наличии");
 
-  // ── Добавление велосипеда через поиск ────────────────────────────────────────
+  // ── Единый поиск: велосипеды + прокатное оборудование ───────────────────────
 
-  const filteredAddBikes = addBikeSearch.length >= 2
+  const filteredAddItems = addBikeSearch.length >= 2
     ? (() => {
         const q = addBikeSearch.toLowerCase();
-        const priority = (b) => {
+        const bikePriority = (b) => {
           const art = (b.internal_article || "").toLowerCase();
-          if (art === q)              return 0; // точное совпадение артикула
-          if (art.startsWith(q))     return 1; // артикул начинается с запроса
-          if (art.includes(q))       return 2; // артикул содержит запрос
-          return 3;                             // совпадение в названии модели
+          if (art === q)          return 0;
+          if (art.startsWith(q)) return 1;
+          if (art.includes(q))   return 2;
+          return 3;
         };
-        return availableBikes
+        const filteredBikes = availableBikes
           .filter(b =>
             (b.internal_article || "").toLowerCase().includes(q) ||
             b.model.toLowerCase().includes(q)
           )
-          .sort((a, b) => priority(a) - priority(b))
-          .slice(0, 10);
+          .sort((a, b) => bikePriority(a) - bikePriority(b))
+          .map(b => ({ _type: "bike", ...b }));
+
+        const filteredEquipment = equipment
+          .filter(eq => eq.name.toLowerCase().includes(q))
+          .map(eq => ({ _type: "equipment", ...eq }));
+
+        return [...filteredBikes, ...filteredEquipment].slice(0, 12);
       })()
     : [];
 
   const addBikeItem = async (bike) => {
-    // Защита от дублей
     if (items.some(i => String(i.bike_id) === String(bike.id))) {
-      setAddBikeSearch("");
-      setAddBikeActive(false);
-      setAddBikeFocused(-1);
+      setAddBikeSearch(""); setAddBikeActive(false); setAddBikeFocused(-1);
       setTimeout(() => addBikeInputRef.current?.focus(), 0);
       return;
     }
-    setAddBikeSearch("");
-    setAddBikeActive(false);
-    setAddBikeFocused(-1);
+    setAddBikeSearch(""); setAddBikeActive(false); setAddBikeFocused(-1);
     const newItem = {
       ...INITIAL_ITEM,
       bike_id: String(bike.id),
@@ -285,6 +297,43 @@ const RentalModal = ({ onClose, onSave }) => {
     setTimeout(() => addBikeInputRef.current?.focus(), 0);
   };
 
+  const addEquipmentItem = (eq) => {
+    if (items.some(i => String(i.equipment_model_id) === String(eq.id))) {
+      setAddBikeSearch(""); setAddBikeActive(false); setAddBikeFocused(-1);
+      setTimeout(() => addBikeInputRef.current?.focus(), 0);
+      return;
+    }
+    setAddBikeSearch(""); setAddBikeActive(false); setAddBikeFocused(-1);
+    setQtyValue(1);
+    setQtyPopup({ eq });
+    setTimeout(() => qtyInputRef.current?.focus(), 50);
+  };
+
+  const confirmEquipmentAdd = async () => {
+    if (!qtyPopup) return;
+    const eq  = qtyPopup.eq;
+    const qty = Math.max(1, parseInt(qtyValue) || 1);
+    const newItem = {
+      ...INITIAL_ITEM,
+      item_type: "equipment",
+      equipment_model_id: String(eq.id),
+      tariff_id: eq.rental_tariff_id ? String(eq.rental_tariff_id) : "",
+      price: "",
+      quantity: qty,
+    };
+    if (newItem.tariff_id && form.booked_start && form.booked_end && !dateError) {
+      const result = await fetchPrice(newItem.tariff_id, form.booked_start, form.booked_end);
+      if (result?.price != null) {
+        newItem.price = result.price;
+        newItem.tariff_type = result.type || newItem.tariff_type;
+      }
+    }
+    setItems(prev => [...prev, newItem]);
+    setQtyPopup(null);
+    setQtyValue(1);
+    setTimeout(() => addBikeInputRef.current?.focus(), 0);
+  };
+
   const handleAddBikeFocus = () => {
     if (addBikeInputRef.current) {
       const rect = addBikeInputRef.current.getBoundingClientRect();
@@ -298,31 +347,34 @@ const RentalModal = ({ onClose, onSave }) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
       setAddBikeFocused(prev =>
-        filteredAddBikes.length === 0 ? -1
-          : prev >= filteredAddBikes.length - 1 ? 0
+        filteredAddItems.length === 0 ? -1
+          : prev >= filteredAddItems.length - 1 ? 0
           : prev + 1
       );
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setAddBikeFocused(prev =>
-        filteredAddBikes.length === 0 ? -1
-          : prev <= 0 ? filteredAddBikes.length - 1
+        filteredAddItems.length === 0 ? -1
+          : prev <= 0 ? filteredAddItems.length - 1
           : prev - 1
       );
     } else if (e.key === "Enter") {
       e.preventDefault();
       const target = addBikeFocused >= 0
-        ? filteredAddBikes[addBikeFocused]
-        : filteredAddBikes.length === 1 ? filteredAddBikes[0]
+        ? filteredAddItems[addBikeFocused]
+        : filteredAddItems.length === 1 ? filteredAddItems[0]
         : null;
-      if (target) addBikeItem(target);
+      if (target) {
+        if (target._type === "bike") addBikeItem(target);
+        else addEquipmentItem(target);
+      }
     } else if (e.key === "Escape") {
       setAddBikeActive(false);
       setAddBikeFocused(-1);
     }
   };
 
-  const totalPrice = items.reduce((sum, i) => sum + (parseFloat(i.price) || 0), 0);
+  const totalPrice = items.reduce((sum, i) => sum + (parseFloat(i.price) || 0) * (parseInt(i.quantity) || 1), 0);
 
   // ── Отправка ─────────────────────────────────────────────────────────────────
 
@@ -509,46 +561,137 @@ const RentalModal = ({ onClose, onSave }) => {
 
             {/* ── 2. Позиции договора ────────────────────────────────────────── */}
             <div className="form-section">
-              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-                <h3 style={{ margin: 0 }}>Позиции договора</h3>
-                {items.length > 0 && (
-                  <span style={{ fontSize: 12, color: "#6b7280" }}>
-                    {(() => {
-                      const bikeCount = items.filter(i => i.item_type === "bike").length;
-                      const eqCount   = items.filter(i => i.item_type === "equipment").length;
-                      return [
-                        bikeCount > 0 ? `🚲 ${bikeCount}` : null,
-                        eqCount   > 0 ? `⛑️ ${eqCount}`  : null,
-                      ].filter(Boolean).join(" · ");
-                    })()}
+
+              {/* Строка поиска — велосипед или оборудование */}
+              <div style={{ position: "relative" }}>
+                <input
+                  ref={addBikeInputRef}
+                  className="form-input"
+                  placeholder="Добавить велосипед или оборудование (артикул, модель, от 2 символов)..."
+                  value={addBikeSearch}
+                  onChange={e => { setAddBikeSearch(e.target.value); setAddBikeFocused(-1); setAddBikeActive(true); }}
+                  onFocus={handleAddBikeFocus}
+                  onBlur={() => setTimeout(() => { setAddBikeActive(false); setAddBikeFocused(-1); }, 150)}
+                  onKeyDown={handleAddBikeKeyDown}
+                  autoComplete="off"
+                />
+                {addBikeActive && filteredAddItems.length > 0 && (
+                  <div style={{
+                    position: "absolute", left: 0, right: 0, zIndex: 300,
+                    ...(dropUp ? { bottom: "calc(100% + 4px)" } : { top: "calc(100% + 4px)" }),
+                    background: "white", border: "1px solid #d1d5db", borderRadius: 6,
+                    boxShadow: "0 4px 16px rgba(0,0,0,0.13)", maxHeight: 300, overflowY: "auto"
+                  }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                      <tbody>
+                        {filteredAddItems.map((item, i) => {
+                          if (item._type === "bike") {
+                            const photo       = item.photos?.urls?.length ? item.photos.urls[item.photos.main ?? 0] : null;
+                            const isDuplicate = items.some(it => String(it.bike_id) === String(item.id));
+                            return (
+                              <tr key={`bike-${item.id}`}
+                                onMouseDown={() => addBikeItem(item)}
+                                onMouseEnter={() => setAddBikeFocused(i)}
+                                onMouseLeave={() => setAddBikeFocused(-1)}
+                                style={{
+                                  cursor: isDuplicate ? "not-allowed" : "pointer",
+                                  borderBottom: "1px solid #f3f4f6",
+                                  background: isDuplicate ? "#fef9c3" : i === addBikeFocused ? "#f0fdf4" : "white",
+                                  opacity: isDuplicate ? 0.65 : 1,
+                                }}
+                              >
+                                <td style={{ padding: "5px 8px", width: 38 }}>
+                                  {photo
+                                    ? <img src={photo} alt="" style={{ width: 30, height: 30, objectFit: "cover", borderRadius: 3, display: "block" }} />
+                                    : <div style={{ width: 30, height: 30, background: "#e5e7eb", borderRadius: 3, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>🚲</div>
+                                  }
+                                </td>
+                                <td style={{ padding: "5px 8px", fontWeight: 600, whiteSpace: "nowrap" }}>{item.internal_article || "—"}</td>
+                                <td style={{ padding: "5px 8px" }}>{item.model}</td>
+                                <td style={{ padding: "5px 8px", whiteSpace: "nowrap", color: "#6b7280" }}>{item.wheel_size ? `${item.wheel_size}"` : "—"}</td>
+                                <td style={{ padding: "5px 8px", whiteSpace: "nowrap", color: "#6b7280" }}>{item.frame_size || "—"}</td>
+                                <td style={{ padding: "5px 8px", whiteSpace: "nowrap", fontWeight: 500, color: isDuplicate ? "#a16207" : "#059669" }}>
+                                  {isDuplicate ? "уже добавлен" : (item.tariff_name || "—")}
+                                </td>
+                              </tr>
+                            );
+                          } else {
+                            const isDuplicate = items.some(it => String(it.equipment_model_id) === String(item.id));
+                            return (
+                              <tr key={`eq-${item.id}`}
+                                onMouseDown={() => addEquipmentItem(item)}
+                                onMouseEnter={() => setAddBikeFocused(i)}
+                                onMouseLeave={() => setAddBikeFocused(-1)}
+                                style={{
+                                  cursor: isDuplicate ? "not-allowed" : "pointer",
+                                  borderBottom: "1px solid #f3f4f6",
+                                  background: isDuplicate ? "#fef9c3" : i === addBikeFocused ? "#f0fdf4" : "white",
+                                  opacity: isDuplicate ? 0.65 : 1,
+                                }}
+                              >
+                                <td style={{ padding: "5px 8px", width: 38 }}>
+                                  <div style={{ width: 30, height: 30, background: "#e0f2fe", borderRadius: 3, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>⛑️</div>
+                                </td>
+                                <td style={{ padding: "5px 8px", fontWeight: 600, whiteSpace: "nowrap", color: "#0369a1" }}>доп</td>
+                                <td style={{ padding: "5px 8px" }}>{item.name}</td>
+                                <td style={{ padding: "5px 8px", color: "#6b7280" }}>{item.category || "—"}</td>
+                                <td style={{ padding: "5px 8px", color: "#6b7280" }}>
+                                  {item.available_quantity != null ? `доступно: ${item.available_quantity}` : ""}
+                                </td>
+                                <td style={{ padding: "5px 8px", whiteSpace: "nowrap", fontWeight: 500, color: isDuplicate ? "#a16207" : "#059669" }}>
+                                  {isDuplicate ? "уже добавлен" : (item.tariff_name || (item.unit_price ? `${item.unit_price} ₴` : "—"))}
+                                </td>
+                              </tr>
+                            );
+                          }
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Заголовок секции с бейджами и итого */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "12px 0 8px" }}>
+                <h3 style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>Позиции договора</h3>
+                {items.length > 0 && (() => {
+                  const bikeCount = items.filter(i => i.item_type === "bike").length;
+                  const eqCount   = items.filter(i => i.item_type === "equipment").length;
+                  return (
+                    <>
+                      {bikeCount > 0 && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, background: "#dcfce7", color: "#15803d", fontWeight: 600 }}>🚲 {bikeCount}</span>}
+                      {eqCount   > 0 && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, background: "#e0f2fe", color: "#0369a1", fontWeight: 600 }}>⛑️ {eqCount}</span>}
+                    </>
+                  );
+                })()}
+                {totalPrice > 0 && (
+                  <span style={{ marginLeft: "auto", fontWeight: 700, color: "#111827", fontSize: 15 }}>
+                    Итого: {totalPrice} ₴
                   </span>
                 )}
               </div>
-              {!form.booked_start && (
-                <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 8 }}>
-                  Введите время начала и окончания — цена рассчитается автоматически
-                </div>
-              )}
 
-              {/* Список добавленных позиций */}
-              {items.map((item, index) => {
+              {/* Список добавленных позиций — новые ближе к поиску (сверху) */}
+              {[...items].reverse().map((item, revIndex) => {
+                const realIndex = items.length - 1 - revIndex;
                 const bike = item.item_type === "bike" && item.bike_id
                   ? bikes.find(b => String(b.id) === String(item.bike_id))
                   : null;
-                const tariffName = bike?.tariff_name
+                const eq = item.item_type === "equipment" && item.equipment_model_id
+                  ? equipment.find(e => String(e.id) === String(item.equipment_model_id))
+                  : null;
+                const tariffName = bike?.tariff_name || eq?.tariff_name
                   || (item.tariff_id ? tariffs.find(t => String(t.id) === String(item.tariff_id))?.name : null);
 
                 return (
-                  <div key={index} style={{
+                  <div key={realIndex} style={{
                     display: "flex", gap: 8, marginBottom: 4, alignItems: "center",
                     padding: "6px 10px", background: "#f9fafb", borderRadius: 6,
                     border: "1px solid #e5e7eb"
                   }}>
-                    {/* Номер строки */}
-                    <span style={{
-                      fontSize: 11, fontWeight: 700, color: "#9ca3af",
-                      width: 18, textAlign: "center", flexShrink: 0
-                    }}>{index + 1}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", width: 18, textAlign: "center", flexShrink: 0 }}>
+                      {realIndex + 1}
+                    </span>
 
                     {item.item_type === "bike" && bike ? (() => {
                       const photo = bike.photos?.urls?.length ? bike.photos.urls[bike.photos.main ?? 0] : null;
@@ -564,46 +707,59 @@ const RentalModal = ({ onClose, onSave }) => {
                               <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{bike.model}</span>
                             </div>
                             <div style={{ color: "#6b7280", fontSize: 11 }}>
-                              {[bike.wheel_size ? `${bike.wheel_size}"` : null, bike.frame_size || null]
-                                .filter(Boolean).join(" · ")}
+                              {[bike.wheel_size ? `${bike.wheel_size}"` : null, bike.frame_size || null].filter(Boolean).join(" · ")}
                             </div>
                           </div>
                         </div>
                       );
                     })() : (
-                      <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
-                        <span style={{ fontSize: 16, flexShrink: 0 }}>⛑️</span>
-                        <select
-                          className="form-select"
-                          style={{ flex: 1, fontSize: 12 }}
-                          value={item.equipment_model_id}
-                          onChange={e => handleItemChange(index, "equipment_model_id", e.target.value)}
-                        >
-                          <option value="">Выберите модель...</option>
-                          {equipment.map(eq => (
-                            <option key={eq.id} value={eq.id}>
-                              {eq.name}{eq.available_quantity != null ? ` (доступно: ${eq.available_quantity})` : ""}
-                            </option>
-                          ))}
-                        </select>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
+                        <div style={{ width: 36, height: 36, background: "#e0f2fe", borderRadius: 4, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>⛑️</div>
+                        <div style={{ fontSize: 12, lineHeight: 1.4, minWidth: 0, flex: 1 }}>
+                          <div style={{ fontWeight: 600 }}>{eq?.name || "Оборудование"}</div>
+                          {eq?.category && <div style={{ color: "#6b7280", fontSize: 11 }}>{eq.category}</div>}
+                        </div>
                       </div>
                     )}
 
-                    {/* Тариф-бейдж */}
-                    {tariffName && (
-                      <span style={{
-                        fontSize: 11, padding: "2px 8px", borderRadius: 10, flexShrink: 0,
-                        background: "#dcfce7", color: "#15803d", fontWeight: 600,
-                      }}>{tariffName}</span>
-                    )}
+                    <span style={{
+                      fontSize: 11, padding: "2px 6px", borderRadius: 10, flexShrink: 0,
+                      background: tariffName ? "#dcfce7" : "transparent",
+                      color: "#15803d", fontWeight: 600,
+                      width: 100, textAlign: "center",
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                      display: "inline-block",
+                    }}>
+                      {tariffName || ""}
+                    </span>
 
-                    {/* Цена */}
+                    {/* Количество */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
+                      {item.item_type === "bike" ? (
+                        <span style={{
+                          width: 36, textAlign: "center", display: "inline-block", boxSizing: "border-box",
+                          border: "1px solid #d1d5db", borderRadius: 6,
+                          padding: "8px 4px", background: "#f9fafb",
+                          fontSize: 12, color: "#9ca3af", lineHeight: "normal",
+                        }}>1</span>
+                      ) : (
+                        <input
+                          className="form-input"
+                          type="number" min="1"
+                          value={item.quantity}
+                          onChange={e => handleItemChange(realIndex, "quantity", parseInt(e.target.value) || 1)}
+                          style={{ width: 36, fontSize: 12, padding: "8px 4px", textAlign: "center" }}
+                        />
+                      )}
+                      <span style={{ fontSize: 11, color: "#6b7280" }}>×</span>
+                    </div>
+
                     <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
                       <input
                         className="form-input"
                         type="number" min="0"
                         value={item.price}
-                        onChange={e => handleItemChange(index, "price", e.target.value)}
+                        onChange={e => handleItemChange(realIndex, "price", e.target.value)}
                         placeholder="0"
                         style={{ width: 80, fontSize: 12 }}
                       />
@@ -615,7 +771,7 @@ const RentalModal = ({ onClose, onSave }) => {
 
                     <button
                       type="button"
-                      onClick={() => removeItem(index)}
+                      onClick={() => removeItem(realIndex)}
                       style={{ padding: "4px 8px", background: "none", border: "1px solid #fca5a5", borderRadius: 4, cursor: "pointer", color: "#ef4444", flexShrink: 0, fontSize: 12 }}
                       title="Удалить"
                     >✕</button>
@@ -623,81 +779,6 @@ const RentalModal = ({ onClose, onSave }) => {
                 );
               })}
 
-              {/* Строка поиска велосипеда */}
-              <div style={{ position: "relative", marginTop: items.length > 0 ? 6 : 0 }}>
-                <input
-                  ref={addBikeInputRef}
-                  className="form-input"
-                  placeholder="Добавить велосипед — артикул или модель (от 2 символов)..."
-                  value={addBikeSearch}
-                  onChange={e => { setAddBikeSearch(e.target.value); setAddBikeFocused(-1); setAddBikeActive(true); }}
-                  onFocus={handleAddBikeFocus}
-                  onBlur={() => setTimeout(() => { setAddBikeActive(false); setAddBikeFocused(-1); }, 150)}
-                  onKeyDown={handleAddBikeKeyDown}
-                  autoComplete="off"
-                />
-                {addBikeActive && filteredAddBikes.length > 0 && (
-                  <div style={{
-                    position: "absolute", left: 0, right: 0, zIndex: 300,
-                    ...(dropUp ? { bottom: "calc(100% + 4px)" } : { top: "calc(100% + 4px)" }),
-                    background: "white", border: "1px solid #d1d5db", borderRadius: 6,
-                    boxShadow: "0 4px 16px rgba(0,0,0,0.13)", maxHeight: 300, overflowY: "auto"
-                  }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                      <tbody>
-                        {filteredAddBikes.map((b, i) => {
-                          const photo       = b.photos?.urls?.length ? b.photos.urls[b.photos.main ?? 0] : null;
-                          const isDuplicate = items.some(it => String(it.bike_id) === String(b.id));
-                          return (
-                            <tr
-                              key={b.id}
-                              onMouseDown={() => addBikeItem(b)}
-                              onMouseEnter={() => setAddBikeFocused(i)}
-                              onMouseLeave={() => setAddBikeFocused(-1)}
-                              style={{
-                                cursor: isDuplicate ? "not-allowed" : "pointer",
-                                borderBottom: "1px solid #f3f4f6",
-                                background: isDuplicate ? "#fef9c3"
-                                  : i === addBikeFocused ? "#f0fdf4"
-                                  : "white",
-                                opacity: isDuplicate ? 0.65 : 1,
-                              }}
-                            >
-                              <td style={{ padding: "5px 8px", width: 38 }}>
-                                {photo
-                                  ? <img src={photo} alt="" style={{ width: 30, height: 30, objectFit: "cover", borderRadius: 3, display: "block" }} />
-                                  : <div style={{ width: 30, height: 30, background: "#e5e7eb", borderRadius: 3 }} />
-                                }
-                              </td>
-                              <td style={{ padding: "5px 8px", fontWeight: 600, whiteSpace: "nowrap" }}>{b.internal_article || "—"}</td>
-                              <td style={{ padding: "5px 8px" }}>{b.model}</td>
-                              <td style={{ padding: "5px 8px", whiteSpace: "nowrap", color: "#6b7280" }}>{b.wheel_size ? `${b.wheel_size}"` : "—"}</td>
-                              <td style={{ padding: "5px 8px", whiteSpace: "nowrap", color: "#6b7280" }}>{b.frame_size || "—"}</td>
-                              <td style={{ padding: "5px 8px", whiteSpace: "nowrap", fontWeight: 500,
-                                color: isDuplicate ? "#a16207" : "#059669" }}>
-                                {isDuplicate ? "уже добавлен" : (b.tariff_name || "—")}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-
-              {/* Добавить оборудование + итого */}
-              <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center" }}>
-                <button type="button" className="btn btn-secondary-green btn-primary-small"
-                  onClick={() => setItems(prev => [...prev, { ...INITIAL_ITEM, item_type: "equipment" }])}>
-                  + Оборудование
-                </button>
-                {totalPrice > 0 && (
-                  <span style={{ marginLeft: "auto", fontWeight: 700, color: "#111827", fontSize: 15 }}>
-                    Итого: {totalPrice} ₴
-                  </span>
-                )}
-              </div>
             </div>
 
             {/* ── 3. Даты и менеджер ─────────────────────────────────────────── */}
@@ -823,6 +904,78 @@ const RentalModal = ({ onClose, onSave }) => {
             {saving ? "Сохранение..." : "Создать договор"}
           </button>
         </div>
+
+        {/* ── Попап выбора количества оборудования ── */}
+        {qtyPopup && (
+          <div
+            style={{
+              position: "absolute", inset: 0, zIndex: 400,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              background: "rgba(0,0,0,0.18)", borderRadius: "inherit",
+            }}
+            onMouseDown={() => setQtyPopup(null)}
+          >
+            <div
+              onMouseDown={e => e.stopPropagation()}
+              style={{
+                background: "white", borderRadius: 10, padding: "20px 24px",
+                boxShadow: "0 8px 32px rgba(0,0,0,0.22)", minWidth: 270,
+                display: "flex", flexDirection: "column", gap: 14,
+              }}
+            >
+              <div style={{ fontWeight: 600, fontSize: 14 }}>
+                ⛑️ {qtyPopup.eq.name}
+                {qtyPopup.eq.category && (
+                  <span style={{ fontWeight: 400, color: "#6b7280", fontSize: 12, marginLeft: 8 }}>
+                    {qtyPopup.eq.category}
+                  </span>
+                )}
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 13, color: "#374151" }}>Количество:</span>
+                <input
+                  ref={qtyInputRef}
+                  type="number"
+                  min="1"
+                  value={qtyValue}
+                  onChange={e => setQtyValue(Math.max(1, parseInt(e.target.value) || 1))}
+                  onKeyDown={e => {
+                    if (e.key === "Enter")  { e.preventDefault(); confirmEquipmentAdd(); }
+                    if (e.key === "Escape") { e.preventDefault(); setQtyPopup(null); setTimeout(() => addBikeInputRef.current?.focus(), 0); }
+                  }}
+                  style={{
+                    width: 72, padding: "8px 10px", fontSize: 18, fontWeight: 600,
+                    border: "2px solid var(--color-primary-green)", borderRadius: 6,
+                    textAlign: "center", outline: "none",
+                  }}
+                />
+                <span style={{ fontSize: 13, color: "#374151" }}>шт.</span>
+              </div>
+
+              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                <button
+                  type="button"
+                  onClick={() => { setQtyPopup(null); setTimeout(() => addBikeInputRef.current?.focus(), 0); }}
+                  style={{ padding: "7px 16px", borderRadius: 6, border: "1px solid #d1d5db", background: "#f9fafb", cursor: "pointer", fontSize: 13 }}
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary-green btn-primary-small"
+                  onClick={confirmEquipmentAdd}
+                >
+                  Добавить
+                </button>
+              </div>
+
+              <div style={{ fontSize: 11, color: "#9ca3af", textAlign: "center" }}>
+                ↑↓ стрелки · Enter — добавить · Esc — отмена
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

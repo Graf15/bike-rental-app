@@ -33,6 +33,7 @@
 }
 
 .modal-content {
+  position: relative;
   background: white;
   border-radius: 8px;
   width: 100%;
