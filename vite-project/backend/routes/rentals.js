@@ -101,8 +101,11 @@ router.post("/", async (req, res) => {
       booked_start, booked_end,
       deposit_type = "none", deposit_value,
       notes_issue,
-      items = []  // [{ item_type, bike_id, equipment_model_id, equipment_name, tariff_id, tariff_type, price, prepaid }]
+      initial_status = "booked",
+      items = []
     } = req.body;
+
+    const contractStatus = ["active", "booked"].includes(initial_status) ? initial_status : "booked";
 
     if (!customer_id) throw new Error("Клиент обязателен");
     if (items.length === 0) throw new Error("Добавьте хотя бы одну позицию");
@@ -139,11 +142,13 @@ router.post("/", async (req, res) => {
     // Создаём договор
     const contractResult = await client.query(`
       INSERT INTO rental_contracts
-        (customer_id, issued_by, booked_start, booked_end, status, deposit_type, deposit_value, notes_issue)
-      VALUES ($1,$2,$3,$4,'booked',$5,$6,$7)
+        (customer_id, issued_by, booked_start, booked_end, status, deposit_type, deposit_value, notes_issue,
+         actual_start)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8, $9)
       RETURNING *
     `, [customer_id, issued_by || null, booked_start || null, booked_end || null,
-        deposit_type, deposit_value || null, notes_issue || null]);
+        contractStatus, deposit_type, deposit_value || null, notes_issue || null,
+        contractStatus === "active" ? new Date() : null]);
 
     const contract = contractResult.rows[0];
 
@@ -152,8 +157,9 @@ router.post("/", async (req, res) => {
       await client.query(`
         INSERT INTO rental_items
           (contract_id, item_type, bike_id, equipment_model_id, equipment_name,
-           tariff_id, tariff_type, price, prepaid, status)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'active')
+           tariff_id, tariff_type, price, prepaid, status, quantity,
+           actual_start)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'active',$10,$11)
       `, [
         contract.id,
         item.item_type || "bike",
@@ -163,8 +169,21 @@ router.post("/", async (req, res) => {
         item.tariff_id || null,
         item.tariff_type || null,
         item.price || null,
-        item.prepaid || false
+        item.prepaid || false,
+        item.quantity || 1,
+        contractStatus === "active" ? new Date() : null
       ]);
+    }
+
+    // Обновляем статусы велосипедов
+    const bikeStatus = contractStatus === "active" ? "в прокате" : "бронь";
+    for (const item of items) {
+      if (item.item_type === "bike" && item.bike_id) {
+        await client.query(
+          "UPDATE bikes SET condition_status=$1, updated_at=NOW() WHERE id=$2",
+          [bikeStatus, item.bike_id]
+        );
+      }
     }
 
     await client.query("COMMIT");
@@ -191,7 +210,7 @@ router.patch("/:id/status", async (req, res) => {
     if (contractCheck.rows.length === 0) throw new Error("Договор не найден");
     const contract = contractCheck.rows[0];
 
-    // При активации — проставляем actual_start
+    // При активации — проставляем actual_start, велосипеды → в прокате
     if (status === "active") {
       await client.query(
         "UPDATE rental_contracts SET status=$1, actual_start=NOW(), updated_at=NOW() WHERE id=$2",
@@ -201,9 +220,15 @@ router.patch("/:id/status", async (req, res) => {
         "UPDATE rental_items SET actual_start=NOW() WHERE contract_id=$1 AND status='active'",
         [id]
       );
+      await client.query(`
+        UPDATE bikes SET condition_status='в прокате', updated_at=NOW()
+        WHERE id IN (
+          SELECT bike_id FROM rental_items WHERE contract_id=$1 AND status='active' AND bike_id IS NOT NULL
+        )
+      `, [id]);
     }
 
-    // При завершении — закрываем оставшиеся позиции
+    // При завершении — закрываем позиции, велосипеды → в наличии
     else if (status === "completed") {
       await client.query(`
         UPDATE rental_contracts SET
@@ -216,9 +241,16 @@ router.patch("/:id/status", async (req, res) => {
         UPDATE rental_items SET status='returned', actual_end=NOW(), received_by=$1
         WHERE contract_id=$2 AND status='active'
       `, [received_by || null, id]);
+
+      await client.query(`
+        UPDATE bikes SET condition_status='в наличии', updated_at=NOW()
+        WHERE id IN (
+          SELECT bike_id FROM rental_items WHERE contract_id=$1 AND bike_id IS NOT NULL
+        )
+      `, [id]);
     }
 
-    // При no_show — инкрементируем счётчик клиента
+    // При no_show — счётчик клиента, велосипеды → в наличии
     else if (status === "no_show") {
       await client.query(
         "UPDATE rental_contracts SET status=$1, updated_at=NOW() WHERE id=$2",
@@ -228,16 +260,35 @@ router.patch("/:id/status", async (req, res) => {
         "UPDATE customers SET no_show_count = no_show_count + 1, updated_at=NOW() WHERE id=$1",
         [contract.customer_id]
       );
-      // Автоблокировка при 2+ неявках
       await client.query(`
         UPDATE customers SET status='no_booking',
           restriction_reason='Автоблокировка: 2 и более неявок по брони',
           updated_at=NOW()
         WHERE id=$1 AND no_show_count >= 2 AND status = 'active'
       `, [contract.customer_id]);
+      await client.query(`
+        UPDATE bikes SET condition_status='в наличии', updated_at=NOW()
+        WHERE id IN (
+          SELECT bike_id FROM rental_items WHERE contract_id=$1 AND bike_id IS NOT NULL
+        )
+      `, [id]);
     }
 
-    // Остальные статусы (cancelled, overdue)
+    // Cancelled → велосипеды в наличии
+    else if (status === "cancelled") {
+      await client.query(
+        "UPDATE rental_contracts SET status=$1, updated_at=NOW() WHERE id=$2",
+        [status, id]
+      );
+      await client.query(`
+        UPDATE bikes SET condition_status='в наличии', updated_at=NOW()
+        WHERE id IN (
+          SELECT bike_id FROM rental_items WHERE contract_id=$1 AND bike_id IS NOT NULL
+        )
+      `, [id]);
+    }
+
+    // Остальные статусы (overdue)
     else {
       await client.query(
         "UPDATE rental_contracts SET status=$1, updated_at=NOW() WHERE id=$2",

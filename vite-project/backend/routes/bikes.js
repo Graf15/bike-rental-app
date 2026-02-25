@@ -23,6 +23,64 @@ router.get("/", async (req, res) => {
   }
 });
 
+// GET /api/bikes/for-rental?start=&end= - велосипеды для выбора в договоре проката
+router.get("/for-rental", async (req, res) => {
+  const { start, end } = req.query;
+  try {
+    const result = await pool.query(`
+      SELECT
+        b.*,
+        br.name as brand_name,
+        t.name as tariff_name,
+        CASE
+          WHEN $1::timestamptz IS NULL OR $2::timestamptz IS NULL THEN
+            b.condition_status NOT IN ('в прокате', 'бронь', 'украден', 'продан', 'невозврат')
+          ELSE NOT EXISTS (
+            SELECT 1 FROM rental_items ri
+            JOIN rental_contracts rc ON ri.contract_id = rc.id
+            WHERE ri.bike_id = b.id
+              AND rc.status IN ('active', 'booked')
+              AND ri.status = 'active'
+              AND rc.booked_start < $2::timestamptz
+              AND COALESCE(rc.booked_end, rc.booked_start + INTERVAL '24 hours') > $1::timestamptz
+          )
+        END AS is_available,
+        (
+          SELECT json_build_object(
+            'status', rc.status,
+            'booked_start', rc.booked_start,
+            'booked_end', rc.booked_end,
+            'contract_id', rc.id
+          )
+          FROM rental_items ri
+          JOIN rental_contracts rc ON ri.contract_id = rc.id
+          WHERE ri.bike_id = b.id
+            AND rc.status IN ('active', 'booked')
+            AND ri.status = 'active'
+          ORDER BY rc.booked_start
+          LIMIT 1
+        ) AS conflict_info
+      FROM bikes b
+      LEFT JOIN brands br ON b.brand_id = br.id
+      LEFT JOIN tariffs t ON b.tariff_id = t.id
+      WHERE b.condition_status NOT IN ('украден', 'продан', 'невозврат')
+      ORDER BY
+        CASE b.condition_status
+          WHEN 'в наличии' THEN 1
+          WHEN 'бронь'     THEN 2
+          WHEN 'в прокате' THEN 3
+          WHEN 'в ремонте' THEN 4
+          ELSE 5
+        END,
+        b.internal_article
+    `, [start || null, end || null]);
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Ошибка при получении велосипедов для проката:", err);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
 // GET /api/bikes/:id - получить конкретный велосипед
 router.get("/:id", async (req, res) => {
   try {

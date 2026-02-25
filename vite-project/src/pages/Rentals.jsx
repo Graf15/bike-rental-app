@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from "react";
 import RentalsTable from "../components/RentalsTable";
-import RentalModal from "../components/RentalModal";
+import ActiveRentalModal from "../components/ActiveRentalModal";
+import BookingModal from "../components/BookingModal";
 import RentalViewModal from "../components/RentalViewModal";
 
 const Rentals = () => {
   const [rentals, setRentals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [viewingRental, setViewingRental] = useState(null);
+  const [isActiveModalOpen, setIsActiveModalOpen]   = useState(false);
+  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [viewingRental, setViewingRental]           = useState(null);
 
   const fetchRentals = async () => {
     setLoading(true);
@@ -107,12 +109,19 @@ const Rentals = () => {
               </div>
             </div>
           </div>
-          <div className="header-right-bottom">
+          <div className="header-right-bottom" style={{ display: "flex", gap: 8 }}>
             <button
               className="btn btn-primary-green add-bike-btn"
-              onClick={() => setIsCreateModalOpen(true)}
+              onClick={() => setIsActiveModalOpen(true)}
             >
-              + Создать договор
+              🚲 Выдать сейчас
+            </button>
+            <button
+              className="btn add-bike-btn"
+              style={{ background: "var(--color-primary-blue, #3b82f6)", color: "white", border: "none" }}
+              onClick={() => setIsBookingModalOpen(true)}
+            >
+              📅 Создать бронь
             </button>
           </div>
         </div>
@@ -126,9 +135,16 @@ const Rentals = () => {
         onRentalOpen={handleOpenRental}
       />
 
-      {isCreateModalOpen && (
-        <RentalModal
-          onClose={() => setIsCreateModalOpen(false)}
+      {isActiveModalOpen && (
+        <ActiveRentalModal
+          onClose={() => setIsActiveModalOpen(false)}
+          onSave={handleCreateSave}
+        />
+      )}
+
+      {isBookingModalOpen && (
+        <BookingModal
+          onClose={() => setIsBookingModalOpen(false)}
           onSave={handleCreateSave}
         />
       )}
