@@ -39,6 +39,11 @@ const RentalViewModal = ({ rental: initialRental, onClose, onUpdate }) => {
   const [returningItemId, setReturningItemId] = useState(null);
   const [returnForm, setReturnForm] = useState({ received_by: "", condition_after: "", notes: "" });
 
+  const [swappingItemId, setSwappingItemId] = useState(null);
+  const [availableBikes, setAvailableBikes] = useState([]);
+  const [swapBikeId, setSwapBikeId] = useState("");
+  const [oldBikeStatus, setOldBikeStatus] = useState("в ремонте");
+
   useEffect(() => {
     loadRental();
     fetch("/api/users").then(r => r.json()).then(d => setUsers(Array.isArray(d) ? d : [])).catch(console.error);
@@ -102,6 +107,47 @@ const RentalViewModal = ({ rental: initialRental, onClose, onUpdate }) => {
       }
       onUpdate();
       onClose();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openSwap = async (item) => {
+    setSwappingItemId(item.id);
+    setSwapBikeId("");
+    setOldBikeStatus("в ремонте");
+    setReturningItemId(null);
+    try {
+      const res = await fetch(`/api/bikes/for-rental?start=${rental.booked_start || ""}&end=${rental.booked_end || ""}`);
+      const data = await res.json();
+      // Исключаем текущий велосипед этой позиции
+      setAvailableBikes((Array.isArray(data) ? data : []).filter(b =>
+        String(b.id) !== String(item.bike_id) && b.is_available
+      ));
+    } catch {
+      setAvailableBikes([]);
+    }
+  };
+
+  const handleSwap = async (itemId) => {
+    if (!swapBikeId) { setError("Выберите велосипед для замены"); return; }
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/rentals/${rental.id}/items/${itemId}/swap`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ new_bike_id: parseInt(swapBikeId), old_bike_status: oldBikeStatus }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Ошибка при замене");
+      }
+      setSwappingItemId(null);
+      onUpdate();
+      await loadRental();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -264,7 +310,7 @@ const RentalViewModal = ({ rental: initialRental, onClose, onUpdate }) => {
                     display: "flex", alignItems: "center", gap: 10, padding: "10px 14px",
                     background: item.status === "returned" ? "#f9fafb" : "#f0fdf4",
                     border: `1px solid ${item.status === "returned" ? "#e5e7eb" : "#86efac"}`,
-                    borderRadius: returningItemId === item.id ? "6px 6px 0 0" : 6,
+                    borderRadius: (returningItemId === item.id || swappingItemId === item.id) ? "6px 6px 0 0" : 6,
                     opacity: item.status !== "active" ? 0.7 : 1,
                   }}>
                     <span style={{ fontSize: 18 }}>{item.item_type === "bike" ? "🚲" : "⛑️"}</span>
@@ -295,12 +341,23 @@ const RentalViewModal = ({ rental: initialRental, onClose, onUpdate }) => {
                     }}>
                       {ITEM_STATUS_LABELS[item.status] || item.status}
                     </span>
+                    {item.status === "active" && item.item_type === "bike" && (isActive || canActivate) && (
+                      <button
+                        type="button"
+                        className="btn btn-primary-small"
+                        onClick={() => swappingItemId === item.id ? setSwappingItemId(null) : openSwap(item)}
+                        style={{ fontSize: 12, padding: "4px 12px", flexShrink: 0, background: "#eff6ff", color: "#2563eb", border: "1px solid #bfdbfe", borderRadius: 6, cursor: "pointer", fontWeight: 500 }}
+                      >
+                        🔄 Заменить
+                      </button>
+                    )}
                     {item.status === "active" && isActive && (
                       <button
                         type="button"
                         className="btn btn-secondary-green btn-primary-small"
                         onClick={() => {
                           setReturningItemId(returningItemId === item.id ? null : item.id);
+                          setSwappingItemId(null);
                           setReturnForm({ received_by: "", condition_after: "", notes: "" });
                           setError(null);
                         }}
@@ -310,6 +367,49 @@ const RentalViewModal = ({ rental: initialRental, onClose, onUpdate }) => {
                       </button>
                     )}
                   </div>
+
+                  {/* Форма замены велосипеда */}
+                  {swappingItemId === item.id && (
+                    <div style={{
+                      padding: "12px 14px", background: "#eff6ff",
+                      border: "1px solid #bfdbfe", borderTop: "none",
+                      borderRadius: "0 0 6px 6px",
+                    }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#1e40af", marginBottom: 10 }}>🔄 Замена велосипеда</div>
+                      <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
+                        <div className="form-group" style={{ flex: 2, minWidth: 200, marginBottom: 0 }}>
+                          <label style={{ fontSize: 12 }}>Новый велосипед</label>
+                          <select className="form-select" value={swapBikeId} onChange={e => setSwapBikeId(e.target.value)}>
+                            <option value="">— Выберите велосипед —</option>
+                            {availableBikes.map(b => (
+                              <option key={b.id} value={b.id}>
+                                {b.internal_article ? `${b.internal_article} · ` : ""}{b.model}{b.wheel_size ? ` (${b.wheel_size}")` : ""}
+                              </option>
+                            ))}
+                          </select>
+                          {availableBikes.length === 0 && (
+                            <span style={{ fontSize: 12, color: "#9ca3af", marginTop: 4, display: "block" }}>Нет доступных велосипедов</span>
+                          )}
+                        </div>
+                        <div className="form-group" style={{ flex: 1, minWidth: 160, marginBottom: 0 }}>
+                          <label style={{ fontSize: 12 }}>Куда отправить старый</label>
+                          <select className="form-select" value={oldBikeStatus} onChange={e => setOldBikeStatus(e.target.value)}>
+                            <option value="в ремонте">В ремонт</option>
+                            <option value="в наличии">В наличие</option>
+                          </select>
+                        </div>
+                        <button type="button" className="btn btn-primary-small"
+                          onClick={() => handleSwap(item.id)} disabled={saving || !swapBikeId}
+                          style={{ marginBottom: 2, background: "#2563eb", color: "white", border: "none", borderRadius: 6, padding: "7px 16px", cursor: "pointer", fontWeight: 500, fontSize: 13, opacity: !swapBikeId ? 0.5 : 1 }}>
+                          {saving ? "..." : "Подтвердить"}
+                        </button>
+                        <button type="button" onClick={() => setSwappingItemId(null)}
+                          style={{ marginBottom: 2, padding: "7px 12px", background: "none", border: "1px solid #e5e7eb", borderRadius: 4, cursor: "pointer", color: "#6b7280" }}>
+                          Отмена
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Форма возврата позиции */}
                   {returningItemId === item.id && (

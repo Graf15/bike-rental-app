@@ -11,6 +11,13 @@ const Rentals = () => {
   const [isActiveModalOpen, setIsActiveModalOpen]   = useState(false);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [viewingRental, setViewingRental]           = useState(null);
+  const [statusFilter, setStatusFilter]             = useState([]);
+
+  const handleStatClick = (statuses) => {
+    setStatusFilter(prev =>
+      JSON.stringify(prev) === JSON.stringify(statuses) ? [] : statuses
+    );
+  };
 
   const fetchRentals = async () => {
     setLoading(true);
@@ -47,7 +54,8 @@ const Rentals = () => {
 
   // После создания — открываем карточку договора для немедленной активации
   const handleCreateSave = (createdContract) => {
-    setIsCreateModalOpen(false);
+    setIsActiveModalOpen(false);
+    setIsBookingModalOpen(false);
     fetchRentals();
     if (createdContract?.id) {
       setViewingRental(createdContract);
@@ -72,53 +80,41 @@ const Rentals = () => {
         </div>
         <div className="header-right">
           <div className="header-stats">
-            <div className="stat-card">
-              <div className="stat-content">
-                <div className="status-indicator" style={{ background: "var(--color-primary-green)" }}></div>
-                <div className="stat-info">
-                  <span className="stat-number">{activeCount}</span>
-                  <span className="stat-label">Активных</span>
+            {[
+              { statuses: ["active"],              color: "var(--color-primary-green)", count: activeCount,    label: "Активных" },
+              { statuses: ["booked"],              color: "var(--color-primary-blue)",  count: bookedCount,    label: "Забронировано" },
+              { statuses: ["overdue", "no_show"],  color: "var(--color-primary-red)",   count: overdueCount,   label: "Просрочено" },
+              { statuses: [],                      color: "#9ca3af",                     count: rentals.length, label: "Всего" },
+            ].map(({ statuses, color, count, label }) => {
+              const isActive = statuses.length > 0 && JSON.stringify(statusFilter) === JSON.stringify(statuses);
+              return (
+                <div
+                  key={label}
+                  className="stat-card"
+                  onClick={() => statuses.length > 0 && handleStatClick(statuses)}
+                  style={{ cursor: statuses.length > 0 ? "pointer" : "default", outline: isActive ? `2px solid ${color}` : "none", borderRadius: 8 }}
+                  title={statuses.length > 0 ? (isActive ? "Сбросить фильтр" : `Фильтр: ${label}`) : undefined}
+                >
+                  <div className="stat-content">
+                    <div className="status-indicator" style={{ background: color }}></div>
+                    <div className="stat-info">
+                      <span className="stat-number">{count}</span>
+                      <span className="stat-label">{label}</span>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-content">
-                <div className="status-indicator" style={{ background: "var(--color-primary-blue)" }}></div>
-                <div className="stat-info">
-                  <span className="stat-number">{bookedCount}</span>
-                  <span className="stat-label">Забронировано</span>
-                </div>
-              </div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-content">
-                <div className="status-indicator" style={{ background: "var(--color-primary-red)" }}></div>
-                <div className="stat-info">
-                  <span className="stat-number">{overdueCount}</span>
-                  <span className="stat-label">Просрочено</span>
-                </div>
-              </div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-content">
-                <div className="status-indicator" style={{ background: "#9ca3af" }}></div>
-                <div className="stat-info">
-                  <span className="stat-number">{rentals.length}</span>
-                  <span className="stat-label">Всего</span>
-                </div>
-              </div>
-            </div>
+              );
+            })}
           </div>
           <div className="header-right-bottom" style={{ display: "flex", gap: 8 }}>
             <button
               className="btn btn-primary-green add-bike-btn"
               onClick={() => setIsActiveModalOpen(true)}
             >
-              🚲 Выдать сейчас
+              Выдать сейчас
             </button>
             <button
-              className="btn add-bike-btn"
-              style={{ background: "var(--color-primary-blue, #3b82f6)", color: "white", border: "none" }}
+              className="btn btn-secondary-green add-bike-btn"
               onClick={() => setIsBookingModalOpen(true)}
             >
               📅 Создать бронь
@@ -133,6 +129,7 @@ const Rentals = () => {
         onRentalEdit={handleOpenRental}
         onRentalDelete={handleDelete}
         onRentalOpen={handleOpenRental}
+        statusFilter={statusFilter}
       />
 
       {isActiveModalOpen && (

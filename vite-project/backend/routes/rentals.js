@@ -76,7 +76,7 @@ router.get("/:id", async (req, res) => {
       FROM rental_items ri
       LEFT JOIN bikes b ON ri.bike_id = b.id
       LEFT JOIN brands br ON b.brand_id = br.id
-      LEFT JOIN equipment_models em ON ri.equipment_model_id = em.id
+      LEFT JOIN part_models em ON ri.equipment_model_id = em.id
       LEFT JOIN tariffs t ON ri.tariff_id = t.id
       LEFT JOIN users received_user ON ri.received_by = received_user.id
       WHERE ri.contract_id = $1
@@ -158,8 +158,8 @@ router.post("/", async (req, res) => {
         INSERT INTO rental_items
           (contract_id, item_type, bike_id, equipment_model_id, equipment_name,
            tariff_id, tariff_type, price, prepaid, status, quantity,
-           actual_start)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'active',$10,$11)
+           actual_start, discount_type, discount_percent, discount_notes)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'active',$10,$11,$12,$13,$14)
       `, [
         contract.id,
         item.item_type || "bike",
@@ -171,7 +171,10 @@ router.post("/", async (req, res) => {
         item.price || null,
         item.prepaid || false,
         item.quantity || 1,
-        contractStatus === "active" ? new Date() : null
+        contractStatus === "active" ? new Date() : null,
+        item.discount_type || null,
+        item.discount_percent > 0 ? item.discount_percent : null,
+        item.discount_notes || null,
       ]);
     }
 
@@ -303,6 +306,67 @@ router.patch("/:id/status", async (req, res) => {
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("Ошибка при смене статуса:", err);
+    res.status(400).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// PATCH /api/rentals/:contractId/items/:itemId/swap - заменить велосипед в позиции
+router.patch("/:contractId/items/:itemId/swap", async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const { contractId, itemId } = req.params;
+    const { new_bike_id, old_bike_status = "в ремонте" } = req.body;
+
+    if (!new_bike_id) throw new Error("Не указан новый велосипед");
+
+    // Получаем текущую позицию
+    const itemRes = await client.query(
+      "SELECT ri.*, rc.status as contract_status FROM rental_items ri JOIN rental_contracts rc ON ri.contract_id = rc.id WHERE ri.id = $1 AND ri.contract_id = $2",
+      [itemId, contractId]
+    );
+    if (itemRes.rows.length === 0) throw new Error("Позиция не найдена");
+    const item = itemRes.rows[0];
+    if (item.item_type !== "bike") throw new Error("Заменить можно только велосипед");
+    if (item.status !== "active") throw new Error("Позиция не активна");
+
+    // Проверяем, что новый велосипед существует и не занят
+    const newBikeRes = await client.query("SELECT * FROM bikes WHERE id = $1", [new_bike_id]);
+    if (newBikeRes.rows.length === 0) throw new Error("Велосипед не найден");
+    const newBike = newBikeRes.rows[0];
+    if (["в прокате", "украден", "продан", "невозврат"].includes(newBike.condition_status)) {
+      throw new Error(`Велосипед "${newBike.model}" недоступен (${newBike.condition_status})`);
+    }
+
+    // Обновляем позицию: меняем bike_id
+    await client.query(
+      "UPDATE rental_items SET bike_id = $1 WHERE id = $2",
+      [new_bike_id, itemId]
+    );
+
+    // Старый велосипед → переданный статус (в ремонте / в наличии)
+    if (item.bike_id) {
+      await client.query(
+        "UPDATE bikes SET condition_status = $1, updated_at = NOW() WHERE id = $2",
+        [old_bike_status, item.bike_id]
+      );
+    }
+
+    // Новый велосипед → статус в соответствии с договором
+    const newBikeStatus = item.contract_status === "active" ? "в прокате" : "бронь";
+    await client.query(
+      "UPDATE bikes SET condition_status = $1, updated_at = NOW() WHERE id = $2",
+      [newBikeStatus, new_bike_id]
+    );
+
+    await client.query("COMMIT");
+    res.json({ success: true });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("Ошибка при замене велосипеда:", err);
     res.status(400).json({ error: err.message });
   } finally {
     client.release();

@@ -58,7 +58,7 @@ const CustomersTable = ({ customers, onCustomerUpdate, onCustomerEdit, onCustome
     const saved = localStorage.getItem("customersTableVisibleColumns");
     return saved
       ? JSON.parse(saved)
-      : ["id", "last_name", "first_name", "middle_name", "phone", "birth_date", "gender", "height_cm", "status", "no_show_count_actual", "restriction_reason", "created_at", "notes"];
+      : ["id", "last_name", "first_name", "middle_name", "phone", "birth_date", "gender", "height_cm", "is_veteran", "status", "no_show_count_actual", "restriction_reason", "created_at", "notes"];
   });
 
   const defaultColumnWidths = {
@@ -70,6 +70,7 @@ const CustomersTable = ({ customers, onCustomerUpdate, onCustomerEdit, onCustome
     birth_date: 120,
     gender: 90,
     height_cm: 70,
+    is_veteran: 80,
     status: 140,
     no_show_count_actual: 90,
     restriction_reason: 180,
@@ -87,7 +88,7 @@ const CustomersTable = ({ customers, onCustomerUpdate, onCustomerEdit, onCustome
     const saved = localStorage.getItem("customersTableColumnOrder");
     return saved
       ? JSON.parse(saved)
-      : ["id", "last_name", "first_name", "middle_name", "phone", "birth_date", "gender", "height_cm", "status", "no_show_count_actual", "restriction_reason", "created_at", "notes"];
+      : ["id", "last_name", "first_name", "middle_name", "phone", "birth_date", "gender", "height_cm", "is_veteran", "status", "no_show_count_actual", "restriction_reason", "created_at", "notes"];
   });
 
   const isResizing = useRef(false);
@@ -254,6 +255,7 @@ const CustomersTable = ({ customers, onCustomerUpdate, onCustomerEdit, onCustome
   const filteredCustomers = customers.filter((c) =>
     Object.entries(filters).every(([key, value]) => {
       if (!value || (Array.isArray(value) && value.length === 0)) return true;
+      if (key === "is_veteran") return Array.isArray(value) && value.includes(c[key] ? "да" : "нет");
       if (Array.isArray(value)) return value.includes(c[key]);
       return String(c[key] || "").toLowerCase().includes(value.toLowerCase());
     })
@@ -284,6 +286,7 @@ const CustomersTable = ({ customers, onCustomerUpdate, onCustomerEdit, onCustome
     { key: "birth_date", label: "Дата рождения" },
     { key: "gender", label: "Пол" },
     { key: "height_cm", label: "Рост" },
+    { key: "is_veteran", label: "УБД" },
     { key: "status", label: "Статус" },
     { key: "no_show_count_actual", label: "Неявки" },
     { key: "restriction_reason", label: "Причина ограничения" },
@@ -317,6 +320,9 @@ const CustomersTable = ({ customers, onCustomerUpdate, onCustomerEdit, onCustome
       return count > 0 ? <span className={`no-show-badge ${count >= 2 ? "danger" : "warning"}`}>{count}</span> : "—";
     }
     if (key === "height_cm") return customer[key] ? `${customer[key]} см` : "—";
+    if (key === "is_veteran") return customer[key]
+      ? <span style={{ color: "var(--color-primary-blue)", fontWeight: 600, fontSize: 13 }}>🎖 УБД</span>
+      : "—";
     return customer[key] || "—";
   };
 

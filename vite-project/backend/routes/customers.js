@@ -64,31 +64,43 @@ router.post("/", async (req, res) => {
       birth_date,
       gender,
       height_cm,
+      is_veteran = false,
       status = "active",
       restriction_reason,
       notes,
     } = req.body;
 
-    if (!last_name || !first_name || !phone || !birth_date) {
+    if (!first_name || !phone) {
       return res.status(400).json({
-        error: "Обязательные поля: фамилия, имя, телефон, дата рождения",
+        error: "Обязательные поля: имя, телефон",
       });
     }
 
     const result = await pool.query(
       `INSERT INTO customers (
         last_name, first_name, middle_name, phone, birth_date,
-        gender, height_cm, status, restriction_reason, notes
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        gender, height_cm, is_veteran, status, restriction_reason, notes
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING *`,
       [
-        last_name, first_name, middle_name || null, phone, birth_date,
-        gender || null, height_cm || null, status, restriction_reason || null, notes || null,
+        last_name || null, first_name, middle_name || null, phone, birth_date || null,
+        gender || null, height_cm || null, is_veteran || false, status,
+        restriction_reason || null, notes || null,
       ]
     );
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
+    if (err.code === "23505" && err.constraint === "customers_phone_unique") {
+      const existing = await pool.query(
+        "SELECT id, first_name, last_name, phone, status, is_veteran, no_show_count, birth_date FROM customers WHERE phone = $1",
+        [req.body.phone]
+      );
+      return res.status(409).json({
+        error: "Клиент с таким номером телефона уже существует",
+        existing: existing.rows[0] || null,
+      });
+    }
     console.error("Ошибка при создании клиента:", err);
     res.status(500).json({ error: "Ошибка сервера" });
   }
@@ -106,6 +118,7 @@ router.put("/:id", async (req, res) => {
       birth_date,
       gender,
       height_cm,
+      is_veteran = false,
       status,
       restriction_reason,
       notes,
@@ -114,14 +127,14 @@ router.put("/:id", async (req, res) => {
     const result = await pool.query(
       `UPDATE customers SET
         last_name = $1, first_name = $2, middle_name = $3, phone = $4,
-        birth_date = $5, gender = $6, height_cm = $7, status = $8,
-        restriction_reason = $9, notes = $10, updated_at = NOW()
-      WHERE id = $11
+        birth_date = $5, gender = $6, height_cm = $7, is_veteran = $8,
+        status = $9, restriction_reason = $10, notes = $11, updated_at = NOW()
+      WHERE id = $12
       RETURNING *`,
       [
         last_name, first_name, middle_name || null, phone,
-        birth_date, gender || null, height_cm || null, status,
-        restriction_reason || null, notes || null, id,
+        birth_date, gender || null, height_cm || null, is_veteran || false,
+        status, restriction_reason || null, notes || null, id,
       ]
     );
 
@@ -131,6 +144,16 @@ router.put("/:id", async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (err) {
+    if (err.code === "23505" && err.constraint === "customers_phone_unique") {
+      const existing = await pool.query(
+        "SELECT id, first_name, last_name, phone FROM customers WHERE phone = $1",
+        [req.body.phone]
+      );
+      return res.status(409).json({
+        error: "Клиент с таким номером телефона уже существует",
+        existing: existing.rows[0] || null,
+      });
+    }
     console.error("Ошибка при обновлении клиента:", err);
     res.status(500).json({ error: "Ошибка сервера" });
   }

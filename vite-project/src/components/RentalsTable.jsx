@@ -31,12 +31,17 @@ const ColumnResizer = ({ onMouseDown }) => (
   <div className="column-resizer" onMouseDown={onMouseDown} onClick={(e) => e.stopPropagation()} />
 );
 
-const RentalsTable = ({ rentals, onRentalUpdate, onRentalEdit, onRentalDelete, onRentalOpen }) => {
+const RentalsTable = ({ rentals, onRentalUpdate, onRentalEdit, onRentalDelete, onRentalOpen, statusFilter }) => {
   const [sortColumn, setSortColumn] = useState("id");
   const [sortAsc, setSortAsc] = useState(false);
   const [filters, setFilters] = useState({});
   const [popoverInfo, setPopoverInfo] = useState({ key: null, visible: false });
   const anchorRefs = useRef({});
+
+  useEffect(() => {
+    setFilters(prev => ({ ...prev, status: statusFilter && statusFilter.length > 0 ? statusFilter : undefined }));
+    setCurrentPage(1);
+  }, [JSON.stringify(statusFilter)]);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(() => parseInt(localStorage.getItem("rentalsTablePageSize") || "50"));
@@ -174,7 +179,7 @@ const RentalsTable = ({ rentals, onRentalUpdate, onRentalEdit, onRentalDelete, o
     Object.entries(filters).every(([key, value]) => {
       if (!value || (Array.isArray(value) && value.length === 0)) return true;
       const cell = key === "customer_name"
-        ? `${r.last_name} ${r.first_name}`
+        ? `${r.last_name ? r.last_name + " " : ""}${r.first_name}`
         : r[key];
       if (Array.isArray(value)) return value.includes(r[key]);
       return String(cell || "").toLowerCase().includes(value.toLowerCase());
@@ -183,8 +188,8 @@ const RentalsTable = ({ rentals, onRentalUpdate, onRentalEdit, onRentalDelete, o
 
   const sortedRentals = [...filteredRentals].sort((a, b) => {
     if (!sortColumn) return 0;
-    const vA = sortColumn === "customer_name" ? `${a.last_name} ${a.first_name}` : a[sortColumn];
-    const vB = sortColumn === "customer_name" ? `${b.last_name} ${b.first_name}` : b[sortColumn];
+    const vA = sortColumn === "customer_name" ? `${a.last_name ? a.last_name + " " : ""}${a.first_name}` : a[sortColumn];
+    const vB = sortColumn === "customer_name" ? `${b.last_name ? b.last_name + " " : ""}${b.first_name}` : b[sortColumn];
     if (vA == null) return sortAsc ? 1 : -1;
     if (vB == null) return sortAsc ? -1 : 1;
     if (typeof vA === "number") return sortAsc ? vA - vB : vB - vA;
@@ -200,7 +205,7 @@ const RentalsTable = ({ rentals, onRentalUpdate, onRentalEdit, onRentalDelete, o
   const selectOptions = RENTAL_OPTIONS;
 
   const renderCell = (r, key) => {
-    if (key === "customer_name") return `${r.last_name} ${r.first_name}${r.middle_name ? " " + r.middle_name : ""}`;
+    if (key === "customer_name") return [r.last_name, r.first_name, r.middle_name].filter(Boolean).join(" ");
     if (key === "status") return <span className={STATUS_COLORS[r.status] || "status-badge"}>{STATUS_LABELS[r.status] || r.status}</span>;
     if (key === "deposit_type") return DEPOSIT_LABELS[r.deposit_type] || r.deposit_type || "—";
     if (key === "booked_start" || key === "booked_end") return formatDate(r[key]);

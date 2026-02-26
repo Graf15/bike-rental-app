@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import "./Modal.css";
 import "./CustomerModal.css";
+import { normalizePhone, PHONE_HINT } from "../constants/phoneUtils";
 
 const INITIAL_FORM = {
   last_name: "",
@@ -10,6 +11,7 @@ const INITIAL_FORM = {
   birth_date: "",
   gender: "",
   height_cm: "",
+  is_veteran: false,
   status: "active",
   restriction_reason: "",
   notes: "",
@@ -19,6 +21,7 @@ const CustomerModal = ({ customer, onClose, onSave }) => {
   const [form, setForm] = useState(INITIAL_FORM);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [existingCustomer, setExistingCustomer] = useState(null);
   const mouseDownOnOverlay = useRef(false);
 
   const isEdit = !!(customer && customer.id);
@@ -33,6 +36,7 @@ const CustomerModal = ({ customer, onClose, onSave }) => {
         birth_date: customer.birth_date ? customer.birth_date.split("T")[0] : "",
         gender: customer.gender || "",
         height_cm: customer.height_cm || "",
+        is_veteran: customer.is_veteran || false,
         status: customer.status || "active",
         restriction_reason: customer.restriction_reason || "",
         notes: customer.notes || "",
@@ -43,16 +47,23 @@ const CustomerModal = ({ customer, onClose, onSave }) => {
   }, [customer]);
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    setForm((prev) => ({ ...prev, [name]: type === "checkbox" ? checked : value }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
+    setExistingCustomer(null);
 
-    if (!form.last_name.trim() || !form.first_name.trim() || !form.phone.trim() || !form.birth_date) {
-      setError("Заполните обязательные поля: фамилия, имя, телефон, дата рождения");
+    if (!form.first_name.trim()) {
+      setError("Заполните обязательное поле: имя");
+      return;
+    }
+
+    const phone = normalizePhone(form.phone);
+    if (!phone) {
+      setError(`Неверный формат телефона. ${PHONE_HINT}`);
       return;
     }
 
@@ -66,12 +77,16 @@ const CustomerModal = ({ customer, onClose, onSave }) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
+          phone,
           height_cm: form.height_cm ? parseInt(form.height_cm) : null,
         }),
       });
 
       if (!response.ok) {
         const data = await response.json();
+        if (response.status === 409 && data.existing) {
+          setExistingCustomer(data.existing);
+        }
         throw new Error(data.error || "Ошибка при сохранении");
       }
 
@@ -97,7 +112,7 @@ const CustomerModal = ({ customer, onClose, onSave }) => {
               <h3>Личные данные</h3>
               <div className="form-row">
                 <div className="form-group">
-                  <label className="required-label">Фамилия</label>
+                  <label>Фамилия</label>
                   <input className="form-input" name="last_name" value={form.last_name} onChange={handleChange} placeholder="Иванов" />
                 </div>
                 <div className="form-group">
@@ -112,12 +127,13 @@ const CustomerModal = ({ customer, onClose, onSave }) => {
                 </div>
                 <div className="form-group">
                   <label className="required-label">Телефон</label>
-                  <input className="form-input" name="phone" value={form.phone} onChange={handleChange} placeholder="+380..." />
+                  <input className="form-input" name="phone" value={form.phone} onChange={handleChange} placeholder="0XXXXXXXXX" />
+                  <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>{PHONE_HINT}</div>
                 </div>
               </div>
               <div className="form-row">
                 <div className="form-group">
-                  <label className="required-label">Дата рождения</label>
+                  <label>Дата рождения</label>
                   <input className="form-input" type="date" name="birth_date" value={form.birth_date} onChange={handleChange} />
                 </div>
                 <div className="form-group">
@@ -156,6 +172,20 @@ const CustomerModal = ({ customer, onClose, onSave }) => {
                   </select>
                 </div>
               </div>
+              <div className="form-group" style={{ marginTop: 8 }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", userSelect: "none" }}>
+                  <input
+                    type="checkbox"
+                    name="is_veteran"
+                    checked={form.is_veteran}
+                    onChange={handleChange}
+                    style={{ width: 16, height: 16, cursor: "pointer", accentColor: "var(--color-primary-blue)" }}
+                  />
+                  <span style={{ fontWeight: form.is_veteran ? 600 : 400, color: form.is_veteran ? "var(--color-primary-blue)" : "#374151" }}>
+                    🎖 Участник боевых действий (УБД) — скидка −20%
+                  </span>
+                </label>
+              </div>
               {form.status !== "active" && (
                 <div className="form-group">
                   <label>Причина ограничения</label>
@@ -184,7 +214,16 @@ const CustomerModal = ({ customer, onClose, onSave }) => {
               </div>
             </div>
 
-            {error && <div className="error-message">{error}</div>}
+            {error && (
+              <div className="error-message">
+                {error}
+                {existingCustomer && (
+                  <span style={{ marginLeft: 8, fontWeight: 500 }}>
+                    — {[existingCustomer.last_name, existingCustomer.first_name].filter(Boolean).join(" ")} ({existingCustomer.phone})
+                  </span>
+                )}
+              </div>
+            )}
           </form>
         </div>
 

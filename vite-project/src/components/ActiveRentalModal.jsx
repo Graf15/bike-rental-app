@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import MultiSelectPopover from "./MultiSelectPopover";
+import { TARIFF_OPTIONS, WHEEL_OPTIONS, heightToFrameRec } from "../constants/bikeFilters";
+import { normalizePhone, PHONE_HINT } from "../constants/phoneUtils";
 import "./Modal.css";
+import "./BikeTable.css";
 
 const INITIAL_FORM = {
   customer_id: "",
@@ -21,6 +25,37 @@ const INITIAL_ITEM = {
   price: "",
   quantity: 1,
   prepaid: false,
+  discount_type: "",
+  discount_percent: 0,
+  discount_notes: "",
+};
+
+const DISCOUNT_PRESETS = { veteran: 20, birthday: 50, group: 10, "": 0 };
+
+const isBirthdayCustomer = (customer) => {
+  if (!customer?.birth_date) return false;
+  const bd = new Date(customer.birth_date), today = new Date();
+  const bday = new Date(today.getFullYear(), bd.getMonth(), bd.getDate());
+  const diff = Math.floor((today - bday) / 86400000);
+  return diff >= 0 && diff <= 7;
+};
+
+const autoApplyDiscounts = (customer, currentItems) => {
+  if (!customer) return currentItems.map(i => i.discount_type === "manual" ? i : { ...i, discount_type: "", discount_percent: 0 });
+  const isBirthday = isBirthdayCustomer(customer);
+  const isVeteran = customer.is_veteran || false;
+  const isGroup = currentItems.length >= 5;
+  const firstBikeIdx = currentItems.findIndex(i => i.item_type === "bike");
+  return currentItems.map((item, idx) => {
+    if (item.discount_type === "manual") return item;
+    let discountType = "", discountPercent = 0;
+    if (isGroup) { discountType = "group"; discountPercent = 10; }
+    if (item.item_type === "bike" && idx === firstBikeIdx) {
+      if (isVeteran && 20 > discountPercent) { discountType = "veteran"; discountPercent = 20; }
+      if (isBirthday && 50 > discountPercent) { discountType = "birthday"; discountPercent = 50; }
+    }
+    return { ...item, discount_type: discountType, discount_percent: discountPercent };
+  });
 };
 
 const DEPOSIT_TYPES = [
@@ -29,10 +64,14 @@ const DEPOSIT_TYPES = [
   { value: "document", label: "Документ" },
 ];
 
+const getBikeIcon = (bike) => bike?.model?.toLowerCase().includes("самокат") ? "🛴" : "🚲";
+
 const QUICK_DURATIONS = [
-  { label: "1ч",     minutes: 60 },
-  { label: "2ч",     minutes: 120 },
-  { label: "3ч",     minutes: 180 },
+  { label: "1",      minutes: 60 },
+  { label: "2",      minutes: 120 },
+  { label: "3",      minutes: 180 },
+  { label: "4",      minutes: 240 },
+  { label: "День",   until2100: true },
   { label: "Сутки",  minutes: 1440 },
   { label: "Неделя", minutes: 10080 },
   { label: "2 нед",  minutes: 20160 },
@@ -50,11 +89,14 @@ const formatConflictTime = (dateStr) => {
   } catch { return null; }
 };
 
-const TARIFF_OPTIONS = ["kids", "econom", "standart", "premium", "эл.вел", "эл.самокат"];
-const WHEEL_OPTIONS  = ["16", "18", "20", "24", "26", "27.5", "29"];
+const getDefault2100 = () => {
+  const d = new Date();
+  d.setHours(21, 0, 0, 0);
+  return toLocalStr(d);
+};
 
 const ActiveRentalModal = ({ onClose, onSave }) => {
-  const [form, setForm]           = useState({ ...INITIAL_FORM, booked_start: toLocalStr(new Date()) });
+  const [form, setForm]           = useState({ ...INITIAL_FORM, booked_start: toLocalStr(new Date()), booked_end: getDefault2100() });
   const [items, setItems]         = useState([]);
   const [saving, setSaving]       = useState(false);
   const [error, setError]         = useState(null);
@@ -67,17 +109,19 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
   const [tariffs, setTariffs]     = useState([]);
   const [equipment, setEquipment] = useState([]);
 
-  // Фильтры (сворачиваемые)
-  const [showFilters, setShowFilters]   = useState(false);
-  const [filterTariff, setFilterTariff] = useState("");
-  const [filterWheel, setFilterWheel]   = useState("");
+  // Фильтры велосипедов
+  const [filterTariffs, setFilterTariffs] = useState([]);
+  const [filterWheels, setFilterWheels]   = useState([]);
+  const [filterHeight, setFilterHeight]   = useState("");
+  const [popoverKey, setPopoverKey]       = useState(null);
 
-  // Поиск велосипеда / оборудования
-  const [addBikeSearch, setAddBikeSearch]   = useState("");
-  const [addBikeActive, setAddBikeActive]   = useState(false);
-  const [addBikeFocused, setAddBikeFocused] = useState(-1);
-  const [dropUp, setDropUp]                 = useState(false);
-  const addBikeInputRef                     = useRef(null);
+  const [filterSearch, setFilterSearch]     = useState("");
+  const [gridFocusedIdx, setGridFocusedIdx] = useState(-1);
+  const tariffFilterRef                     = useRef(null);
+  const wheelFilterRef                      = useRef(null);
+  const filterSearchRef                     = useRef(null);
+  const bikeGridRef                         = useRef(null);
+  const eqGridRef                           = useRef(null);
 
   // Попап количества оборудования
   const [qtyPopup, setQtyPopup] = useState(null);
@@ -91,6 +135,15 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
   const [customerFocused, setCustomerFocused]   = useState(-1);
   const customerInputRef                        = useRef(null);
   const dropdownRef                             = useRef(null);
+
+  // Быстрое создание клиента
+  const [quickDismissed, setQuickDismissed]   = useState(false);
+  const [quickForm, setQuickForm]             = useState({ phone: "", first_name: "", last_name: "" });
+  const [quickSaving, setQuickSaving]         = useState(false);
+  const [quickError, setQuickError]           = useState(null);
+  const [quickExisting, setQuickExisting]     = useState(null);
+  const quickFirstNameRef                     = useRef(null);
+  const prevShowQuickCreate                   = useRef(false);
 
   useEffect(() => {
     Promise.all([
@@ -159,19 +212,43 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
       ).slice(0, 8)
     : [];
 
+  const showQuickCreate = customerSearch.length >= 2 && filteredCustomers.length === 0 && !selectedCustomer && !quickDismissed;
+
+  useEffect(() => {
+    if (!showQuickCreate) { prevShowQuickCreate.current = false; return; }
+    const isPhone = /^\+?[\d\s\-()+]{6,}$/.test(customerSearch.trim());
+    if (!prevShowQuickCreate.current) {
+      setQuickForm({ first_name: "", last_name: "", phone: isPhone ? customerSearch.trim() : "" });
+      setQuickError(null); setQuickExisting(null);
+      prevShowQuickCreate.current = true;
+    } else if (isPhone) {
+      setQuickForm(prev => ({ ...prev, phone: customerSearch.trim() }));
+    }
+  }, [customerSearch, showQuickCreate]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Авто-сброс ошибки когда условие исправлено
+  useEffect(() => {
+    if (!error) return;
+    if (error.includes("клиента") && form.customer_id) setError(null);
+    if ((error.includes("позиц") || error.includes("велосипед")) && items.length > 0) setError(null);
+  }, [form.customer_id, items.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleCustomerSelect = (customer) => {
     setSelectedCustomer(customer);
     setForm(prev => ({ ...prev, customer_id: customer.id }));
-    setCustomerSearch(`${customer.last_name} ${customer.first_name}${customer.middle_name ? " " + customer.middle_name : ""}`);
+    setCustomerSearch([customer.last_name, customer.first_name, customer.middle_name].filter(Boolean).join(" "));
     setShowDropdown(false);
     setCustomerFocused(-1);
-    setTimeout(() => addBikeInputRef.current?.focus(), 50);
+    setItems(prev => autoApplyDiscounts(customer, prev));
+    setTimeout(() => filterSearchRef.current?.focus(), 50);
   };
 
   const clearCustomer = () => {
     setSelectedCustomer(null);
     setForm(prev => ({ ...prev, customer_id: "" }));
     setCustomerSearch("");
+    setQuickDismissed(false);
+    setItems(prev => autoApplyDiscounts(null, prev));
     setTimeout(() => customerInputRef.current?.focus(), 0);
   };
 
@@ -186,9 +263,36 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
       e.preventDefault();
       const target = customerFocused >= 0 ? filteredCustomers[customerFocused]
         : filteredCustomers.length === 1 ? filteredCustomers[0] : null;
-      if (target) handleCustomerSelect(target);
+      if (target) { handleCustomerSelect(target); }
+      else if (customerSearch.length >= 2 && filteredCustomers.length === 0) {
+        setShowDropdown(false);
+        setTimeout(() => quickFirstNameRef.current?.focus(), 50);
+      }
     } else if (e.key === "Escape") {
-      setShowDropdown(false); setCustomerFocused(-1);
+      setShowDropdown(false); setCustomerFocused(-1); setQuickDismissed(true);
+    }
+  };
+
+  const handleQuickCreateSave = async () => {
+    setQuickError(null); setQuickExisting(null);
+    if (!quickForm.first_name.trim()) { setQuickError("Укажите имя"); return; }
+    const phone = normalizePhone(quickForm.phone);
+    if (!phone) { setQuickError(`Неверный формат телефона. ${PHONE_HINT}`); return; }
+    setQuickSaving(true);
+    try {
+      const res = await fetch("/api/customers", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ first_name: quickForm.first_name.trim(), last_name: quickForm.last_name.trim() || null, phone }),
+      });
+      const d = await res.json();
+      if (res.status === 409 && d.existing) { setQuickExisting(d.existing); setQuickError(d.error); return; }
+      if (!res.ok) throw new Error(d.error || "Ошибка");
+      setCustomers(prev => [d, ...prev]);
+      handleCustomerSelect(d);
+    } catch (err) {
+      setQuickError(err.message);
+    } finally {
+      setQuickSaving(false);
     }
   };
 
@@ -207,9 +311,16 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
     recalcAll(newStart, newEnd, items);
   };
 
-  const applyQuickDuration = (minutes) => {
+  const applyQuickDuration = (minutes, until2100) => {
     if (!form.booked_start) return;
-    const endStr = toLocalStr(new Date(new Date(form.booked_start).getTime() + minutes * 60000));
+    let endStr;
+    if (until2100) {
+      const d = new Date();
+      d.setHours(21, 0, 0, 0);
+      endStr = toLocalStr(d);
+    } else {
+      endStr = toLocalStr(new Date(new Date(form.booked_start).getTime() + minutes * 60000));
+    }
     setForm(prev => ({ ...prev, booked_end: endStr }));
     setDateError(null);
     recalcAll(form.booked_start, endStr, items);
@@ -230,62 +341,63 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
         newItems[index] = { ...newItems[index], price: result.price, tariff_type: result.type || newItems[index].tariff_type };
       }
     }
+    if (field === "discount_type") {
+      newItems[index] = { ...newItems[index], discount_type: value, discount_percent: value in DISCOUNT_PRESETS ? DISCOUNT_PRESETS[value] : newItems[index].discount_percent };
+    }
     setItems(newItems);
   };
 
-  const removeItem = (index) => setItems(prev => prev.filter((_, i) => i !== index));
+  const removeItem = (index) => setItems(prev => {
+    const newItems = prev.filter((_, i) => i !== index);
+    return autoApplyDiscounts(selectedCustomer, newItems);
+  });
 
   // Велосипеды: показываем в наличии + бронь (с предупреждением), скрываем в прокате
   const selectableBikes = bikes.filter(b => b.condition_status !== "в прокате");
 
   // Фильтрованный список с учётом фильтров
-  const filteredByOptions = selectableBikes.filter(b => {
-    if (filterTariff && b.tariff_name !== filterTariff) return false;
-    if (filterWheel && String(b.wheel_size) !== filterWheel) return false;
-    return true;
-  });
-
-  const filteredAddItems = addBikeSearch.length >= 2
-    ? (() => {
-        const q = addBikeSearch.toLowerCase();
-        const bikePriority = (b) => {
-          const art = (b.internal_article || "").toLowerCase();
-          if (art === q) return 0; if (art.startsWith(q)) return 1; if (art.includes(q)) return 2; return 3;
-        };
-        const filteredBikes = filteredByOptions
-          .filter(b => (b.internal_article || "").toLowerCase().includes(q) || b.model.toLowerCase().includes(q))
-          .sort((a, b) => bikePriority(a) - bikePriority(b))
-          .map(b => ({ _type: "bike", ...b }));
-
-        const filteredEquipment = equipment
-          .filter(eq => eq.name.toLowerCase().includes(q))
-          .map(eq => ({ _type: "equipment", ...eq }));
-
-        return [...filteredBikes, ...filteredEquipment].slice(0, 12);
-      })()
+  const heightRec = heightToFrameRec(filterHeight);
+  const filteredEquipment = filterSearch.length >= 2
+    ? equipment.filter(eq => eq.name.toLowerCase().includes(filterSearch.toLowerCase()))
     : [];
 
-  const addBikeItem = async (bike) => {
-    if (items.some(i => String(i.bike_id) === String(bike.id))) {
-      setAddBikeSearch(""); setAddBikeActive(false); setAddBikeFocused(-1);
-      setTimeout(() => addBikeInputRef.current?.focus(), 0); return;
-    }
-    setAddBikeSearch(""); setAddBikeActive(false); setAddBikeFocused(-1);
+  const filteredByOptions = selectableBikes
+    .filter(b => {
+      if (filterTariffs.length > 0 && !filterTariffs.includes(b.tariff_name)) return false;
+      if (filterWheels.length > 0 && !filterWheels.includes(String(b.wheel_size))) return false;
+      if (heightRec) {
+        const ok = heightRec.perfect.includes(b.frame_size) || heightRec.acceptable.includes(b.frame_size);
+        if (!ok) return false;
+      }
+      if (filterSearch.length >= 2) {
+        const q = filterSearch.toLowerCase();
+        if (!(b.internal_article || "").toLowerCase().includes(q) && !b.model.toLowerCase().includes(q)) return false;
+      }
+      return true;
+    })
+    .map(b => ({
+      ...b,
+      _heightMatch: heightRec
+        ? (heightRec.perfect.includes(b.frame_size) ? "perfect" : "acceptable")
+        : null,
+    }))
+    .sort((a, b) => {
+      if (!heightRec) return 0;
+      return (a._heightMatch === "perfect" ? 0 : 1) - (b._heightMatch === "perfect" ? 0 : 1);
+    });
+
+  const addBikeFromList = async (bike) => {
+    if (items.some(i => String(i.bike_id) === String(bike.id))) return;
     const newItem = { ...INITIAL_ITEM, bike_id: String(bike.id), tariff_id: bike.tariff_id ? String(bike.tariff_id) : "" };
     if (newItem.tariff_id && form.booked_start && form.booked_end && !dateError) {
       const result = await fetchPrice(newItem.tariff_id, form.booked_start, form.booked_end);
       if (result?.price != null) { newItem.price = result.price; newItem.tariff_type = result.type || newItem.tariff_type; }
     }
-    setItems(prev => [...prev, newItem]);
-    setTimeout(() => addBikeInputRef.current?.focus(), 0);
+    setItems(prev => autoApplyDiscounts(selectedCustomer, [...prev, newItem]));
   };
 
-  const addEquipmentItem = (eq) => {
-    if (items.some(i => String(i.equipment_model_id) === String(eq.id))) {
-      setAddBikeSearch(""); setAddBikeActive(false); setAddBikeFocused(-1);
-      setTimeout(() => addBikeInputRef.current?.focus(), 0); return;
-    }
-    setAddBikeSearch(""); setAddBikeActive(false); setAddBikeFocused(-1);
+  const handleEqSelect = (eq) => {
+    if (items.some(i => String(i.equipment_model_id) === String(eq.id))) return;
     setQtyValue(1);
     setQtyPopup({ eq });
     setTimeout(() => qtyInputRef.current?.focus(), 50);
@@ -305,38 +417,79 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
       const result = await fetchPrice(newItem.tariff_id, form.booked_start, form.booked_end);
       if (result?.price != null) { newItem.price = result.price; newItem.tariff_type = result.type || newItem.tariff_type; }
     }
-    setItems(prev => [...prev, newItem]);
+    setItems(prev => autoApplyDiscounts(selectedCustomer, [...prev, newItem]));
     setQtyPopup(null); setQtyValue(1);
-    setTimeout(() => addBikeInputRef.current?.focus(), 0);
+    setTimeout(() => filterSearchRef.current?.focus(), 0);
   };
 
-  const handleAddBikeFocus = () => {
-    if (addBikeInputRef.current) {
-      const rect = addBikeInputRef.current.getBoundingClientRect();
-      setDropUp(window.innerHeight - rect.bottom < 300);
-      addBikeInputRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+  const getColsFor = (idx) => {
+    const ref = idx >= filteredByOptions.length ? eqGridRef : bikeGridRef;
+    if (!ref.current) return 1;
+    return window.getComputedStyle(ref.current).gridTemplateColumns.split(" ").filter(Boolean).length || 1;
+  };
+
+  useEffect(() => {
+    if (gridFocusedIdx < 0) return;
+    const bLen = filteredByOptions.length;
+    if (gridFocusedIdx < bLen) {
+      bikeGridRef.current?.children[gridFocusedIdx]?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    } else {
+      eqGridRef.current?.children[gridFocusedIdx - bLen]?.scrollIntoView({ block: "nearest", inline: "nearest" });
     }
-    setAddBikeActive(true);
-  };
+  }, [gridFocusedIdx]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleAddBikeKeyDown = (e) => {
-    if (e.key === "ArrowDown") {
+  const handleGridKeyDown = (e) => {
+    const allItems = [...filteredByOptions, ...filteredEquipment];
+    if (e.key === "ArrowRight") {
       e.preventDefault();
-      setAddBikeFocused(prev => filteredAddItems.length === 0 ? -1 : prev >= filteredAddItems.length - 1 ? 0 : prev + 1);
+      if (allItems.length > 0) setGridFocusedIdx(prev => prev < 0 ? 0 : Math.min(prev + 1, allItems.length - 1));
+    } else if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      if (allItems.length > 0) setGridFocusedIdx(prev => prev < 0 ? 0 : Math.max(prev - 1, 0));
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (allItems.length > 0) setGridFocusedIdx(prev => {
+        if (prev < 0) return 0;
+        return Math.min(prev + getColsFor(prev), allItems.length - 1);
+      });
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setAddBikeFocused(prev => filteredAddItems.length === 0 ? -1 : prev <= 0 ? filteredAddItems.length - 1 : prev - 1);
+      if (allItems.length > 0) setGridFocusedIdx(prev => {
+        if (prev < 0) return 0;
+        return Math.max(prev - getColsFor(prev), 0);
+      });
     } else if (e.key === "Enter") {
       e.preventDefault();
-      const target = addBikeFocused >= 0 ? filteredAddItems[addBikeFocused]
-        : filteredAddItems.length === 1 ? filteredAddItems[0] : null;
-      if (target) { if (target._type === "bike") addBikeItem(target); else addEquipmentItem(target); }
+      if (gridFocusedIdx >= 0) {
+        const item = allItems[gridFocusedIdx];
+        if (gridFocusedIdx < filteredByOptions.length) {
+          const isAdded = items.some(i => String(i.bike_id) === String(item.id));
+          if (isAdded) setItems(prev => autoApplyDiscounts(selectedCustomer, prev.filter(i => String(i.bike_id) !== String(item.id))));
+          else addBikeFromList(item);
+        } else {
+          handleEqSelect(item);
+        }
+      } else if (filteredByOptions.length === 1) {
+        const b = filteredByOptions[0];
+        const isAdded = items.some(i => String(i.bike_id) === String(b.id));
+        if (isAdded) setItems(prev => autoApplyDiscounts(selectedCustomer, prev.filter(i => String(i.bike_id) !== String(b.id))));
+        else addBikeFromList(b);
+      } else if (filteredEquipment.length === 1) {
+        handleEqSelect(filteredEquipment[0]);
+      }
     } else if (e.key === "Escape") {
-      setAddBikeActive(false); setAddBikeFocused(-1);
+      setGridFocusedIdx(-1);
     }
   };
 
-  const totalPrice = items.reduce((sum, i) => sum + (parseFloat(i.price) || 0) * (parseInt(i.quantity) || 1), 0);
+  const totalPrice = items.reduce((sum, i) => {
+    const base = (parseFloat(i.price) || 0) * (parseInt(i.quantity) || 1);
+    return sum + base * (1 - (i.discount_percent || 0) / 100);
+  }, 0);
+  const totalDiscount = items.reduce((sum, i) => {
+    const base = (parseFloat(i.price) || 0) * (parseInt(i.quantity) || 1);
+    return sum + base * (i.discount_percent || 0) / 100;
+  }, 0);
 
   // ── Отправка ─────────────────────────────────────────────────────────────────
 
@@ -360,6 +513,9 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
           tariff_id:          i.tariff_id           ? parseInt(i.tariff_id)          : null,
           price:              i.price !== ""        ? parseFloat(i.price)            : null,
           quantity:           parseInt(i.quantity)  || 1,
+          discount_type:      i.discount_type       || null,
+          discount_percent:   i.discount_percent    > 0 ? i.discount_percent : null,
+          discount_notes:     i.discount_notes      || null,
         })),
       };
       const response = await fetch("/api/rentals", {
@@ -397,7 +553,7 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
               {selectedCustomer ? (
                 <div style={{ padding: "10px 14px", background: "#f0fdf4", border: "1px solid #10b981", borderRadius: 6, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                   <span style={{ fontWeight: 600, color: "#065f46" }}>
-                    {selectedCustomer.last_name} {selectedCustomer.first_name} {selectedCustomer.middle_name || ""}
+                    {[selectedCustomer.last_name, selectedCustomer.first_name, selectedCustomer.middle_name].filter(Boolean).join(" ")}
                   </span>
                   <span style={{ color: "#047857" }}>{selectedCustomer.phone}</span>
                   {selectedCustomer.is_veteran && <span style={{ color: "var(--color-primary-blue)", fontSize: 13, fontWeight: 500 }}>🎖 УБД — скидка −20%</span>}
@@ -419,7 +575,7 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
                     <label className="required-label">Поиск клиента</label>
                     <input
                       ref={customerInputRef} className="form-input" value={customerSearch}
-                      onChange={e => { setCustomerSearch(e.target.value); setSelectedCustomer(null); setForm(p => ({ ...p, customer_id: "" })); setShowDropdown(true); setCustomerFocused(-1); }}
+                      onChange={e => { setCustomerSearch(e.target.value); setSelectedCustomer(null); setForm(p => ({ ...p, customer_id: "" })); setShowDropdown(true); setCustomerFocused(-1); setQuickDismissed(false); }}
                       onFocus={() => setShowDropdown(true)}
                       onBlur={() => setTimeout(() => { setShowDropdown(false); setCustomerFocused(-1); }, 150)}
                       onKeyDown={handleCustomerKeyDown}
@@ -431,7 +587,7 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
                       {filteredCustomers.map((c, i) => (
                         <div key={c.id} onMouseDown={() => handleCustomerSelect(c)} onMouseEnter={() => setCustomerFocused(i)} onMouseLeave={() => setCustomerFocused(-1)}
                           style={{ padding: "10px 14px", cursor: "pointer", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "center", gap: 10, background: i === customerFocused ? "#f0fdf4" : "white" }}>
-                          <span style={{ fontWeight: 500 }}>{c.last_name} {c.first_name} {c.middle_name || ""}</span>
+                          <span style={{ fontWeight: 500 }}>{[c.last_name, c.first_name, c.middle_name].filter(Boolean).join(" ")}</span>
                           <span style={{ color: "#6b7280", fontSize: 13 }}>{c.phone}</span>
                           {c.status !== "active" && (
                             <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 500, color: c.status === "no_rental" ? "var(--color-primary-red)" : "var(--color-primary-orange)" }}>
@@ -442,6 +598,56 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
                       ))}
                     </div>
                   )}
+                  {/* Форма быстрого создания клиента */}
+                  {showQuickCreate && (
+                    <div style={{ marginTop: 8, padding: "14px 16px", background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#0369a1", marginBottom: 10 }}>➕ Новый клиент</div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                        <div className="form-group" style={{ margin: 0 }}>
+                          <label className="required-label" style={{ fontSize: 12 }}>Имя</label>
+                          <input ref={quickFirstNameRef} className="form-input" value={quickForm.first_name}
+                            onChange={e => setQuickForm(p => ({ ...p, first_name: e.target.value }))}
+                            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleQuickCreateSave(); } if (e.key === "Escape") { setQuickDismissed(true); setTimeout(() => customerInputRef.current?.focus(), 0); } }}
+                            placeholder="Имя" autoComplete="off" style={{ fontSize: 13 }} />
+                        </div>
+                        <div className="form-group" style={{ margin: 0 }}>
+                          <label style={{ fontSize: 12 }}>Фамилия</label>
+                          <input className="form-input" value={quickForm.last_name}
+                            onChange={e => setQuickForm(p => ({ ...p, last_name: e.target.value }))}
+                            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleQuickCreateSave(); } if (e.key === "Escape") { setQuickDismissed(true); setTimeout(() => customerInputRef.current?.focus(), 0); } }}
+                            placeholder="Необязательно" autoComplete="off" style={{ fontSize: 13 }} />
+                        </div>
+                        <div className="form-group" style={{ margin: 0 }}>
+                          <label className="required-label" style={{ fontSize: 12 }}>Телефон</label>
+                          <input className="form-input" value={quickForm.phone}
+                            onChange={e => setQuickForm(p => ({ ...p, phone: e.target.value }))}
+                            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleQuickCreateSave(); } if (e.key === "Escape") { setQuickDismissed(true); setTimeout(() => customerInputRef.current?.focus(), 0); } }}
+                            placeholder="0XXXXXXXXX" autoComplete="off" style={{ fontSize: 13 }} />
+                        </div>
+                      </div>
+                      {quickError && (
+                        <div style={{ fontSize: 12, color: "var(--color-primary-red)", marginTop: 6, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                          <span>{quickError}</span>
+                          {quickExisting && (
+                            <button type="button"
+                              onClick={() => { setCustomers(prev => prev.some(c => c.id === quickExisting.id) ? prev : [quickExisting, ...prev]); handleCustomerSelect(quickExisting); }}
+                              style={{ fontSize: 12, padding: "2px 10px", borderRadius: 4, border: "1px solid #10b981", background: "#f0fdf4", color: "#059669", cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>
+                              Выбрать {[quickExisting.last_name, quickExisting.first_name].filter(Boolean).join(" ")}
+                            </button>
+                          )}
+                        </div>
+                      )}
+                      <div style={{ display: "flex", gap: 8, marginTop: 10, justifyContent: "flex-end", alignItems: "center" }}>
+                        <span style={{ fontSize: 11, color: "#9ca3af", marginRight: "auto" }}>Enter — создать · Esc — отмена</span>
+                        <button type="button" onClick={() => { setQuickDismissed(true); setTimeout(() => customerInputRef.current?.focus(), 0); }}
+                          style={{ padding: "5px 14px", fontSize: 12, borderRadius: 5, border: "1px solid #d1d5db", background: "white", cursor: "pointer" }}>Отмена</button>
+                        <button type="button" onClick={handleQuickCreateSave} disabled={quickSaving || !quickForm.first_name.trim() || !quickForm.phone.trim()}
+                          className="btn btn-primary-green" style={{ padding: "5px 14px", fontSize: 12 }}>
+                          {quickSaving ? "Сохранение..." : "Создать и выбрать"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -449,90 +655,135 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
             {/* ── 2. Позиции ── */}
             <div className="form-section">
 
-              {/* Сворачиваемые фильтры */}
-              <div style={{ marginBottom: 8 }}>
-                <button type="button" onClick={() => setShowFilters(v => !v)}
-                  style={{ fontSize: 12, color: "#6b7280", background: "none", border: "1px solid #e5e7eb", borderRadius: 5, padding: "3px 10px", cursor: "pointer" }}>
-                  {showFilters ? "▲ Скрыть фильтры" : "▼ Фильтр по типу / колесу"}
-                </button>
-                {showFilters && (
-                  <div style={{ display: "flex", gap: 10, marginTop: 8, flexWrap: "wrap" }}>
-                    <select className="form-select" value={filterTariff} onChange={e => setFilterTariff(e.target.value)} style={{ width: 160, fontSize: 13 }}>
-                      <option value="">Все типы</option>
-                      {TARIFF_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
-                    </select>
-                    <select className="form-select" value={filterWheel} onChange={e => setFilterWheel(e.target.value)} style={{ width: 130, fontSize: 13 }}>
-                      <option value="">Все колёса</option>
-                      {WHEEL_OPTIONS.map(w => <option key={w} value={w}>{w}"</option>)}
-                    </select>
-                    {(filterTariff || filterWheel) && (
-                      <button type="button" onClick={() => { setFilterTariff(""); setFilterWheel(""); }} style={{ fontSize: 12, color: "#ef4444", background: "none", border: "none", cursor: "pointer" }}>× сбросить</button>
-                    )}
-                  </div>
+              {/* Фильтры велосипедов */}
+              <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap", alignItems: "center" }}>
+                <div ref={tariffFilterRef}
+                  onClick={() => setPopoverKey(prev => prev === "tariff" ? null : "tariff")}
+                  className="filter-select-box" style={{ minWidth: 140, padding: "5px 8px" }}>
+                  {filterTariffs.length > 0 ? filterTariffs.join(", ") : "Все типы"}
+                  <span className="arrow">▼</span>
+                </div>
+                <div ref={wheelFilterRef}
+                  onClick={() => setPopoverKey(prev => prev === "wheel" ? null : "wheel")}
+                  className="filter-select-box" style={{ minWidth: 130, padding: "5px 8px" }}>
+                  {filterWheels.length > 0 ? filterWheels.map(w => `${w}"`).join(", ") : "Все колёса"}
+                  <span className="arrow">▼</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <input className="form-input" type="number" placeholder="Рост см" value={filterHeight}
+                    onChange={e => setFilterHeight(e.target.value)} style={{ width: 90, fontSize: 13 }} />
+                  {heightRec && <span style={{ fontSize: 11, color: "#059669", whiteSpace: "nowrap" }}>→ {heightRec.label}</span>}
+                </div>
+                <input ref={filterSearchRef} className="form-input" placeholder="Поиск велосипедов / оборудования" value={filterSearch}
+                  onChange={e => { setFilterSearch(e.target.value); setGridFocusedIdx(-1); }}
+                  onKeyDown={handleGridKeyDown}
+                  style={{ width: 240, fontSize: 13 }} />
+                {(filterTariffs.length > 0 || filterWheels.length > 0 || filterHeight || filterSearch) && (
+                  <button type="button" onClick={() => { setFilterTariffs([]); setFilterWheels([]); setFilterHeight(""); setFilterSearch(""); setGridFocusedIdx(-1); }}
+                    style={{ fontSize: 12, color: "#ef4444", background: "none", border: "none", cursor: "pointer" }}>× сбросить</button>
                 )}
               </div>
 
-              {/* Поиск */}
-              <div style={{ position: "relative" }}>
-                <input
-                  ref={addBikeInputRef} className="form-input"
-                  placeholder="Добавить велосипед или оборудование (артикул, модель, от 2 символов)..."
-                  value={addBikeSearch}
-                  onChange={e => { setAddBikeSearch(e.target.value); setAddBikeFocused(-1); setAddBikeActive(true); }}
-                  onFocus={handleAddBikeFocus}
-                  onBlur={() => setTimeout(() => { setAddBikeActive(false); setAddBikeFocused(-1); }, 150)}
-                  onKeyDown={handleAddBikeKeyDown} autoComplete="off"
-                />
-                {addBikeActive && filteredAddItems.length > 0 && (
-                  <div style={{ position: "absolute", left: 0, right: 0, zIndex: 300, ...(dropUp ? { bottom: "calc(100% + 4px)" } : { top: "calc(100% + 4px)" }), background: "white", border: "1px solid #d1d5db", borderRadius: 6, boxShadow: "0 4px 16px rgba(0,0,0,0.13)", maxHeight: 300, overflowY: "auto" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                      <tbody>
-                        {filteredAddItems.map((item, i) => {
-                          if (item._type === "bike") {
-                            const photo = item.photos?.urls?.length ? item.photos.urls[item.photos.main ?? 0] : null;
-                            const isDuplicate = items.some(it => String(it.bike_id) === String(item.id));
-                            const isBooked = item.condition_status === "бронь";
-                            const conflictEnd = isBooked ? formatConflictTime(item.conflict_info?.booked_end) : null;
-                            return (
-                              <tr key={`bike-${item.id}`}
-                                onMouseDown={() => addBikeItem(item)} onMouseEnter={() => setAddBikeFocused(i)} onMouseLeave={() => setAddBikeFocused(-1)}
-                                style={{ cursor: isDuplicate ? "not-allowed" : "pointer", borderBottom: "1px solid #f3f4f6", background: isDuplicate ? "#fef9c3" : i === addBikeFocused ? "#f0fdf4" : "white", opacity: isDuplicate ? 0.65 : 1 }}>
-                                <td style={{ padding: "5px 8px", width: 38 }}>
-                                  {photo ? <img src={photo} alt="" style={{ width: 30, height: 30, objectFit: "cover", borderRadius: 3, display: "block" }} />
-                                    : <div style={{ width: 30, height: 30, background: "#e5e7eb", borderRadius: 3, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>🚲</div>}
-                                </td>
-                                <td style={{ padding: "5px 8px", fontWeight: 600, whiteSpace: "nowrap" }}>{item.internal_article || "—"}</td>
-                                <td style={{ padding: "5px 8px" }}>{item.model}</td>
-                                <td style={{ padding: "5px 8px", whiteSpace: "nowrap", color: "#6b7280" }}>{item.wheel_size ? `${item.wheel_size}"` : "—"}</td>
-                                <td style={{ padding: "5px 8px", whiteSpace: "nowrap", color: "#6b7280" }}>{item.frame_size || "—"}</td>
-                                <td style={{ padding: "5px 8px", whiteSpace: "nowrap", fontWeight: 500, color: isDuplicate ? "#a16207" : isBooked ? "#d97706" : "#059669" }}>
-                                  {isDuplicate ? "уже добавлен" : isBooked ? `🟡 бронь${conflictEnd ? " до " + conflictEnd : ""}` : (item.tariff_name || "—")}
-                                </td>
-                              </tr>
-                            );
-                          } else {
-                            const isDuplicate = items.some(it => String(it.equipment_model_id) === String(item.id));
-                            return (
-                              <tr key={`eq-${item.id}`}
-                                onMouseDown={() => addEquipmentItem(item)} onMouseEnter={() => setAddBikeFocused(i)} onMouseLeave={() => setAddBikeFocused(-1)}
-                                style={{ cursor: isDuplicate ? "not-allowed" : "pointer", borderBottom: "1px solid #f3f4f6", background: isDuplicate ? "#fef9c3" : i === addBikeFocused ? "#f0fdf4" : "white", opacity: isDuplicate ? 0.65 : 1 }}>
-                                <td style={{ padding: "5px 8px", width: 38 }}><div style={{ width: 30, height: 30, background: "#e0f2fe", borderRadius: 3, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>⛑️</div></td>
-                                <td style={{ padding: "5px 8px", fontWeight: 600, whiteSpace: "nowrap", color: "#0369a1" }}>доп</td>
-                                <td style={{ padding: "5px 8px" }}>{item.name}</td>
-                                <td style={{ padding: "5px 8px", color: "#6b7280" }}>{item.category || "—"}</td>
-                                <td style={{ padding: "5px 8px", color: "#6b7280" }}>{item.available_quantity != null ? `доступно: ${item.available_quantity}` : ""}</td>
-                                <td style={{ padding: "5px 8px", whiteSpace: "nowrap", fontWeight: 500, color: isDuplicate ? "#a16207" : "#059669" }}>
-                                  {isDuplicate ? "уже добавлен" : (item.tariff_name || "—")}
-                                </td>
-                              </tr>
-                            );
+              {/* Карточки велосипедов */}
+              {filteredByOptions.length === 0 ? (
+                <div style={{ color: "#9ca3af", fontSize: 13, padding: "12px 0" }}>Нет велосипедов с такими параметрами</div>
+              ) : (
+                <div ref={bikeGridRef} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 8, maxHeight: 380, overflowY: "auto", marginBottom: 10 }}>
+                  {filteredByOptions.map((bike, bIdx) => {
+                    const isAdded   = items.some(i => String(i.bike_id) === String(bike.id));
+                    const isBooked  = bike.condition_status === "бронь";
+                    const isFocused = bIdx === gridFocusedIdx;
+                    const photo     = bike.photos?.urls?.length ? bike.photos.urls[bike.photos.main ?? 0] : null;
+                    const conflictEnd = isBooked ? formatConflictTime(bike.conflict_info?.booked_end) : null;
+                    let bgColor = "white", borderColor = "#e5e7eb", statusText = null, statusColor = "#6b7280";
+                    if (isAdded)       { bgColor = "#f0fdf4"; borderColor = "#10b981"; statusText = "✓ добавлен"; statusColor = "#059669"; }
+                    else if (isBooked) { bgColor = "#fffbeb"; borderColor = "#fcd34d"; statusText = conflictEnd ? `бронь до ${conflictEnd}` : "есть бронь"; statusColor = "#d97706"; }
+                    return (
+                      <div key={bike.id}
+                        onClick={() => {
+                          if (isAdded) setItems(prev => autoApplyDiscounts(selectedCustomer, prev.filter(i => String(i.bike_id) !== String(bike.id))));
+                          else addBikeFromList(bike);
+                        }}
+                        style={{
+                          border: `2px solid ${isFocused ? "var(--color-primary-orange)" : borderColor}`,
+                          borderRadius: 8, padding: "7px 9px", background: bgColor,
+                          cursor: "pointer", display: "flex", flexDirection: "column", gap: 4,
+                          transition: "border-color 0.25s, box-shadow 0.15s",
+                        }}
+                        onMouseEnter={e => { if (!isFocused) e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.12)"; }}
+                        onMouseLeave={e => { if (!isFocused) e.currentTarget.style.boxShadow = "none"; }}
+                      >
+                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                          {photo
+                            ? <img src={photo} alt="" style={{ width: 60, height: 60, objectFit: "cover", borderRadius: 6, flexShrink: 0 }} />
+                            : <div style={{ width: 60, height: 60, background: "#e5e7eb", borderRadius: 6, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26 }}>{getBikeIcon(bike)}</div>
                           }
-                        })}
-                      </tbody>
-                    </table>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontWeight: 700, fontSize: 12 }}>{bike.internal_article || "—"}</div>
+                            <div style={{ fontSize: 11, color: "#4b5563", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{bike.model}</div>
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <span style={{ fontSize: 11, color: "#6b7280" }}>
+                            {[bike.wheel_size ? `${bike.wheel_size}"` : null, bike.frame_size || null].filter(Boolean).join(" · ")}
+                          </span>
+                          {bike.tariff_name && <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 8, background: "#dcfce7", color: "#15803d", fontWeight: 600 }}>{bike.tariff_name}</span>}
+                        </div>
+                        {bike._heightMatch === "perfect"    && <div style={{ fontSize: 10, fontWeight: 600, color: "#059669" }}>🟢 идеально по росту</div>}
+                        {bike._heightMatch === "acceptable" && <div style={{ fontSize: 10, fontWeight: 600, color: "#d97706" }}>🟡 допустимо по росту</div>}
+                        {statusText && <div style={{ fontSize: 11, fontWeight: 500, color: statusColor }}>{statusText}</div>}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Карточки оборудования */}
+              {filteredEquipment.length > 0 && (
+                <div style={{ marginTop: 12 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "#6b7280", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    Оборудование ({filteredEquipment.length})
                   </div>
-                )}
-              </div>
+                  <div ref={eqGridRef} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 8, maxHeight: 320, overflowY: "auto" }}>
+                    {filteredEquipment.map((eq, eqIdx) => {
+                      const isFocused   = (filteredByOptions.length + eqIdx) === gridFocusedIdx;
+                      const isDup       = items.some(i => String(i.equipment_model_id) === String(eq.id));
+                      const unavailable = eq.available_quantity != null && eq.available_quantity <= 0;
+                      let bgColor = "white", borderColor = "#e5e7eb", statusText = null, statusColor = "#6b7280";
+                      if (isDup)           { bgColor = "#eff6ff"; borderColor = "#93c5fd"; statusText = "✓ добавлен"; statusColor = "#2563eb"; }
+                      else if (unavailable){ bgColor = "#fef2f2"; borderColor = "#fca5a5"; statusText = "нет на складе"; statusColor = "#ef4444"; }
+                      else if (eq.available_quantity != null) { statusText = `${eq.available_quantity} шт.`; statusColor = "#059669"; }
+                      return (
+                        <div key={eq.id}
+                          onClick={() => !isDup && !unavailable && handleEqSelect(eq)}
+                          style={{
+                            border: `2px solid ${isFocused ? "var(--color-primary-orange)" : borderColor}`,
+                            borderRadius: 8, padding: "7px 9px",
+                            background: bgColor, cursor: (isDup || unavailable) ? "default" : "pointer",
+                            display: "flex", flexDirection: "column", gap: 4,
+                            transition: "border-color 0.25s, box-shadow 0.15s",
+                            opacity: unavailable ? 0.6 : 1,
+                          }}
+                          onMouseEnter={e => { if (!isFocused && !isDup && !unavailable) e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.12)"; }}
+                          onMouseLeave={e => { if (!isFocused) e.currentTarget.style.boxShadow = "none"; }}
+                        >
+                          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                            <div style={{ width: 60, height: 60, background: isDup ? "#dbeafe" : "#e0f2fe", borderRadius: 6, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26 }}>🔦</div>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontWeight: 700, fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{eq.name}</div>
+                              {eq.category && <div style={{ fontSize: 11, color: "#4b5563" }}>{eq.category}</div>}
+                            </div>
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 4 }}>
+                            {statusText && <span style={{ fontSize: 11, color: statusColor, fontWeight: 500 }}>{statusText}</span>}
+                            {eq.tariff_name && <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 8, background: "#e0f2fe", color: "#0369a1", fontWeight: 600, flexShrink: 0 }}>{eq.tariff_name}</span>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Заголовок + итого */}
               <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "12px 0 8px" }}>
@@ -548,7 +799,10 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
                   );
                 })()}
                 {totalPrice > 0 && (
-                  <span style={{ marginLeft: "auto", fontWeight: 700, color: "#111827", fontSize: 15 }}>Итого: {totalPrice} ₴</span>
+                  <span style={{ marginLeft: "auto", fontWeight: 700, color: "#111827", fontSize: 15 }}>
+                    Итого: {Math.round(totalPrice)} ₴
+                    {totalDiscount > 0 && <span style={{ fontSize: 12, color: "#d97706", marginLeft: 6, fontWeight: 500 }}>(скидка −{Math.round(totalDiscount)} ₴)</span>}
+                  </span>
                 )}
               </div>
 
@@ -603,9 +857,28 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
                         onChange={e => handleItemChange(realIndex, "price", e.target.value)}
                         placeholder="0" style={{ width: 80, fontSize: 12 }} />
                       <span style={{ fontSize: 11, color: "#6b7280" }}>₴</span>
-                      {item.tariff_id && form.booked_start && form.booked_end && !dateError && (
-                        <span style={{ fontSize: 10, color: "#059669", fontWeight: 500 }}>авто</span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0, minWidth: 160 }}>
+                      <select
+                        value={item.discount_type || ""}
+                        onChange={e => handleItemChange(realIndex, "discount_type", e.target.value)}
+                        title="Скидка"
+                        style={{ fontSize: 11, padding: "5px 3px", border: "1px solid #d1d5db", borderRadius: 4, background: item.discount_percent > 0 ? "#eff6ff" : "white", color: item.discount_percent > 0 ? "var(--color-primary-blue)" : "#9ca3af", cursor: "pointer", width: 110 }}
+                      >
+                        <option value="">−%</option>
+                        <option value="veteran">🎖 УБД −20%</option>
+                        <option value="birthday">🎂 Имен. −50%</option>
+                        <option value="group">👥 Группа −10%</option>
+                        <option value="manual">✏ Вручную</option>
+                      </select>
+                      {item.discount_type === "manual" && (
+                        <input type="number" min="0" max="100" value={item.discount_percent}
+                          onChange={e => handleItemChange(realIndex, "discount_percent", parseFloat(e.target.value) || 0)}
+                          style={{ width: 38, fontSize: 11, padding: "5px 3px", textAlign: "center", border: "1px solid #d1d5db", borderRadius: 4 }} />
                       )}
+                      <span style={{ fontSize: 11, color: "var(--color-primary-blue)", fontWeight: 600, whiteSpace: "nowrap", minWidth: 44, display: "inline-block" }}>
+                        {item.discount_percent > 0 && item.price !== "" ? `=${Math.round(parseFloat(item.price || 0) * (1 - item.discount_percent / 100))}₴` : ""}
+                      </span>
                     </div>
                     <button type="button" onClick={() => removeItem(realIndex)}
                       style={{ padding: "4px 8px", background: "none", border: "1px solid #fca5a5", borderRadius: 4, cursor: "pointer", color: "#ef4444", flexShrink: 0, fontSize: 12 }} title="Удалить">✕</button>
@@ -616,14 +889,10 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
 
             {/* ── 3. Время ── */}
             <div className="form-section">
-              <h3>Время и менеджер</h3>
-              <div className="form-row" style={{ gridTemplateColumns: "1fr 1fr 1fr" }}>
+              <h3>Возврат и менеджер</h3>
+              <div className="form-row" style={{ gridTemplateColumns: "1fr 1fr" }}>
                 <div className="form-group">
-                  <label className="required-label">Начало</label>
-                  <input className="form-input" type="datetime-local" name="booked_start" value={form.booked_start} onChange={handleDateChange} />
-                </div>
-                <div className="form-group">
-                  <label>Планируемый возврат</label>
+                  <label>Возврат до</label>
                   <input className="form-input" type="datetime-local" name="booked_end" value={form.booked_end} onChange={handleDateChange}
                     style={dateError ? { borderColor: "var(--color-primary-red)" } : {}} />
                   {dateError && <span style={{ color: "var(--color-primary-red)", fontSize: 12, marginTop: 4, display: "block" }}>{dateError}</span>}
@@ -637,10 +906,9 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
                 </div>
               </div>
               <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 8, flexWrap: "wrap" }}>
-                <span style={{ fontSize: 12, color: "#6b7280", marginRight: 2 }}>Быстро:</span>
-                {QUICK_DURATIONS.map(({ label, minutes }) => (
-                  <button key={label} type="button" onClick={() => applyQuickDuration(minutes)} disabled={!form.booked_start}
-                    style={{ padding: "3px 10px", fontSize: 12, borderRadius: 4, cursor: "pointer", border: "1px solid #d1d5db", background: form.booked_start ? "#f9fafb" : "#f3f4f6", color: form.booked_start ? "#374151" : "#9ca3af" }}
+                {QUICK_DURATIONS.map(({ label, minutes, until2100 }) => (
+                  <button key={label} type="button" onClick={() => applyQuickDuration(minutes, until2100)} disabled={!form.booked_start}
+                    style={{ padding: "3px 6px", fontSize: 12, borderRadius: 4, cursor: form.booked_start ? "pointer" : "default", border: "1px solid #d1d5db", background: form.booked_start ? "#f9fafb" : "#f3f4f6", color: form.booked_start ? "#374151" : "#9ca3af", minWidth: 52, textAlign: "center" }}
                     onMouseEnter={e => { if (form.booked_start) e.currentTarget.style.background = "#e5e7eb"; }}
                     onMouseLeave={e => { if (form.booked_start) e.currentTarget.style.background = "#f9fafb"; }}>
                     {label}
@@ -687,6 +955,18 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
           </button>
         </div>
 
+        {/* Поповеры фильтров */}
+        {popoverKey && (
+          <MultiSelectPopover
+            options={popoverKey === "tariff" ? TARIFF_OPTIONS : WHEEL_OPTIONS.map(w => ({ value: w, label: `${w}"` }))}
+            selected={popoverKey === "tariff" ? filterTariffs : filterWheels}
+            onChange={popoverKey === "tariff" ? setFilterTariffs : setFilterWheels}
+            visible={true}
+            anchorRef={popoverKey === "tariff" ? tariffFilterRef : wheelFilterRef}
+            onClose={() => setPopoverKey(null)}
+          />
+        )}
+
         {/* Попап количества оборудования */}
         {qtyPopup && (
           <div style={{ position: "absolute", inset: 0, zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.18)", borderRadius: "inherit" }}
@@ -703,16 +983,17 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <span style={{ fontSize: 13, color: "#374151" }}>Количество:</span>
                 <input ref={qtyInputRef} type="number" min="1" max={qtyPopup.eq.available_quantity || 999} value={qtyValue}
-                  onChange={e => setQtyValue(Math.max(1, parseInt(e.target.value) || 1))}
+                  onChange={e => setQtyValue(e.target.value)}
+                  onBlur={e => { const v = parseInt(e.target.value); setQtyValue(isNaN(v) || v < 1 ? 1 : v); }}
                   onKeyDown={e => {
                     if (e.key === "Enter") { e.preventDefault(); confirmEquipmentAdd(); }
-                    if (e.key === "Escape") { e.preventDefault(); setQtyPopup(null); setTimeout(() => addBikeInputRef.current?.focus(), 0); }
+                    if (e.key === "Escape") { e.preventDefault(); setQtyPopup(null); setTimeout(() => filterSearchRef.current?.focus(), 0); }
                   }}
                   style={{ width: 72, padding: "8px 10px", fontSize: 18, fontWeight: 600, border: "2px solid var(--color-primary-green)", borderRadius: 6, textAlign: "center", outline: "none" }} />
                 <span style={{ fontSize: 13, color: "#374151" }}>шт.</span>
               </div>
               <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                <button type="button" onClick={() => { setQtyPopup(null); setTimeout(() => addBikeInputRef.current?.focus(), 0); }}
+                <button type="button" onClick={() => { setQtyPopup(null); setTimeout(() => filterSearchRef.current?.focus(), 0); }}
                   style={{ padding: "7px 16px", borderRadius: 6, border: "1px solid #d1d5db", background: "#f9fafb", cursor: "pointer", fontSize: 13 }}>Отмена</button>
                 <button type="button" className="btn btn-primary-green btn-primary-small" onClick={confirmEquipmentAdd}>Добавить</button>
               </div>

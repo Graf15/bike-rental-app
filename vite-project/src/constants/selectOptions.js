@@ -24,6 +24,10 @@ export const CUSTOMER_OPTIONS = {
     { value: "no_booking", label: "Запрет брони" },
     { value: "no_rental",  label: "Запрет выдачи" },
   ],
+  is_veteran: [
+    { value: "да", label: "🎖 УБД" },
+    { value: "нет", label: "Нет" },
+  ],
 };
 
 // Опции для договоров проката
