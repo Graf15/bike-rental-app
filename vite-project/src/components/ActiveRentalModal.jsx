@@ -340,18 +340,18 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
   };
 
   const applyQuickDuration = (minutes, until2100) => {
-    if (!form.booked_start) return;
+    const nowStr = toLocalStr(new Date());
     let endStr;
     if (until2100) {
       const d = new Date();
       d.setHours(21, 0, 0, 0);
       endStr = toLocalStr(d);
     } else {
-      endStr = toLocalStr(new Date(new Date(form.booked_start).getTime() + minutes * 60000));
+      endStr = toLocalStr(new Date(new Date(nowStr).getTime() + minutes * 60000));
     }
-    setForm(prev => ({ ...prev, booked_end: endStr }));
+    setForm(prev => ({ ...prev, booked_start: nowStr, booked_end: endStr }));
     setDateError(null);
-    recalcAll(form.booked_start, endStr, items);
+    recalcAll(nowStr, endStr, items);
   };
 
   const handleChange = (e) => {
