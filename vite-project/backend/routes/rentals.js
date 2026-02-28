@@ -99,7 +99,7 @@ router.post("/", async (req, res) => {
     const {
       customer_id, issued_by,
       booked_start, booked_end,
-      deposit_type = "none", deposit_value,
+      deposit_type = "none", deposit_value, deposit_amount,
       notes_issue,
       initial_status = "booked",
       items = []
@@ -142,12 +142,12 @@ router.post("/", async (req, res) => {
     // Создаём договор
     const contractResult = await client.query(`
       INSERT INTO rental_contracts
-        (customer_id, issued_by, booked_start, booked_end, status, deposit_type, deposit_value, notes_issue,
+        (customer_id, issued_by, booked_start, booked_end, status, deposit_type, deposit_value, deposit_amount, notes_issue,
          actual_start)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8, $9)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
       RETURNING *
     `, [customer_id, issued_by || null, booked_start || null, booked_end || null,
-        contractStatus, deposit_type, deposit_value || null, notes_issue || null,
+        contractStatus, deposit_type, deposit_value || null, deposit_amount || null, notes_issue || null,
         contractStatus === "active" ? new Date() : null]);
 
     const contract = contractResult.rows[0];

@@ -53,7 +53,7 @@
 .date-input-group input[type="date"]:focus {
   outline: none;
   border-color: var(--color-primary-green);
-  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
+  box-shadow: 0 0 0 3px var(--color-primary-green-light);
 }
 
 /* Стили для календаря - зеленые цвета для выбранных дат */

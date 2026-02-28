@@ -92,27 +92,6 @@
   color: #495057;
 }
 
-.form-group select,
-.form-group textarea {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid #dee2e6;
-  border-radius: 4px;
-  font-size: 14px;
-  transition: border-color 0.2s;
-}
-
-.form-group select:focus,
-.form-group textarea:focus {
-  outline: none;
-  border-color: var(--color-primary-green);
-  box-shadow: 0 0 0 2px rgba(32, 167, 64, 0.1);
-}
-
-.form-group textarea {
-  resize: vertical;
-  font-family: inherit;
-}
 
 .status-change-modal .modal-footer {
   padding: 16px 24px;

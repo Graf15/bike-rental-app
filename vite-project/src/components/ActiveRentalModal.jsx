@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import MultiSelectPopover from "./MultiSelectPopover";
+import DateTimePickerField from "./DateTimePickerField";
 import { TARIFF_OPTIONS, WHEEL_OPTIONS, heightToFrameRec } from "../constants/bikeFilters";
 import { normalizePhone, PHONE_HINT } from "../constants/phoneUtils";
 import "./Modal.css";
@@ -10,7 +11,8 @@ const INITIAL_FORM = {
   issued_by: "",
   booked_start: "",
   booked_end: "",
-  deposit_type: "none",
+  deposit_type: ["none"],
+  deposit_amount: "",
   deposit_value: "",
   notes_issue: "",
 };
@@ -23,6 +25,7 @@ const INITIAL_ITEM = {
   tariff_id: "",
   tariff_type: "hourly",
   price: "",
+  final_price: "",
   quantity: 1,
   prepaid: false,
   discount_type: "",
@@ -31,6 +34,21 @@ const INITIAL_ITEM = {
 };
 
 const DISCOUNT_PRESETS = { veteran: 20, birthday: 50, group: 10, "": 0 };
+
+const computeFinalPrice = (price, pct) => {
+  const base = parseFloat(price);
+  if (isNaN(base) || base <= 0) return "";
+  return Math.round(base * (1 - (pct || 0) / 100) / 10) * 10;
+};
+
+const DISCOUNT_OPTIONS = [
+  { value: "", label: "Без скидки" },
+  { value: "veteran", label: "УБД −20%" },
+  { value: "birthday", label: "ДР −50%" },
+  { value: "group", label: "Группа −10%" },
+  { value: "manual", label: "Вручную" },
+];
+const DISCOUNT_LABEL = Object.fromEntries(DISCOUNT_OPTIONS.map(o => [o.value, o.label]));
 
 const isBirthdayCustomer = (customer) => {
   if (!customer?.birth_date) return false;
@@ -41,24 +59,24 @@ const isBirthdayCustomer = (customer) => {
 };
 
 const autoApplyDiscounts = (customer, currentItems) => {
-  if (!customer) return currentItems.map(i => i.discount_type === "manual" ? i : { ...i, discount_type: "", discount_percent: 0 });
+  if (!customer) return currentItems.map(i => i.discount_type === "manual" ? i : { ...i, discount_type: "", discount_percent: 0, final_price: computeFinalPrice(i.price, 0) });
   const isBirthday = isBirthdayCustomer(customer);
   const isVeteran = customer.is_veteran || false;
   const isGroup = currentItems.length >= 5;
   const firstBikeIdx = currentItems.findIndex(i => i.item_type === "bike");
   return currentItems.map((item, idx) => {
-    if (item.discount_type === "manual") return item;
+    if (item.discount_type) return item;
     let discountType = "", discountPercent = 0;
     if (isGroup) { discountType = "group"; discountPercent = 10; }
     if (item.item_type === "bike" && idx === firstBikeIdx) {
       if (isVeteran && 20 > discountPercent) { discountType = "veteran"; discountPercent = 20; }
       if (isBirthday && 50 > discountPercent) { discountType = "birthday"; discountPercent = 50; }
     }
-    return { ...item, discount_type: discountType, discount_percent: discountPercent };
+    return { ...item, discount_type: discountType, discount_percent: discountPercent, final_price: computeFinalPrice(item.price, discountPercent) };
   });
 };
 
-const DEPOSIT_TYPES = [
+const DEPOSIT_TYPES_OPTIONS = [
   { value: "none",     label: "Без залога" },
   { value: "money",    label: "Денежный залог" },
   { value: "document", label: "Документ" },
@@ -100,7 +118,8 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
   const [items, setItems]         = useState([]);
   const [saving, setSaving]       = useState(false);
   const [error, setError]         = useState(null);
-  const [dateError, setDateError] = useState(null);
+  const [dateError, setDateError]           = useState(null);
+  const [activeQuickLabel, setActiveQuickLabel] = useState(null);
   const mouseDownOnOverlay        = useRef(false);
 
   const [customers, setCustomers] = useState([]);
@@ -135,6 +154,14 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
   const [customerFocused, setCustomerFocused]   = useState(-1);
   const customerInputRef                        = useRef(null);
   const dropdownRef                             = useRef(null);
+
+  // Поповеры менеджера и залога
+  const issuedByRef                   = useRef(null);
+  const [issuedByPopover, setIssuedByPopover] = useState(false);
+  const [discountPopoverIdx, setDiscountPopoverIdx] = useState(null);
+  const discountAnchorRefs = useRef({});
+  const depositTypeRef                = useRef(null);
+  const [depositTypePopover, setDepositTypePopover] = useState(false);
 
   // Быстрое создание клиента
   const [quickDismissed, setQuickDismissed]   = useState(false);
@@ -197,7 +224,7 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
         if (!item.tariff_id) return item;
         const result = await fetchPrice(item.tariff_id, startTime, endTime);
         if (!result || result.price == null) return item;
-        return { ...item, price: result.price, tariff_type: result.type || item.tariff_type };
+        return { ...item, price: result.price, tariff_type: result.type || item.tariff_type, final_price: computeFinalPrice(result.price, item.discount_percent || 0) };
       })
     );
     setItems(updated);
@@ -302,6 +329,7 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
     const { name, value } = e.target;
     const newStart = name === "booked_start" ? value : form.booked_start;
     const newEnd   = name === "booked_end"   ? value : form.booked_end;
+    setActiveQuickLabel(null);
     setForm(prev => ({ ...prev, [name]: value }));
     if (newStart && newEnd && new Date(newEnd) <= new Date(newStart)) {
       setDateError("Время окончания должно быть позже времени начала");
@@ -338,11 +366,16 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
     if (field === "tariff_id" && value && form.booked_start && form.booked_end && !dateError) {
       const result = await fetchPrice(value, form.booked_start, form.booked_end);
       if (result?.price != null) {
-        newItems[index] = { ...newItems[index], price: result.price, tariff_type: result.type || newItems[index].tariff_type };
+        const pct = newItems[index].discount_percent || 0;
+        newItems[index] = { ...newItems[index], price: result.price, tariff_type: result.type || newItems[index].tariff_type, final_price: computeFinalPrice(result.price, pct) };
       }
     }
     if (field === "discount_type") {
-      newItems[index] = { ...newItems[index], discount_type: value, discount_percent: value in DISCOUNT_PRESETS ? DISCOUNT_PRESETS[value] : newItems[index].discount_percent };
+      const pct = value in DISCOUNT_PRESETS ? DISCOUNT_PRESETS[value] : newItems[index].discount_percent;
+      newItems[index] = { ...newItems[index], discount_type: value, discount_percent: pct, final_price: computeFinalPrice(newItems[index].price, pct) };
+    }
+    if (field === "discount_percent") {
+      newItems[index] = { ...newItems[index], final_price: computeFinalPrice(newItems[index].price, parseFloat(value) || 0) };
     }
     setItems(newItems);
   };
@@ -431,11 +464,14 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
   useEffect(() => {
     if (gridFocusedIdx < 0) return;
     const bLen = filteredByOptions.length;
+    let el;
     if (gridFocusedIdx < bLen) {
-      bikeGridRef.current?.children[gridFocusedIdx]?.scrollIntoView({ block: "nearest", inline: "nearest" });
+      el = bikeGridRef.current?.children[gridFocusedIdx];
     } else {
-      eqGridRef.current?.children[gridFocusedIdx - bLen]?.scrollIntoView({ block: "nearest", inline: "nearest" });
+      el = eqGridRef.current?.children[gridFocusedIdx - bLen];
     }
+    el?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    el?.focus();
   }, [gridFocusedIdx]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleGridKeyDown = (e) => {
@@ -464,7 +500,7 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
         const item = allItems[gridFocusedIdx];
         if (gridFocusedIdx < filteredByOptions.length) {
           const isAdded = items.some(i => String(i.bike_id) === String(item.id));
-          if (isAdded) setItems(prev => autoApplyDiscounts(selectedCustomer, prev.filter(i => String(i.bike_id) !== String(item.id))));
+          if (isAdded) setItems(prev => prev.filter(i => String(i.bike_id) !== String(item.id)));
           else addBikeFromList(item);
         } else {
           handleEqSelect(item);
@@ -472,7 +508,7 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
       } else if (filteredByOptions.length === 1) {
         const b = filteredByOptions[0];
         const isAdded = items.some(i => String(i.bike_id) === String(b.id));
-        if (isAdded) setItems(prev => autoApplyDiscounts(selectedCustomer, prev.filter(i => String(i.bike_id) !== String(b.id))));
+        if (isAdded) setItems(prev => prev.filter(i => String(i.bike_id) !== String(b.id)));
         else addBikeFromList(b);
       } else if (filteredEquipment.length === 1) {
         handleEqSelect(filteredEquipment[0]);
@@ -482,14 +518,14 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
     }
   };
 
-  const totalPrice = items.reduce((sum, i) => {
-    const base = (parseFloat(i.price) || 0) * (parseInt(i.quantity) || 1);
-    return sum + base * (1 - (i.discount_percent || 0) / 100);
+  const totalBase = items.reduce((sum, i) => sum + (parseFloat(i.price) || 0) * (parseInt(i.quantity) || 1), 0);
+  const totalFinal = items.reduce((sum, i) => {
+    const qty = parseInt(i.quantity) || 1;
+    const fp = parseFloat(i.final_price);
+    if (!isNaN(fp)) return sum + fp * qty;
+    return sum + Math.round((parseFloat(i.price) || 0) * (1 - (i.discount_percent || 0) / 100) / 10) * 10 * qty;
   }, 0);
-  const totalDiscount = items.reduce((sum, i) => {
-    const base = (parseFloat(i.price) || 0) * (parseInt(i.quantity) || 1);
-    return sum + base * (i.discount_percent || 0) / 100;
-  }, 0);
+  const totalDiscount = Math.round(totalBase - totalFinal);
 
   // ── Отправка ─────────────────────────────────────────────────────────────────
 
@@ -501,8 +537,15 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
 
     setSaving(true);
     try {
+      const depositType = (() => {
+        const dt = form.deposit_type;
+        if (!Array.isArray(dt) || dt.length === 0 || dt.includes("none")) return "none";
+        return dt.filter(v => v !== "none").join(",");
+      })();
       const body = {
         ...form,
+        deposit_type: depositType,
+        deposit_amount: form.deposit_amount !== "" ? parseFloat(form.deposit_amount) : null,
         initial_status: "active",
         customer_id: parseInt(form.customer_id),
         issued_by: form.issued_by ? parseInt(form.issued_by) : null,
@@ -511,7 +554,7 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
           bike_id:            i.bike_id            ? parseInt(i.bike_id)            : null,
           equipment_model_id: i.equipment_model_id ? parseInt(i.equipment_model_id) : null,
           tariff_id:          i.tariff_id           ? parseInt(i.tariff_id)          : null,
-          price:              i.price !== ""        ? parseFloat(i.price)            : null,
+          price:              i.final_price !== "" && i.final_price != null ? parseFloat(i.final_price) : (i.price !== "" ? parseFloat(i.price) : null),
           quantity:           parseInt(i.quantity)  || 1,
           discount_type:      i.discount_type       || null,
           discount_percent:   i.discount_percent    > 0 ? i.discount_percent : null,
@@ -540,7 +583,7 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
     >
       <div className="modal-content" style={{ maxWidth: 920 }} onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>🚲 Прокат сейчас</h2>
+          <h2>Выдать сейчас</h2>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
 
@@ -549,7 +592,6 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
 
             {/* ── 1. Клиент ── */}
             <div className="form-section">
-              <h3>Клиент</h3>
               {selectedCustomer ? (
                 <div style={{ padding: "10px 14px", background: "#f0fdf4", border: "1px solid #10b981", borderRadius: 6, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                   <span style={{ fontWeight: 600, color: "#065f46" }}>
@@ -572,7 +614,7 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
               ) : (
                 <div ref={dropdownRef} style={{ position: "relative" }}>
                   <div className="form-group">
-                    <label className="required-label">Поиск клиента</label>
+                    <label className="required-label">Клиент</label>
                     <input
                       ref={customerInputRef} className="form-input" value={customerSearch}
                       onChange={e => { setCustomerSearch(e.target.value); setSelectedCustomer(null); setForm(p => ({ ...p, customer_id: "" })); setShowDropdown(true); setCustomerFocused(-1); setQuickDismissed(false); }}
@@ -676,11 +718,13 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
                 </div>
                 <input ref={filterSearchRef} className="form-input" placeholder="Поиск велосипедов / оборудования" value={filterSearch}
                   onChange={e => { setFilterSearch(e.target.value); setGridFocusedIdx(-1); }}
+                  onFocus={() => setGridFocusedIdx(-1)}
                   onKeyDown={handleGridKeyDown}
                   style={{ width: 240, fontSize: 13 }} />
                 {(filterTariffs.length > 0 || filterWheels.length > 0 || filterHeight || filterSearch) && (
-                  <button type="button" onClick={() => { setFilterTariffs([]); setFilterWheels([]); setFilterHeight(""); setFilterSearch(""); setGridFocusedIdx(-1); }}
-                    style={{ fontSize: 12, color: "#ef4444", background: "none", border: "none", cursor: "pointer" }}>× сбросить</button>
+                  <button type="button" className="btn-reset-filters"
+                    onClick={() => { setFilterTariffs([]); setFilterWheels([]); setFilterHeight(""); setFilterSearch(""); setGridFocusedIdx(-1); }}
+                    title="Сбросить фильтры">🔄</button>
                 )}
               </div>
 
@@ -688,7 +732,7 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
               {filteredByOptions.length === 0 ? (
                 <div style={{ color: "#9ca3af", fontSize: 13, padding: "12px 0" }}>Нет велосипедов с такими параметрами</div>
               ) : (
-                <div ref={bikeGridRef} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 8, maxHeight: 380, overflowY: "auto", marginBottom: 10 }}>
+                <div ref={bikeGridRef} onKeyDown={handleGridKeyDown} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 8, maxHeight: 380, overflowY: "auto", marginBottom: 10 }}>
                   {filteredByOptions.map((bike, bIdx) => {
                     const isAdded   = items.some(i => String(i.bike_id) === String(bike.id));
                     const isBooked  = bike.condition_status === "бронь";
@@ -700,18 +744,21 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
                     else if (isBooked) { bgColor = "#fffbeb"; borderColor = "#fcd34d"; statusText = conflictEnd ? `бронь до ${conflictEnd}` : "есть бронь"; statusColor = "#d97706"; }
                     return (
                       <div key={bike.id}
+                        tabIndex={-1}
+                        className="grid-card-item"
                         onClick={() => {
-                          if (isAdded) setItems(prev => autoApplyDiscounts(selectedCustomer, prev.filter(i => String(i.bike_id) !== String(bike.id))));
+                          setGridFocusedIdx(bIdx);
+                          if (isAdded) setItems(prev => prev.filter(i => String(i.bike_id) !== String(bike.id)));
                           else addBikeFromList(bike);
                         }}
                         style={{
-                          border: `2px solid ${isFocused ? "var(--color-primary-orange)" : borderColor}`,
+                          border: `2px solid ${isFocused ? "var(--color-focus-ring)" : borderColor}`,
                           borderRadius: 8, padding: "7px 9px", background: bgColor,
                           cursor: "pointer", display: "flex", flexDirection: "column", gap: 4,
                           transition: "border-color 0.25s, box-shadow 0.15s",
                         }}
                         onMouseEnter={e => { if (!isFocused) e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.12)"; }}
-                        onMouseLeave={e => { if (!isFocused) e.currentTarget.style.boxShadow = "none"; }}
+                        onMouseLeave={e => { if (!isFocused) e.currentTarget.style.boxShadow = ""; }}
                       >
                         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                           {photo
@@ -744,7 +791,7 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
                   <div style={{ fontSize: 11, fontWeight: 600, color: "#6b7280", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                     Оборудование ({filteredEquipment.length})
                   </div>
-                  <div ref={eqGridRef} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 8, maxHeight: 320, overflowY: "auto" }}>
+                  <div ref={eqGridRef} onKeyDown={handleGridKeyDown} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 8, maxHeight: 320, overflowY: "auto" }}>
                     {filteredEquipment.map((eq, eqIdx) => {
                       const isFocused   = (filteredByOptions.length + eqIdx) === gridFocusedIdx;
                       const isDup       = items.some(i => String(i.equipment_model_id) === String(eq.id));
@@ -755,9 +802,11 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
                       else if (eq.available_quantity != null) { statusText = `${eq.available_quantity} шт.`; statusColor = "#059669"; }
                       return (
                         <div key={eq.id}
-                          onClick={() => !isDup && !unavailable && handleEqSelect(eq)}
+                          tabIndex={-1}
+                          className="grid-card-item"
+                          onClick={() => { setGridFocusedIdx(filteredByOptions.length + eqIdx); if (!isDup && !unavailable) handleEqSelect(eq); }}
                           style={{
-                            border: `2px solid ${isFocused ? "var(--color-primary-orange)" : borderColor}`,
+                            border: `2px solid ${isFocused ? "var(--color-focus-ring)" : borderColor}`,
                             borderRadius: 8, padding: "7px 9px",
                             background: bgColor, cursor: (isDup || unavailable) ? "default" : "pointer",
                             display: "flex", flexDirection: "column", gap: 4,
@@ -765,7 +814,7 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
                             opacity: unavailable ? 0.6 : 1,
                           }}
                           onMouseEnter={e => { if (!isFocused && !isDup && !unavailable) e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.12)"; }}
-                          onMouseLeave={e => { if (!isFocused) e.currentTarget.style.boxShadow = "none"; }}
+                          onMouseLeave={e => { if (!isFocused) e.currentTarget.style.boxShadow = ""; }}
                         >
                           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                             <div style={{ width: 60, height: 60, background: isDup ? "#dbeafe" : "#e0f2fe", borderRadius: 6, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26 }}>🔦</div>
@@ -785,25 +834,21 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
                 </div>
               )}
 
-              {/* Заголовок + итого */}
-              <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "12px 0 8px" }}>
+              {/* Заголовок позиций */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "24px 0 8px" }}>
                 <h3 style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>Позиции договора</h3>
                 {items.length > 0 && (() => {
-                  const bikeCount = items.filter(i => i.item_type === "bike").length;
-                  const eqCount   = items.filter(i => i.item_type === "equipment").length;
+                  const scootCount = items.filter(i => i.item_type === "bike" && bikes.find(b => String(b.id) === String(i.bike_id))?.model?.toLowerCase().includes("самокат")).length;
+                  const bikeCount  = items.filter(i => i.item_type === "bike").length - scootCount;
+                  const eqCount    = items.filter(i => i.item_type === "equipment").length;
                   return (
                     <>
-                      {bikeCount > 0 && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, background: "#dcfce7", color: "#15803d", fontWeight: 600 }}>🚲 {bikeCount}</span>}
-                      {eqCount   > 0 && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, background: "#e0f2fe", color: "#0369a1", fontWeight: 600 }}>⛑️ {eqCount}</span>}
+                      {bikeCount  > 0 && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, background: "#dcfce7", color: "#15803d", fontWeight: 600 }}>🚲 {bikeCount}</span>}
+                      {scootCount > 0 && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, background: "#dcfce7", color: "#15803d", fontWeight: 600 }}>🛴 {scootCount}</span>}
+                      {eqCount    > 0 && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, background: "#e0f2fe", color: "#0369a1", fontWeight: 600 }}>🔦 {eqCount}</span>}
                     </>
                   );
                 })()}
-                {totalPrice > 0 && (
-                  <span style={{ marginLeft: "auto", fontWeight: 700, color: "#111827", fontSize: 15 }}>
-                    Итого: {Math.round(totalPrice)} ₴
-                    {totalDiscount > 0 && <span style={{ fontSize: 12, color: "#d97706", marginLeft: 6, fontWeight: 500 }}>(скидка −{Math.round(totalDiscount)} ₴)</span>}
-                  </span>
-                )}
               </div>
 
               {/* Список позиций */}
@@ -820,7 +865,7 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
                       return (
                         <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
                           {photo ? <img src={photo} alt="" style={{ width: 36, height: 36, objectFit: "cover", borderRadius: 4, flexShrink: 0 }} />
-                            : <div style={{ width: 36, height: 36, background: "#e5e7eb", borderRadius: 4, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🚲</div>}
+                            : <div style={{ width: 36, height: 36, background: "#e5e7eb", borderRadius: 4, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>{getBikeIcon(bike)}</div>}
                           <div style={{ fontSize: 12, lineHeight: 1.4, minWidth: 0, flex: 1 }}>
                             <div style={{ display: "flex", gap: 6, alignItems: "baseline", flexWrap: "wrap" }}>
                               {bike.internal_article && <span style={{ fontWeight: 700 }}>{bike.internal_article}</span>}
@@ -832,7 +877,7 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
                       );
                     })() : (
                       <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
-                        <div style={{ width: 36, height: 36, background: "#e0f2fe", borderRadius: 4, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>⛑️</div>
+                        <div style={{ width: 36, height: 36, background: "#e0f2fe", borderRadius: 4, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🔦</div>
                         <div style={{ fontSize: 12, lineHeight: 1.4, minWidth: 0, flex: 1 }}>
                           <div style={{ fontWeight: 600 }}>{eq?.name || "Оборудование"}</div>
                           {eq?.category && <div style={{ color: "#6b7280", fontSize: 11 }}>{eq.category}</div>}
@@ -854,37 +899,64 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
                       <input className="form-input" type="number" min="0" value={item.price}
-                        onChange={e => handleItemChange(realIndex, "price", e.target.value)}
-                        placeholder="0" style={{ width: 80, fontSize: 12 }} />
+                        disabled
+                        placeholder="0" style={{ width: 55, fontSize: 12, padding: "8px 8px", background: "#f3f4f6", color: "#6b7280", cursor: "default" }} />
                       <span style={{ fontSize: 11, color: "#6b7280" }}>₴</span>
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0, minWidth: 160 }}>
-                      <select
-                        value={item.discount_type || ""}
-                        onChange={e => handleItemChange(realIndex, "discount_type", e.target.value)}
-                        title="Скидка"
-                        style={{ fontSize: 11, padding: "5px 3px", border: "1px solid #d1d5db", borderRadius: 4, background: item.discount_percent > 0 ? "#eff6ff" : "white", color: item.discount_percent > 0 ? "var(--color-primary-blue)" : "#9ca3af", cursor: "pointer", width: 110 }}
-                      >
-                        <option value="">−%</option>
-                        <option value="veteran">🎖 УБД −20%</option>
-                        <option value="birthday">🎂 Имен. −50%</option>
-                        <option value="group">👥 Группа −10%</option>
-                        <option value="manual">✏ Вручную</option>
-                      </select>
+                    <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
+                      <button
+                        type="button"
+                        ref={(el) => { discountAnchorRefs.current[realIndex] = { current: el }; }}
+                        className="filter-select-box"
+                        style={{ fontSize: 11, padding: "8px 8px", minWidth: 100, background: item.discount_percent > 0 ? "#f0fdf4" : undefined, color: item.discount_percent > 0 ? "var(--color-primary-green)" : undefined }}
+                        onClick={() => setDiscountPopoverIdx(prev => prev === realIndex ? null : realIndex)}>
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {DISCOUNT_LABEL[item.discount_type || ""] ?? "Скидка"}
+                        </span>
+                        <span className="arrow">▼</span>
+                      </button>
+                      {discountPopoverIdx === realIndex && (
+                        <MultiSelectPopover singleSelect
+                          options={DISCOUNT_OPTIONS}
+                          selected={[item.discount_type || ""]}
+                          onChange={(vals) => { handleItemChange(realIndex, "discount_type", vals[0] || ""); setDiscountPopoverIdx(null); }}
+                          visible={true}
+                          anchorRef={discountAnchorRefs.current[realIndex] || { current: null }}
+                          onClose={() => setDiscountPopoverIdx(null)} />
+                      )}
                       {item.discount_type === "manual" && (
                         <input type="number" min="0" max="100" value={item.discount_percent}
                           onChange={e => handleItemChange(realIndex, "discount_percent", parseFloat(e.target.value) || 0)}
-                          style={{ width: 38, fontSize: 11, padding: "5px 3px", textAlign: "center", border: "1px solid #d1d5db", borderRadius: 4 }} />
+                          style={{ width: 38, fontSize: 11, padding: "8px 4px", textAlign: "center", border: "1px solid #d1d5db", borderRadius: 4 }} />
                       )}
-                      <span style={{ fontSize: 11, color: "var(--color-primary-blue)", fontWeight: 600, whiteSpace: "nowrap", minWidth: 44, display: "inline-block" }}>
-                        {item.discount_percent > 0 && item.price !== "" ? `=${Math.round(parseFloat(item.price || 0) * (1 - item.discount_percent / 100))}₴` : ""}
-                      </span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                      <input className="form-input" type="number" min="0"
+                        value={item.final_price}
+                        onChange={e => handleItemChange(realIndex, "final_price", e.target.value)}
+                        placeholder="0" style={{ width: 60, fontSize: 12, padding: "8px 8px" }} />
+                      <span style={{ fontSize: 11, color: "#6b7280" }}>₴</span>
                     </div>
                     <button type="button" onClick={() => removeItem(realIndex)}
                       style={{ padding: "4px 8px", background: "none", border: "1px solid #fca5a5", borderRadius: 4, cursor: "pointer", color: "#ef4444", flexShrink: 0, fontSize: 12 }} title="Удалить">✕</button>
                   </div>
                 );
               })}
+              {totalBase > 0 && (
+                <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8, paddingTop: 8, borderTop: "1px solid #e5e7eb" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "auto 64px", gap: "3px 8px", alignItems: "baseline" }}>
+                    {totalDiscount > 0 && (<>
+                      <span style={{ fontSize: 12, textAlign: "right" }}>База:</span>
+                      <span style={{ fontSize: 12, textAlign: "right" }}>{Math.round(totalBase)} ₴</span>
+                      <span style={{ fontSize: 12, textAlign: "right" }}>Скидка:</span>
+                      <span style={{ fontSize: 12, fontWeight: 600, textAlign: "right" }}>−{totalDiscount} ₴</span>
+                      <div style={{ gridColumn: "1 / -1", borderTop: "1px solid #444444", margin: "2px 0" }} />
+                    </>)}
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "#111827", textAlign: "right" }}>Итого:</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "#111827", textAlign: "right" }}>{Math.round(totalFinal)} ₴</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* ── 3. Время ── */}
@@ -893,24 +965,36 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
               <div className="form-row" style={{ gridTemplateColumns: "1fr 1fr" }}>
                 <div className="form-group">
                   <label>Возврат до</label>
-                  <input className="form-input" type="datetime-local" name="booked_end" value={form.booked_end} onChange={handleDateChange}
-                    style={dateError ? { borderColor: "var(--color-primary-red)" } : {}} />
+                  <DateTimePickerField value={form.booked_end}
+                    onChange={v => { const synth = { target: { name: "booked_end", value: v } }; handleDateChange(synth); }}
+                    minDate={form.booked_start} />
                   {dateError && <span style={{ color: "var(--color-primary-red)", fontSize: 12, marginTop: 4, display: "block" }}>{dateError}</span>}
                 </div>
-                <div className="form-group">
+                <div className="form-group" style={{ position: "relative" }}>
                   <label>Выдал</label>
-                  <select className="form-select" name="issued_by" value={form.issued_by} onChange={handleChange}>
-                    <option value="">— Не указан —</option>
-                    {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-                  </select>
+                  <button ref={issuedByRef} type="button" className="filter-select-box"
+                    style={{ width: "100%", justifyContent: "space-between", padding: "7px 10px" }}
+                    onClick={() => setIssuedByPopover(p => !p)}>
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {users.find(u => String(u.id) === String(form.issued_by))?.name || "— Не указан —"}
+                    </span>
+                    <span className="arrow">▼</span>
+                  </button>
+                  {issuedByPopover && (
+                    <MultiSelectPopover singleSelect
+                      options={[{ value: "", label: "— Не указан —" }, ...users.map(u => ({ value: String(u.id), label: u.name }))]}
+                      selected={form.issued_by ? [String(form.issued_by)] : [""]}
+                      onChange={(vals) => { setForm(prev => ({ ...prev, issued_by: vals[0] === "" ? "" : vals[0] || "" })); }}
+                      visible={true} anchorRef={issuedByRef} onClose={() => setIssuedByPopover(false)} />
+                  )}
                 </div>
               </div>
               <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 8, flexWrap: "wrap" }}>
                 {QUICK_DURATIONS.map(({ label, minutes, until2100 }) => (
-                  <button key={label} type="button" onClick={() => applyQuickDuration(minutes, until2100)} disabled={!form.booked_start}
-                    style={{ padding: "3px 6px", fontSize: 12, borderRadius: 4, cursor: form.booked_start ? "pointer" : "default", border: "1px solid #d1d5db", background: form.booked_start ? "#f9fafb" : "#f3f4f6", color: form.booked_start ? "#374151" : "#9ca3af", minWidth: 52, textAlign: "center" }}
-                    onMouseEnter={e => { if (form.booked_start) e.currentTarget.style.background = "#e5e7eb"; }}
-                    onMouseLeave={e => { if (form.booked_start) e.currentTarget.style.background = "#f9fafb"; }}>
+                  <button key={label} type="button"
+                    className={`btn-quick-duration${activeQuickLabel === label ? " active" : ""}`}
+                    onClick={() => { applyQuickDuration(minutes, until2100); setActiveQuickLabel(label); }}
+                    disabled={!form.booked_start}>
                     {label}
                   </button>
                 ))}
@@ -921,16 +1005,52 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
             <div className="form-section">
               <h3>Залог</h3>
               <div className="form-row">
-                <div className="form-group">
+                <div className="form-group" style={{ position: "relative" }}>
                   <label>Тип залога</label>
-                  <select className="form-select" name="deposit_type" value={form.deposit_type} onChange={handleChange}>
-                    {DEPOSIT_TYPES.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
-                  </select>
+                  <button ref={depositTypeRef} type="button" className="filter-select-box"
+                    style={{ width: "100%", justifyContent: "space-between", padding: "7px 10px" }}
+                    onClick={() => setDepositTypePopover(p => !p)}>
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {(Array.isArray(form.deposit_type) && form.deposit_type.length > 0 && !form.deposit_type.includes("none"))
+                        ? form.deposit_type.filter(v => v !== "none").map(v => DEPOSIT_TYPES_OPTIONS.find(d => d.value === v)?.label || v).join(", ")
+                        : "Без залога"}
+                    </span>
+                    <span className="arrow">▼</span>
+                  </button>
+                  {depositTypePopover && (
+                    <MultiSelectPopover
+                      options={DEPOSIT_TYPES_OPTIONS}
+                      selected={Array.isArray(form.deposit_type) ? form.deposit_type : [form.deposit_type || "none"]}
+                      onChange={(vals) => {
+                        let result;
+                        if (vals.length === 0) {
+                          result = ["none"];
+                        } else if (vals.includes("none") && vals.length > 1) {
+                          const prevHasNone = Array.isArray(form.deposit_type) && form.deposit_type.includes("none");
+                          result = prevHasNone ? vals.filter(v => v !== "none") : ["none"];
+                        } else {
+                          result = vals;
+                        }
+                        setForm(prev => ({ ...prev, deposit_type: result }));
+                      }}
+                      visible={true} anchorRef={depositTypeRef} onClose={() => setDepositTypePopover(false)} />
+                  )}
                 </div>
-                {form.deposit_type !== "none" && (
+                {Array.isArray(form.deposit_type) && form.deposit_type.includes("money") && (
                   <div className="form-group">
-                    <label>{form.deposit_type === "money" ? "Сумма залога (грн)" : "Документ (серия и номер)"}</label>
-                    <input className="form-input" name="deposit_value" value={form.deposit_value} onChange={handleChange} placeholder={form.deposit_type === "money" ? "500" : "АА 123456"} />
+                    <label>Сумма залога</label>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <input className="form-input" type="number" min="0" name="deposit_amount"
+                        value={form.deposit_amount} onChange={handleChange} placeholder="500" />
+                      <span style={{ fontSize: 13, color: "#6b7280", flexShrink: 0 }}>₴</span>
+                    </div>
+                  </div>
+                )}
+                {Array.isArray(form.deposit_type) && form.deposit_type.includes("document") && (
+                  <div className="form-group">
+                    <label>Документ (серия и номер)</label>
+                    <input className="form-input" name="deposit_value" value={form.deposit_value}
+                      onChange={handleChange} placeholder="АА 123456" />
                   </div>
                 )}
               </div>

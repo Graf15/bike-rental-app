@@ -8,6 +8,7 @@ const MultiSelectPopover = ({
   visible,
   anchorRef,
   onClose,
+  singleSelect = false,
 }) => {
   const popoverRef = useRef(null);
   const [position, setPosition] = useState({ top: 0, left: 0, width: 0 });
@@ -72,6 +73,11 @@ const MultiSelectPopover = ({
   if (!visible || !isPositioned || !Array.isArray(options) || options.length === 0) return null;
 
   const toggleOption = (value) => {
+    if (singleSelect) {
+      onChange([value]);
+      onClose();
+      return;
+    }
     if (selected.includes(value)) {
       onChange(selected.filter((v) => v !== value));
     } else {
