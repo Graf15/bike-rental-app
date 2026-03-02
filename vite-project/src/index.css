@@ -1,3 +1,11 @@
+::selection,
+input::selection,
+textarea::selection,
+select::selection {
+  background: var(--color-primary-green);
+  color: white;
+}
+
 :root {
   font-family: Arial, sans-serif;
   background-color: rgb(255, 255, 255);
@@ -391,12 +399,14 @@ tr:hover {
   border: 1px solid var(--color-primary-green);
 }
 
-.popover-option:hover {
+.popover-option:hover,
+.popover-option.focused {
   background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
   transform: translateX(2px);
 }
 
-.popover-option.selected:hover {
+.popover-option.selected:hover,
+.popover-option.selected.focused {
   background: linear-gradient(135deg, var(--color-primary-green-light) 0%, var(--color-primary-green-light) 100%);
   transform: translateX(2px);
 }
@@ -688,6 +698,49 @@ tr:hover {
   margin: 0;
   width: auto;
   height: auto;
+}
+
+/* ── CheckboxField — переиспользуемый «таблетка»-чекбокс ──────── */
+.checkbox-field-wrapper {
+  align-self: end;
+  margin: 0;
+}
+
+.checkbox-field-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  user-select: none;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 6px 10px;
+  background: white;
+  transition: border-color 0.15s;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.checkbox-field-label:has(.checkbox-field-input:focus-visible) {
+  box-shadow: 0 0 0 3px var(--color-primary-green-light);
+  border-color: var(--color-primary-green);
+  outline: none;
+}
+
+.checkbox-field-input {
+  accent-color: var(--color-primary-green);
+  width: 13px;
+  height: 13px;
+  cursor: pointer;
+  flex-shrink: 0;
+  outline: none;
+}
+
+.checkbox-field-input:focus-visible {
+  outline: none;
 }
 
 .documents-section {

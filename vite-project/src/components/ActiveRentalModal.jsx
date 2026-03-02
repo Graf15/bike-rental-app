@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import MultiSelectPopover from "./MultiSelectPopover";
 import DateTimePickerField from "./DateTimePickerField";
+import CheckboxField from "./CheckboxField";
+import { printContract } from "../utils/contractPrint";
 import { TARIFF_OPTIONS, WHEEL_OPTIONS, heightToFrameRec } from "../constants/bikeFilters";
 import { normalizePhone, PHONE_HINT } from "../constants/phoneUtils";
 import "./Modal.css";
@@ -15,6 +17,7 @@ const INITIAL_FORM = {
   deposit_amount: "",
   deposit_value: "",
   notes_issue: "",
+  is_paid: false,
 };
 
 const INITIAL_ITEM = {
@@ -50,6 +53,12 @@ const DISCOUNT_OPTIONS = [
 ];
 const DISCOUNT_LABEL = Object.fromEntries(DISCOUNT_OPTIONS.map(o => [o.value, o.label]));
 
+const GENDER_OPTIONS = [
+  { value: "", label: "— Не указан —" },
+  { value: "male", label: "Мужской" },
+  { value: "female", label: "Женский" },
+];
+
 const isBirthdayCustomer = (customer) => {
   if (!customer?.birth_date) return false;
   const bd = new Date(customer.birth_date), today = new Date();
@@ -75,6 +84,8 @@ const autoApplyDiscounts = (customer, currentItems) => {
     return { ...item, discount_type: discountType, discount_percent: discountPercent, final_price: computeFinalPrice(item.price, discountPercent) };
   });
 };
+
+const capName = (s) => s.replace(/(^|[\s-])\S/g, c => c.toUpperCase());
 
 const DEPOSIT_TYPES_OPTIONS = [
   { value: "none",     label: "Без залога" },
@@ -163,14 +174,25 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
   const depositTypeRef                = useRef(null);
   const [depositTypePopover, setDepositTypePopover] = useState(false);
 
+  // Поповеры пола
+  const completionGenderRef           = useRef(null);
+  const [completionGenderPopover, setCompletionGenderPopover] = useState(false);
+  const quickGenderRef                = useRef(null);
+  const [quickGenderPopover, setQuickGenderPopover] = useState(false);
+
   // Быстрое создание клиента
   const [quickDismissed, setQuickDismissed]   = useState(false);
-  const [quickForm, setQuickForm]             = useState({ phone: "", first_name: "", last_name: "" });
+  const [quickForm, setQuickForm]             = useState({ phone: "", last_name: "", first_name: "", middle_name: "", birth_date: "", gender: "", is_veteran: false });
   const [quickSaving, setQuickSaving]         = useState(false);
   const [quickError, setQuickError]           = useState(null);
   const [quickExisting, setQuickExisting]     = useState(null);
   const quickFirstNameRef                     = useRef(null);
   const prevShowQuickCreate                   = useRef(false);
+
+  // Дозаполнение данных клиента для договора
+  const [completionForm, setCompletionForm]   = useState({ last_name: "", first_name: "", middle_name: "", birth_date: "", gender: "", is_veteran: false });
+  const [completionSaving, setCompletionSaving] = useState(false);
+  const [completionError, setCompletionError]   = useState(null);
 
   useEffect(() => {
     Promise.all([
@@ -267,6 +289,15 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
     setShowDropdown(false);
     setCustomerFocused(-1);
     setItems(prev => autoApplyDiscounts(customer, prev));
+    setCompletionForm({
+      last_name:   customer.last_name   || "",
+      first_name:  customer.first_name  || "",
+      middle_name: customer.middle_name || "",
+      birth_date:  customer.birth_date  ? customer.birth_date.slice(0, 10) : "",
+      gender:      customer.gender      || "",
+      is_veteran:  customer.is_veteran  || false,
+    });
+    setCompletionError(null);
     setTimeout(() => filterSearchRef.current?.focus(), 50);
   };
 
@@ -302,14 +333,24 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
 
   const handleQuickCreateSave = async () => {
     setQuickError(null); setQuickExisting(null);
+    if (!quickForm.last_name.trim())  { setQuickError("Укажите фамилию"); return; }
     if (!quickForm.first_name.trim()) { setQuickError("Укажите имя"); return; }
+    if (!quickForm.birth_date)        { setQuickError("Укажите дату рождения"); return; }
     const phone = normalizePhone(quickForm.phone);
     if (!phone) { setQuickError(`Неверный формат телефона. ${PHONE_HINT}`); return; }
     setQuickSaving(true);
     try {
       const res = await fetch("/api/customers", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ first_name: quickForm.first_name.trim(), last_name: quickForm.last_name.trim() || null, phone }),
+        body: JSON.stringify({
+          last_name:   quickForm.last_name.trim(),
+          first_name:  quickForm.first_name.trim(),
+          middle_name: quickForm.middle_name.trim() || null,
+          phone,
+          birth_date:  quickForm.birth_date || null,
+          gender:      quickForm.gender     || null,
+          is_veteran:  quickForm.is_veteran,
+        }),
       });
       const d = await res.json();
       if (res.status === 409 && d.existing) { setQuickExisting(d.existing); setQuickError(d.error); return; }
@@ -320,6 +361,43 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
       setQuickError(err.message);
     } finally {
       setQuickSaving(false);
+    }
+  };
+
+  // ── Проверка полноты данных клиента ─────────────────────────────────────────
+  const customerNeedsCompletion = selectedCustomer && (
+    !selectedCustomer.last_name || !selectedCustomer.first_name || !selectedCustomer.birth_date
+  );
+
+  const handleCustomerCompletion = async () => {
+    if (!completionForm.last_name.trim()) { setCompletionError("Укажите фамилию"); return; }
+    if (!completionForm.first_name.trim()) { setCompletionError("Укажите имя"); return; }
+    if (!completionForm.birth_date) { setCompletionError("Укажите дату рождения"); return; }
+    setCompletionSaving(true);
+    setCompletionError(null);
+    try {
+      const res = await fetch(`/api/customers/${selectedCustomer.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          last_name:   completionForm.last_name.trim(),
+          first_name:  completionForm.first_name.trim(),
+          middle_name: completionForm.middle_name.trim() || null,
+          birth_date:  completionForm.birth_date || null,
+          gender:      completionForm.gender     || null,
+          is_veteran:  completionForm.is_veteran,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Ошибка сохранения");
+      const updated = { ...selectedCustomer, ...data };
+      setSelectedCustomer(updated);
+      setCustomers(prev => prev.map(c => c.id === updated.id ? updated : c));
+      setItems(prev => autoApplyDiscounts(updated, prev));
+    } catch (err) {
+      setCompletionError(err.message);
+    } finally {
+      setCompletionSaving(false);
     }
   };
 
@@ -592,7 +670,7 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
 
             {/* ── 1. Клиент ── */}
             <div className="form-section">
-              {selectedCustomer ? (
+              {selectedCustomer && (
                 <div style={{ padding: "10px 14px", background: "#f0fdf4", border: "1px solid #10b981", borderRadius: 6, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                   <span style={{ fontWeight: 600, color: "#065f46" }}>
                     {[selectedCustomer.last_name, selectedCustomer.first_name, selectedCustomer.middle_name].filter(Boolean).join(" ")}
@@ -611,7 +689,70 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
                   })()}
                   <button type="button" onClick={clearCustomer} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: "#6b7280", fontSize: 16, padding: "2px 6px" }} title="Сменить клиента">✕</button>
                 </div>
-              ) : (
+              )}
+
+              {/* ── Блок дозаполнения данных клиента ── */}
+              {customerNeedsCompletion && (
+                <div style={{ marginTop: 10, padding: "12px 14px", background: "#fffbeb", border: "1px solid #fbbf24", borderRadius: 8 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#92400e", marginBottom: 10 }}>
+                    ⚠️ Для оформления договора нужно дозаполнить данные клиента
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label className="required-label" style={{ fontSize: 12 }}>Фамилия</label>
+                      <input className="form-input" value={completionForm.last_name}
+                        onChange={e => setCompletionForm(p => ({ ...p, last_name: capName(e.target.value) }))}
+                        placeholder="Фамилия" autoComplete="off" style={{ fontSize: 13 }} />
+                    </div>
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label className="required-label" style={{ fontSize: 12 }}>Имя</label>
+                      <input className="form-input" value={completionForm.first_name}
+                        onChange={e => setCompletionForm(p => ({ ...p, first_name: capName(e.target.value) }))}
+                        placeholder="Имя" autoComplete="off" style={{ fontSize: 13 }} />
+                    </div>
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label style={{ fontSize: 12 }}>Отчество</label>
+                      <input className="form-input" value={completionForm.middle_name}
+                        onChange={e => setCompletionForm(p => ({ ...p, middle_name: capName(e.target.value) }))}
+                        placeholder="Необязательно" autoComplete="off" style={{ fontSize: 13 }} />
+                    </div>
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label className="required-label" style={{ fontSize: 12 }}>Дата рождения</label>
+                      <DateTimePickerField granularity="day" value={completionForm.birth_date}
+                        onChange={v => setCompletionForm(p => ({ ...p, birth_date: v }))} />
+                    </div>
+                    <div className="form-group" style={{ margin: 0, position: "relative" }}>
+                      <label style={{ fontSize: 12 }}>Пол</label>
+                      <button ref={completionGenderRef} type="button" className="filter-select-box"
+                        style={{ width: "100%", justifyContent: "space-between", padding: "7px 10px", fontSize: 13 }}
+                        onClick={() => setCompletionGenderPopover(p => !p)}>
+                        <span>{GENDER_OPTIONS.find(o => o.value === completionForm.gender)?.label ?? "— Не указан —"}</span>
+                        <span className="arrow">▼</span>
+                      </button>
+                      {completionGenderPopover && (
+                        <MultiSelectPopover singleSelect
+                          options={GENDER_OPTIONS}
+                          selected={[completionForm.gender]}
+                          onChange={vals => setCompletionForm(p => ({ ...p, gender: vals[0] ?? "" }))}
+                          visible={true} anchorRef={completionGenderRef} onClose={() => setCompletionGenderPopover(false)} />
+                      )}
+                    </div>
+                    <div className="checkbox-field-wrapper">
+                      <CheckboxField
+                        label="🎖 УБД"
+                        checked={completionForm.is_veteran}
+                        onChange={v => setCompletionForm(p => ({ ...p, is_veteran: v }))} />
+                    </div>
+                  </div>
+                  {completionError && <div style={{ fontSize: 12, color: "var(--color-primary-red)", marginBottom: 8 }}>{completionError}</div>}
+                  <button type="button" className="btn btn-primary-green" onClick={handleCustomerCompletion}
+                    disabled={completionSaving} style={{ fontSize: 13, padding: "6px 18px" }}>
+                    {completionSaving ? "Сохранение..." : "Сохранить данные клиента"}
+                  </button>
+                </div>
+              )}
+
+              {!selectedCustomer && (
                 <div ref={dropdownRef} style={{ position: "relative" }}>
                   <div className="form-group">
                     <label className="required-label">Клиент</label>
@@ -646,16 +787,23 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
                       <div style={{ fontSize: 13, fontWeight: 600, color: "#0369a1", marginBottom: 10 }}>➕ Новый клиент</div>
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
                         <div className="form-group" style={{ margin: 0 }}>
+                          <label className="required-label" style={{ fontSize: 12 }}>Фамилия</label>
+                          <input ref={quickFirstNameRef} className="form-input" value={quickForm.last_name}
+                            onChange={e => setQuickForm(p => ({ ...p, last_name: capName(e.target.value) }))}
+                            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleQuickCreateSave(); } if (e.key === "Escape") { setQuickDismissed(true); setTimeout(() => customerInputRef.current?.focus(), 0); } }}
+                            placeholder="Фамилия" autoComplete="off" style={{ fontSize: 13 }} />
+                        </div>
+                        <div className="form-group" style={{ margin: 0 }}>
                           <label className="required-label" style={{ fontSize: 12 }}>Имя</label>
-                          <input ref={quickFirstNameRef} className="form-input" value={quickForm.first_name}
-                            onChange={e => setQuickForm(p => ({ ...p, first_name: e.target.value }))}
+                          <input className="form-input" value={quickForm.first_name}
+                            onChange={e => setQuickForm(p => ({ ...p, first_name: capName(e.target.value) }))}
                             onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleQuickCreateSave(); } if (e.key === "Escape") { setQuickDismissed(true); setTimeout(() => customerInputRef.current?.focus(), 0); } }}
                             placeholder="Имя" autoComplete="off" style={{ fontSize: 13 }} />
                         </div>
                         <div className="form-group" style={{ margin: 0 }}>
-                          <label style={{ fontSize: 12 }}>Фамилия</label>
-                          <input className="form-input" value={quickForm.last_name}
-                            onChange={e => setQuickForm(p => ({ ...p, last_name: e.target.value }))}
+                          <label style={{ fontSize: 12 }}>Отчество</label>
+                          <input className="form-input" value={quickForm.middle_name}
+                            onChange={e => setQuickForm(p => ({ ...p, middle_name: capName(e.target.value) }))}
                             onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleQuickCreateSave(); } if (e.key === "Escape") { setQuickDismissed(true); setTimeout(() => customerInputRef.current?.focus(), 0); } }}
                             placeholder="Необязательно" autoComplete="off" style={{ fontSize: 13 }} />
                         </div>
@@ -665,6 +813,33 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
                             onChange={e => setQuickForm(p => ({ ...p, phone: e.target.value }))}
                             onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleQuickCreateSave(); } if (e.key === "Escape") { setQuickDismissed(true); setTimeout(() => customerInputRef.current?.focus(), 0); } }}
                             placeholder="0XXXXXXXXX" autoComplete="off" style={{ fontSize: 13 }} />
+                        </div>
+                        <div className="form-group" style={{ margin: 0 }}>
+                          <label className="required-label" style={{ fontSize: 12 }}>Дата рождения</label>
+                          <DateTimePickerField granularity="day" value={quickForm.birth_date}
+                            onChange={v => setQuickForm(p => ({ ...p, birth_date: v }))} />
+                        </div>
+                        <div className="form-group" style={{ margin: 0, position: "relative" }}>
+                          <label style={{ fontSize: 12 }}>Пол</label>
+                          <button ref={quickGenderRef} type="button" className="filter-select-box"
+                            style={{ width: "100%", justifyContent: "space-between", padding: "7px 10px", fontSize: 13 }}
+                            onClick={() => setQuickGenderPopover(p => !p)}>
+                            <span>{GENDER_OPTIONS.find(o => o.value === quickForm.gender)?.label ?? "— Не указан —"}</span>
+                            <span className="arrow">▼</span>
+                          </button>
+                          {quickGenderPopover && (
+                            <MultiSelectPopover singleSelect
+                              options={GENDER_OPTIONS}
+                              selected={[quickForm.gender]}
+                              onChange={vals => setQuickForm(p => ({ ...p, gender: vals[0] ?? "" }))}
+                              visible={true} anchorRef={quickGenderRef} onClose={() => setQuickGenderPopover(false)} />
+                          )}
+                        </div>
+                        <div className="checkbox-field-wrapper">
+                          <CheckboxField
+                            label="🎖 УБД"
+                            checked={quickForm.is_veteran}
+                            onChange={v => setQuickForm(p => ({ ...p, is_veteran: v }))} />
                         </div>
                       </div>
                       {quickError && (
@@ -683,7 +858,7 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
                         <span style={{ fontSize: 11, color: "#9ca3af", marginRight: "auto" }}>Enter — создать · Esc — отмена</span>
                         <button type="button" onClick={() => { setQuickDismissed(true); setTimeout(() => customerInputRef.current?.focus(), 0); }}
                           style={{ padding: "5px 14px", fontSize: 12, borderRadius: 5, border: "1px solid #d1d5db", background: "white", cursor: "pointer" }}>Отмена</button>
-                        <button type="button" onClick={handleQuickCreateSave} disabled={quickSaving || !quickForm.first_name.trim() || !quickForm.phone.trim()}
+                        <button type="button" onClick={handleQuickCreateSave} disabled={quickSaving || !quickForm.last_name.trim() || !quickForm.first_name.trim() || !quickForm.birth_date || !quickForm.phone.trim()}
                           className="btn btn-primary-green" style={{ padding: "5px 14px", fontSize: 12 }}>
                           {quickSaving ? "Сохранение..." : "Создать и выбрать"}
                         </button>
@@ -1001,9 +1176,19 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
               </div>
             </div>
 
-            {/* ── 4. Залог ── */}
+            {/* ── 4. Залог и оплата ── */}
             <div className="form-section">
-              <h3>Залог</h3>
+              <h3>Залог и оплата</h3>
+              <div className="form-row">
+                <div className="checkbox-field-wrapper">
+                  <CheckboxField
+                    id="is_paid"
+                    label="Оплачено"
+                    checked={form.is_paid}
+                    onChange={(v) => setForm(prev => ({ ...prev, is_paid: v }))}
+                  />
+                </div>
+              </div>
               <div className="form-row">
                 <div className="form-group" style={{ position: "relative" }}>
                   <label>Тип залога</label>
@@ -1070,8 +1255,16 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
 
         <div className="modal-footer">
           <button type="button" className="btn btn-secondary-green btn-primary-small" onClick={onClose}>Отмена</button>
-          <button type="button" className="btn btn-primary-green btn-primary-small" onClick={handleSubmit} disabled={saving}>
-            {saving ? "Сохранение..." : "Выдать велосипед"}
+          <button type="button" className="btn btn-secondary-green btn-primary-small"
+            disabled={!form.customer_id || items.length === 0 || !!customerNeedsCompletion}
+            title={customerNeedsCompletion ? "Дозаполните данные клиента для договора" : "Распечатать договор"}
+            onClick={() => printContract({ form: { ...form, booked_start: toLocalStr(new Date()) }, items, selectedCustomer, bikes, equipment, tariffs })}>
+            🖨 Договір
+          </button>
+          <button type="button" className="btn btn-primary-green btn-primary-small" onClick={handleSubmit}
+            disabled={saving || !!customerNeedsCompletion}
+            title={customerNeedsCompletion ? "Дозаполните данные клиента для договора" : undefined}>
+            {saving ? "Сохранение..." : "Старт проката"}
           </button>
         </div>
 

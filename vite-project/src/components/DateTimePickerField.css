@@ -3,6 +3,10 @@
    Классы .react-aria-* добавляются компонентами автоматически
 ═══════════════════════════════════════════════════════════════════ */
 
+.react-aria-DatePicker {
+  outline: none;
+}
+
 /* ── Обёртка поля ──────────────────────────────────────────────── */
 .dt-field-group {
   display: flex;
@@ -12,6 +16,7 @@
   cursor: text;
   box-sizing: border-box;
   border-radius: 8px;
+  outline: none;
 }
 
 .dt-field-group[data-focus-within] {

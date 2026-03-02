@@ -15,19 +15,32 @@ import {
   Heading,
   Group,
 } from "react-aria-components";
-import { parseDateTime } from "@internationalized/date";
+import { parseDateTime, parseDate, CalendarDate } from "@internationalized/date";
 import "./DateTimePickerField.css";
 
-// ─── Конвертация ISO ↔ CalendarDateTime ──────────────────────────────────
+// ─── Конвертация ISO ↔ CalendarDateTime / CalendarDate ───────────────────
 const toCalDT = (isoStr) => {
   if (!isoStr) return null;
   try { return parseDateTime(isoStr); } catch { return null; }
 };
 
+const toCalDate = (isoStr) => {
+  if (!isoStr) return null;
+  try { return parseDate(isoStr.slice(0, 10)); } catch { return null; }
+};
+
 const fromCalDT = (calDT) => {
   if (!calDT) return "";
   const pad = (n) => String(n).padStart(2, "0");
-  return `${calDT.year}-${pad(calDT.month)}-${pad(calDT.day)}T${pad(calDT.hour)}:${pad(calDT.minute)}`;
+  const padY = (y) => String(y).padStart(4, "0");
+  return `${padY(calDT.year)}-${pad(calDT.month)}-${pad(calDT.day)}T${pad(calDT.hour)}:${pad(calDT.minute)}`;
+};
+
+const fromCalDate = (calDate) => {
+  if (!calDate) return "";
+  const pad = (n) => String(n).padStart(2, "0");
+  const padY = (y) => String(y).padStart(4, "0");
+  return `${padY(calDate.year)}-${pad(calDate.month)}-${pad(calDate.day)}`;
 };
 
 const getNowCalDT = () => {
@@ -48,10 +61,9 @@ for (let h = 8; h <= 22; h++) {
 
 // ─── Боковая панель времени ───────────────────────────────────────────────
 const TimePanel = ({ calValue, onChange }) => {
-  const listRef  = useRef(null);
+  const listRef   = useRef(null);
   const activeRef = useRef(null);
 
-  // Скролл к выбранному/текущему времени при открытии
   useEffect(() => {
     if (activeRef.current && listRef.current) {
       const itemH   = activeRef.current.offsetHeight;
@@ -90,24 +102,33 @@ const TimePanel = ({ calValue, onChange }) => {
 };
 
 // ─── Компонент ────────────────────────────────────────────────────────────
-const DateTimePickerField = forwardRef(({ value, onChange, minDate }, ref) => {
+// granularity="minute" (по умолчанию) — дата + время + панель слотов
+// granularity="day"                   — только дата, без времени
+const DateTimePickerField = forwardRef(({ value, onChange, minDate, granularity = "minute" }, ref) => {
   const groupRef = useRef(null);
+  const isDateOnly = granularity === "day";
 
   useImperativeHandle(ref, () => ({
     focus: () => groupRef.current?.querySelector("[data-type]")?.focus(),
   }));
 
-  const calValue    = toCalDT(value);
-  const minCalValue = (minDate && toCalDT(minDate)) || getNowCalDT();
+  const calValue    = isDateOnly ? toCalDate(value)  : toCalDT(value);
+  const minCalValue = isDateOnly
+    ? (minDate ? toCalDate(minDate) : new CalendarDate(1, 1, 1))
+    : ((minDate && toCalDT(minDate)) || getNowCalDT());
+
+  const handleChange = (v) => {
+    onChange(v ? (isDateOnly ? fromCalDate(v) : fromCalDT(v)) : "");
+  };
 
   return (
     <DatePicker
       value={calValue}
-      onChange={(v) => onChange(v ? fromCalDT(v) : "")}
+      onChange={handleChange}
       minValue={minCalValue}
-      granularity="minute"
-      hourCycle={24}
-      shouldCloseOnSelect={false}
+      granularity={granularity}
+      {...(!isDateOnly && { hourCycle: 24 })}
+      shouldCloseOnSelect={isDateOnly}
     >
       <Group ref={groupRef} className="form-input dt-field-group">
         <DateInput>
@@ -135,7 +156,7 @@ const DateTimePickerField = forwardRef(({ value, onChange, minDate }, ref) => {
               </CalendarGrid>
             </Calendar>
 
-            <TimePanel calValue={calValue} onChange={onChange} />
+            {!isDateOnly && <TimePanel calValue={calValue} onChange={onChange} />}
           </div>
         </Dialog>
       </Popover>
