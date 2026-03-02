@@ -1,6 +1,8 @@
 // contractPrint.js — v2: тариф замість суми, час повернення — від руки
 // Резервна копія попередньої версії: contractPrint_v1.js
 
+import _logoUrl from '../assets/images/logo.png';
+
 // ── Дані орендодавця ─────────────────────────────────────────────────────────
 const LANDLORD = {
   name:   'ФОП Панасенко Д.Д.',
@@ -37,7 +39,7 @@ const fmtBirthDate = (isoStr) => {
 
 
 const u = (text = '', w = '20mm') =>
-  `<span style="display:inline-block;border-bottom:1px solid #000;min-width:${w};padding:0 0.5mm;">${text}</span>`;
+  `<span style="display:inline-block;border-bottom:1px solid #000;min-width:${w};padding:0 0.5mm;text-align:center;">${text}</span>`;
 
 const uRow = (label, value = '') =>
   `<div style="display:flex;align-items:flex-end;gap:1.5mm;min-height:4.5mm;">
@@ -94,6 +96,13 @@ const buildTariffTable = (usedTariffIds, tariffs) => {
 
   if (rows.length === 0) {
     return `<div>${u('', '60mm')}</div>`;
+  }
+
+  const TARIFF_MIN_ROWS = 4;
+  const tdEmpty = (align = 'center') =>
+    `<td style="border:0.5px solid #000;padding:0.3mm 1mm;text-align:${align};">—</td>`;
+  while (rows.length < TARIFF_MIN_ROWS) {
+    rows.push(`<tr>${tdEmpty('left')}${tdEmpty()}${tdEmpty()}${tdEmpty()}${tdEmpty()}</tr>`);
   }
 
   const th = (label, w = '') =>
@@ -162,7 +171,7 @@ export const printContract = ({ form, items, selectedCustomer, bikes, equipment 
   });
 
   // Дополняем таблицу прочерками до минимума
-  const MIN_ROWS = 9;
+  const MIN_ROWS = 8;
   while (rows.length < MIN_ROWS) {
     rows.push(`<tr style="height:4.5mm;">
       ${td('—', 'center')}
@@ -223,9 +232,10 @@ export const printContract = ({ form, items, selectedCustomer, bikes, equipment 
     }
     .page:last-of-type { page-break-after: auto; break-after: auto; }
     .spacer { flex: 1; }
+    .items-table { flex: 1; height: 100%; }
     .hdr   { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:1.5mm; }
-    .logo  { font-size:9pt; font-weight:bold; line-height:1.1; }
-    .logo small { font-size:7.5pt; font-weight:normal; display:block; }
+    .logo  { line-height:1.1; }
+    .logo small { font-size:7.5pt; display:block; }
     .title    { text-align:center; font-size:10pt; font-weight:bold; margin-bottom:0.8mm; }
     .city-row { display:flex; justify-content:space-between; margin-bottom:1mm; }
     .sec  { margin-bottom:1mm; }
@@ -240,6 +250,10 @@ export const printContract = ({ form, items, selectedCustomer, bikes, equipment 
     @media print { body { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
   `;
 
+  const logoSrc = _logoUrl.startsWith('data:')
+    ? _logoUrl
+    : window.location.origin + _logoUrl;
+
   const html = `<!DOCTYPE html>
 <html lang="uk"><head><meta charset="UTF-8"><title>Договір оренди</title>
 <style>${CSS}</style></head><body>
@@ -248,7 +262,7 @@ export const printContract = ({ form, items, selectedCustomer, bikes, equipment 
 <div class="page">
 
 <div class="hdr">
-  <div class="logo">Vel&#x1F6B2;<br><small>prokatik.com</small></div>
+  <div class="logo"><img src="${logoSrc}" alt="Логотип" style="height:9mm;display:block;"></div>
   <div>тел. ${LANDLORD.phone}</div>
 </div>
 
@@ -272,7 +286,7 @@ export const printContract = ({ form, items, selectedCustomer, bikes, equipment 
   1.1 Орендодавець передає, а Орендар приймає в тимчасове користування таке майно:
 </div>
 
-<table style="margin:0 0 1.5mm;">
+<table class="items-table" style="margin:0 0 1.5mm;">
   <thead><tr>
     <th style="width:5.5mm;">№</th>
     <th style="width:14mm;">Артикул</th>
@@ -330,11 +344,9 @@ export const printContract = ({ form, items, selectedCustomer, bikes, equipment 
   ${tariffTable}
 </div>
 
-<div class="spacer"></div>
-
 <div class="sec">
   ${isPaid
-    ? `Загальна сума: ${u(totalPaid || '','20mm')} грн<br>`
+    ? `Вартість оренди: ${u(totalPaid || '','14mm')} грн<br>`
     : `Загальна вартість розраховується за тарифами з точністю до хвилини з округленням до 10&thinsp;грн під час повернення. Мінімальна оплата — 1 година.<br>`
   }
   Сплачується під час укладання договору: так ${cb(isPaid)}, ні ${cb(!isPaid)}<br>
@@ -344,15 +356,18 @@ export const printContract = ({ form, items, selectedCustomer, bikes, equipment 
 
 <div class="sec">
   <span class="b">4. Обов'язки Орендодавця.</span><br>
-  4.1 Надати в оренду Орендарю технічно справне майно, вказане в п.1.1<br>
-  4.2 Провести інструктаж з правил технічної експлуатації.<br>
-  4.3 Повернути Орендарю заставу і документ зазначений в п.&thinsp;3.3 по поверненні орендованого майна в технічно справному та чистому стані в строк згідно п.&thinsp;2.1
+  4.1 Надати в оренду Орендарю технічно справне майно, вказане в п.1.1
 </div>
 
 </div>
 
 <!-- ═══ СТОРІНКА 2 ═══ -->
 <div class="page">
+
+<div class="sec">
+  4.2 Провести інструктаж з правил технічної експлуатації.<br>
+  4.3 Повернути Орендарю заставу і документ зазначений в п.&thinsp;3.3 по поверненні орендованого майна в технічно справному та чистому стані в строк згідно п.&thinsp;2.1
+</div>
 
 <div class="sec">
   <span class="b">5. Обов'язки Орендаря.</span><br>

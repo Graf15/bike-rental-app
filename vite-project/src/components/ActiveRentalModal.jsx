@@ -1183,7 +1183,7 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
                 <div className="checkbox-field-wrapper">
                   <CheckboxField
                     id="is_paid"
-                    label="Оплачено"
+                    label="Оплата при старте"
                     checked={form.is_paid}
                     onChange={(v) => setForm(prev => ({ ...prev, is_paid: v }))}
                   />
@@ -1257,9 +1257,32 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
           <button type="button" className="btn btn-secondary-green btn-primary-small" onClick={onClose}>Отмена</button>
           <button type="button" className="btn btn-secondary-green btn-primary-small"
             disabled={!form.customer_id || items.length === 0 || !!customerNeedsCompletion}
-            title={customerNeedsCompletion ? "Дозаполните данные клиента для договора" : "Распечатать договор"}
-            onClick={() => printContract({ form: { ...form, booked_start: toLocalStr(new Date()) }, items, selectedCustomer, bikes, equipment, tariffs })}>
+            title={
+              customerNeedsCompletion ? "Дозаполните данные клиента для договора"
+              : items.length > 8 ? `${items.length} позицій — може не влізти на 1 сторінку`
+              : "Распечатать договор"
+            }
+            onClick={() => {
+              const now = new Date();
+              const durationMs = new Date(form.booked_end) - new Date(form.booked_start);
+              const newStart = toLocalStr(now);
+              const newEnd   = toLocalStr(new Date(now.getTime() + (durationMs > 0 ? durationMs : 0)));
+              printContract({ form: { ...form, booked_start: newStart, booked_end: newEnd }, items, selectedCustomer, bikes, equipment, tariffs });
+            }}>
             🖨 Договір
+            {items.length > 0 && (
+              <span style={{
+                marginLeft: 5,
+                padding: '1px 5px',
+                borderRadius: 8,
+                fontSize: 11,
+                fontWeight: 700,
+                background: items.length > 10 ? '#fee2e2' : items.length > 8 ? '#ffedd5' : '#dcfce7',
+                color:      items.length > 10 ? '#b91c1c' : items.length > 8 ? '#c2410c' : '#15803d',
+              }}>
+                {items.length > 8 ? '⚠ ' : ''}{items.length}
+              </span>
+            )}
           </button>
           <button type="button" className="btn btn-primary-green btn-primary-small" onClick={handleSubmit}
             disabled={saving || !!customerNeedsCompletion}
