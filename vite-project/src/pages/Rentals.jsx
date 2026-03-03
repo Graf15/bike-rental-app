@@ -11,6 +11,8 @@ const Rentals = () => {
   const [isActiveModalOpen, setIsActiveModalOpen]   = useState(false);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [viewingRental, setViewingRental]           = useState(null);
+  const [activatingBooking, setActivatingBooking]   = useState(null);
+  const [editingBooking, setEditingBooking]         = useState(null);
   const [statusFilter, setStatusFilter]             = useState([]);
 
   const handleStatClick = (statuses) => {
@@ -62,7 +64,10 @@ const Rentals = () => {
     }
   };
 
-  const handleOpenRental = (rental) => setViewingRental(rental);
+  const handleOpenRental = (rental) => {
+    if (rental.status === "booked") setEditingBooking(rental);
+    else setViewingRental(rental);
+  };
 
   const activeCount  = rentals.filter(r => r.status === "active").length;
   const bookedCount  = rentals.filter(r => r.status === "booked").length;
@@ -143,6 +148,26 @@ const Rentals = () => {
         <BookingModal
           onClose={() => setIsBookingModalOpen(false)}
           onSave={handleCreateSave}
+        />
+      )}
+
+      {editingBooking && (
+        <BookingModal
+          editingRental={editingBooking}
+          onClose={() => setEditingBooking(null)}
+          onSave={() => { setEditingBooking(null); fetchRentals(); }}
+          onProceedToIssue={(saved) => {
+            setEditingBooking(null);
+            setActivatingBooking(saved);
+          }}
+        />
+      )}
+
+      {activatingBooking && (
+        <ActiveRentalModal
+          bookingId={activatingBooking.id}
+          onClose={() => setActivatingBooking(null)}
+          onSave={() => { setActivatingBooking(null); fetchRentals(); }}
         />
       )}
 

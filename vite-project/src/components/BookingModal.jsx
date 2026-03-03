@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import MultiSelectPopover from "./MultiSelectPopover";
 import DateTimePickerField from "./DateTimePickerField";
+import CheckboxField from "./CheckboxField";
 import { TARIFF_OPTIONS, WHEEL_OPTIONS, heightToFrameRec } from "../constants/bikeFilters";
 import { normalizePhone, PHONE_HINT } from "../constants/phoneUtils";
 import "./Modal.css";
 import "./BikeTable.css";
+
+const capitalizeName = (s) => s.replace(/(^|\s|-)(\S)/g, (_, sep, ch) => sep + ch.toUpperCase());
 
 const INITIAL_FORM = {
   customer_id: "",
@@ -14,6 +17,7 @@ const INITIAL_FORM = {
   deposit_type: ["none"],
   deposit_amount: "",
   deposit_value: "",
+  prepayment_amount: "",
   notes_issue: "",
 };
 
@@ -76,6 +80,12 @@ const autoApplyDiscounts = (customer, currentItems) => {
   });
 };
 
+const GENDER_OPTIONS = [
+  { value: "", label: "— Не указан —" },
+  { value: "male", label: "Мужской" },
+  { value: "female", label: "Женский" },
+];
+
 const DEPOSIT_TYPES_OPTIONS = [
   { value: "none",     label: "Без залога" },
   { value: "money",    label: "Денежный залог" },
@@ -95,13 +105,21 @@ const formatDt = (dateStr) => {
 
 const getBikeIcon = (bike) => bike?.model?.toLowerCase().includes("самокат") ? "🛴" : "🚲";
 
-const BookingModal = ({ onClose, onSave }) => {
+const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue = null }) => {
   const [form, setForm]           = useState(() => ({ ...INITIAL_FORM, booked_start: toLocalStr(new Date()) }));
   const [items, setItems]         = useState([]);
   const [saving, setSaving]       = useState(false);
   const [error, setError]         = useState(null);
   const [dateError, setDateError]           = useState(null);
-  const [activeQuickLabel, setActiveQuickLabel] = useState(null);
+  // Редактирование клиента
+  const [editCustOpen, setEditCustOpen]         = useState(false);
+  const [editCustForm, setEditCustForm]         = useState({ last_name: "", first_name: "", middle_name: "", phone: "", birth_date: "", gender: "", is_veteran: false });
+  const [editCustSaving, setEditCustSaving]     = useState(false);
+  const [editCustError, setEditCustError]       = useState(null);
+  const editCustGenderRef                       = useRef(null);
+  const [editCustGenderPopover, setEditCustGenderPopover] = useState(false);
+
+  // activeQuickLabel вычисляется из реальных дат — подсвечивается автоматически при открытии брони
   const mouseDownOnOverlay        = useRef(false);
 
   const [customers, setCustomers]   = useState([]);
@@ -194,6 +212,67 @@ const BookingModal = ({ onClose, onSave }) => {
     fetch(url).then(r => r.json()).then(b => setAllBikes(Array.isArray(b) ? b : [])).catch(console.error).finally(() => setBikesLoading(false));
   }, [form.booked_start, form.booked_end, dateError]);
 
+  // Загружаем данные редактируемой брони (pre-fill)
+  useEffect(() => {
+    if (!editingRental) return;
+    fetch(`/api/rentals/${editingRental.id}`)
+      .then(r => r.json())
+      .then(rental => {
+        setForm({
+          customer_id:       rental.customer_id    || "",
+          issued_by:         rental.issued_by       || "",
+          booked_start:      rental.booked_start    ? toLocalStr(new Date(rental.booked_start)) : "",
+          booked_end:        rental.booked_end      ? toLocalStr(new Date(rental.booked_end))   : "",
+          deposit_type:      rental.deposit_type && rental.deposit_type !== "none"
+                               ? rental.deposit_type.split(",") : ["none"],
+          deposit_amount:    rental.deposit_amount  != null ? String(rental.deposit_amount)  : "",
+          deposit_value:     rental.deposit_value   || "",
+          prepayment_amount: rental.prepayment_amount != null ? String(rental.prepayment_amount) : "",
+          notes_issue:       rental.notes_issue      || "",
+        });
+        const customer = {
+          id:            rental.customer_id,
+          last_name:     rental.last_name,
+          first_name:    rental.first_name,
+          middle_name:   rental.middle_name,
+          phone:         rental.phone,
+          birth_date:    rental.birth_date,
+          gender:        rental.gender,
+          is_veteran:    rental.is_veteran,
+          no_show_count: rental.no_show_count,
+          status:        rental.customer_status || "active",
+        };
+        setSelectedCustomer(customer);
+        setCustomerSearch([rental.last_name, rental.first_name, rental.middle_name].filter(Boolean).join(" "));
+        setEditCustOpen(false);
+        setEditCustForm({ last_name: rental.last_name || "", first_name: rental.first_name || "", middle_name: rental.middle_name || "", phone: rental.phone || "", birth_date: rental.birth_date ? rental.birth_date.slice(0, 10) : "", gender: rental.gender || "", is_veteran: rental.is_veteran || false });
+        if (Array.isArray(rental.items)) {
+          const mappedItems = rental.items.map(item => {
+            const price = parseFloat(item.price) || "";
+            const pct   = item.discount_percent  || 0;
+            return {
+              ...INITIAL_ITEM,
+              _key:               item.id,
+              item_type:          item.item_type,
+              bike_id:            String(item.bike_id            || ""),
+              equipment_model_id: String(item.equipment_model_id || ""),
+              equipment_name:     item.equipment_name || "",
+              tariff_id:          String(item.tariff_id || ""),
+              tariff_type:        item.tariff_type || "hourly",
+              price,
+              final_price:        price !== "" ? computeFinalPrice(price, pct) : "",
+              quantity:           item.quantity   || 1,
+              discount_type:      item.discount_type   || "",
+              discount_percent:   pct,
+              discount_notes:     item.discount_notes  || "",
+            };
+          });
+          setItems(autoApplyDiscounts(customer, mappedItems));
+        }
+      })
+      .catch(console.error);
+  }, [editingRental?.id]);
+
   // ── Расчёт цены ─────────────────────────────────────────────────────────────
 
   const fetchPrice = useCallback(async (tariff_id, start_time, end_time) => {
@@ -271,6 +350,8 @@ const BookingModal = ({ onClose, onSave }) => {
     setCustomerSearch([customer.last_name, customer.first_name, customer.middle_name].filter(Boolean).join(" "));
     setShowDropdown(false); setCustomerFocused(-1);
     setItems(prev => autoApplyDiscounts(customer, prev));
+    setEditCustOpen(false);
+    setEditCustForm({ last_name: customer.last_name || "", first_name: customer.first_name || "", middle_name: customer.middle_name || "", phone: customer.phone || "", birth_date: customer.birth_date ? customer.birth_date.slice(0, 10) : "", gender: customer.gender || "", is_veteran: customer.is_veteran || false });
     setTimeout(() => bookedStartRef.current?.focus?.(), 80);
   };
 
@@ -342,6 +423,59 @@ const BookingModal = ({ onClose, onSave }) => {
   };
 
   // ── Даты ────────────────────────────────────────────────────────────────────
+
+  const handleEditCustomerSave = async () => {
+    if (!editCustForm.first_name.trim()) { setEditCustError("Укажите имя"); return; }
+    const phone = normalizePhone(editCustForm.phone);
+    if (!phone) { setEditCustError(`Неверный формат телефона. ${PHONE_HINT}`); return; }
+    setEditCustSaving(true);
+    setEditCustError(null);
+    try {
+      const res = await fetch(`/api/customers/${selectedCustomer.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          last_name:   editCustForm.last_name.trim()   || null,
+          first_name:  editCustForm.first_name.trim(),
+          middle_name: editCustForm.middle_name.trim() || null,
+          phone,
+          birth_date:  editCustForm.birth_date || null,
+          gender:      editCustForm.gender     || null,
+          is_veteran:  editCustForm.is_veteran,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Ошибка сохранения");
+      const updated = { ...selectedCustomer, ...data };
+      setSelectedCustomer(updated);
+      setCustomerSearch([data.last_name, data.first_name, data.middle_name].filter(Boolean).join(" "));
+      setCustomers(prev => prev.map(c => c.id === updated.id ? updated : c));
+      setItems(prev => autoApplyDiscounts(updated, prev));
+      setEditCustOpen(false);
+    } catch (err) {
+      setEditCustError(err.message);
+    } finally {
+      setEditCustSaving(false);
+    }
+  };
+
+  const getActiveQuickLabel = () => {
+    if (!form.booked_start || !form.booked_end) return null;
+    const startD = new Date(form.booked_start);
+    const endD   = new Date(form.booked_end);
+    const diffMin = Math.round((endD - startD) / 60000);
+    if (diffMin === 60)    return "1ч";
+    if (diffMin === 120)   return "2ч";
+    if (diffMin === 180)   return "3ч";
+    if (diffMin === 240)   return "4ч";
+    if (diffMin === 1440)  return "Сутки";
+    if (diffMin === 10080) return "Неделя";
+    if (diffMin === 20160) return "2 нед";
+    // "День" — конец в 21:00 того же дня что и старт
+    const day2100 = new Date(startD); day2100.setHours(21, 0, 0, 0);
+    if (Math.abs(endD - day2100) < 60000) return "День";
+    return null;
+  };
 
   const applyQuickDuration = (minutes, until2100) => {
     if (!form.booked_start) return;
@@ -559,48 +693,66 @@ const BookingModal = ({ onClose, onSave }) => {
 
   // ── Отправка ─────────────────────────────────────────────────────────────────
 
+  const validateAndSave = async () => {
+    if (!form.customer_id)  throw new Error("Выберите клиента");
+    if (!form.booked_start) throw new Error("Укажите время начала брони");
+    if (!form.booked_end)   throw new Error("Укажите время окончания брони");
+    if (dateError)          throw new Error(dateError);
+    if (items.length === 0) throw new Error("Добавьте хотя бы один велосипед или оборудование");
+
+    const depositType = (() => {
+      const dt = form.deposit_type;
+      if (!Array.isArray(dt) || dt.length === 0 || dt.includes("none")) return "none";
+      return dt.filter(v => v !== "none").join(",");
+    })();
+    const body = {
+      ...form,
+      deposit_type:      depositType,
+      deposit_amount:    form.deposit_amount    !== "" ? parseFloat(form.deposit_amount)    : null,
+      prepayment_amount: form.prepayment_amount !== "" ? parseFloat(form.prepayment_amount) : null,
+      initial_status:    "booked",
+      customer_id:       parseInt(form.customer_id),
+      issued_by:         form.issued_by ? parseInt(form.issued_by) : null,
+      items: items.map(i => ({
+        ...i,
+        bike_id:            i.bike_id            ? parseInt(i.bike_id)            : null,
+        equipment_model_id: i.equipment_model_id ? parseInt(i.equipment_model_id) : null,
+        tariff_id:          i.tariff_id           ? parseInt(i.tariff_id)          : null,
+        price:              i.final_price !== "" && i.final_price != null ? parseFloat(i.final_price) : (i.price !== "" ? parseFloat(i.price) : null),
+        quantity:           parseInt(i.quantity)  || 1,
+        discount_type:      i.discount_type       || null,
+        discount_percent:   i.discount_percent    > 0 ? i.discount_percent : null,
+        discount_notes:     i.discount_notes      || null,
+      })),
+    };
+
+    const url    = editingRental ? `/api/rentals/${editingRental.id}` : "/api/rentals";
+    const method = editingRental ? "PATCH" : "POST";
+    const response = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (!response.ok) { const data = await response.json(); throw new Error(data.error || "Ошибка"); }
+    return await response.json();
+  };
+
   const handleSubmit = async () => {
     setError(null);
-    if (!form.customer_id)  { setError("Выберите клиента"); return; }
-    if (!form.booked_start) { setError("Укажите время начала брони"); return; }
-    if (!form.booked_end)   { setError("Укажите время окончания брони"); return; }
-    if (dateError)          { setError(dateError); return; }
-    if (items.length === 0) { setError("Добавьте хотя бы один велосипед или оборудование"); return; }
-
     setSaving(true);
     try {
-      const depositType = (() => {
-        const dt = form.deposit_type;
-        if (!Array.isArray(dt) || dt.length === 0 || dt.includes("none")) return "none";
-        return dt.filter(v => v !== "none").join(",");
-      })();
-      const body = {
-        ...form,
-        deposit_type: depositType,
-        deposit_amount: form.deposit_amount !== "" ? parseFloat(form.deposit_amount) : null,
-        initial_status: "booked",
-        customer_id: parseInt(form.customer_id),
-        issued_by: form.issued_by ? parseInt(form.issued_by) : null,
-        items: items.map(i => ({
-          ...i,
-          bike_id:            i.bike_id            ? parseInt(i.bike_id)            : null,
-          equipment_model_id: i.equipment_model_id ? parseInt(i.equipment_model_id) : null,
-          tariff_id:          i.tariff_id           ? parseInt(i.tariff_id)          : null,
-          price:              i.final_price !== "" && i.final_price != null ? parseFloat(i.final_price) : (i.price !== "" ? parseFloat(i.price) : null),
-          quantity:           parseInt(i.quantity)  || 1,
-          discount_type:      i.discount_type       || null,
-          discount_percent:   i.discount_percent    > 0 ? i.discount_percent : null,
-          discount_notes:     i.discount_notes      || null,
-        })),
-      };
-      const response = await fetch("/api/rentals", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
-      });
-      if (!response.ok) { const data = await response.json(); throw new Error(data.error || "Ошибка"); }
-      onSave(await response.json());
+      const saved = await validateAndSave();
+      onSave(saved);
     } catch (err) {
       setError(err.message);
-    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleProceedToIssue = async () => {
+    setError(null);
+    setSaving(true);
+    try {
+      const saved = await validateAndSave();
+      onProceedToIssue(saved);
+    } catch (err) {
+      setError(err.message);
       setSaving(false);
     }
   };
@@ -617,7 +769,7 @@ const BookingModal = ({ onClose, onSave }) => {
     >
       <div className="modal-content" style={{ maxWidth: 980 }} onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>📅 Создать бронь</h2>
+          <h2>{editingRental ? `Бронь #${editingRental.id}` : "📅 Создать бронь"}</h2>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
 
@@ -626,7 +778,7 @@ const BookingModal = ({ onClose, onSave }) => {
 
             {/* ── 1. Клиент ── */}
             <div className="form-section">
-              {selectedCustomer ? (
+              {selectedCustomer && (
                 <div style={{ padding: "10px 14px", background: "#f0fdf4", border: "1px solid #10b981", borderRadius: 6, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                   <span style={{ fontWeight: 600, color: "#065f46" }}>{[selectedCustomer.last_name, selectedCustomer.first_name, selectedCustomer.middle_name].filter(Boolean).join(" ")}</span>
                   <span style={{ color: "#047857" }}>{selectedCustomer.phone}</span>
@@ -641,9 +793,81 @@ const BookingModal = ({ onClose, onSave }) => {
                     if (diff >= 0 && diff <= 7) return <span style={{ color: "#7c3aed", fontSize: 13, fontWeight: 500 }}>🎂 Именинник — скидка −50%!</span>;
                     return null;
                   })()}
-                  <button type="button" onClick={clearCustomer} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: "#6b7280", fontSize: 16, padding: "2px 6px" }} title="Сменить клиента">✕</button>
+                  <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 2 }}>
+                    <button type="button" onClick={() => { setEditCustOpen(p => !p); setEditCustError(null); }}
+                      style={{ background: "none", border: "none", cursor: "pointer", color: "#6b7280", fontSize: 16, lineHeight: 1, padding: "2px 6px", transform: "rotate(135deg)" }} title="Редактировать клиента">✏</button>
+                    <button type="button" onClick={clearCustomer} style={{ background: "none", border: "none", cursor: "pointer", color: "#6b7280", fontSize: 16, lineHeight: 1, padding: "2px 6px" }} title="Сменить клиента">✕</button>
+                  </div>
                 </div>
-              ) : (
+              )}
+
+              {/* ── Редактирование клиента ── */}
+              {editCustOpen && selectedCustomer && (
+                <div style={{ marginTop: 10, padding: "12px 14px", background: "#f0fdf4", border: "1px solid #10b981", borderRadius: 8 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#065f46", marginBottom: 10 }}><span style={{ display: "inline-block", transform: "rotate(135deg)" }}>✏</span> Редактирование данных клиента</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label style={{ fontSize: 12 }}>Фамилия</label>
+                      <input className="form-input" value={editCustForm.last_name}
+                        onChange={e => setEditCustForm(p => ({ ...p, last_name: capitalizeName(e.target.value) }))}
+                        placeholder="Фамилия" autoComplete="off" style={{ fontSize: 13 }} />
+                    </div>
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label className="required-label" style={{ fontSize: 12 }}>Имя</label>
+                      <input className="form-input" value={editCustForm.first_name}
+                        onChange={e => setEditCustForm(p => ({ ...p, first_name: capitalizeName(e.target.value) }))}
+                        placeholder="Имя" autoComplete="off" style={{ fontSize: 13 }} />
+                    </div>
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label style={{ fontSize: 12 }}>Отчество</label>
+                      <input className="form-input" value={editCustForm.middle_name}
+                        onChange={e => setEditCustForm(p => ({ ...p, middle_name: capitalizeName(e.target.value) }))}
+                        placeholder="Необязательно" autoComplete="off" style={{ fontSize: 13 }} />
+                    </div>
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label className="required-label" style={{ fontSize: 12 }}>Телефон</label>
+                      <input className="form-input" value={editCustForm.phone}
+                        onChange={e => setEditCustForm(p => ({ ...p, phone: e.target.value }))}
+                        placeholder="+380..." autoComplete="off" style={{ fontSize: 13 }} />
+                    </div>
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label style={{ fontSize: 12 }}>Дата рождения</label>
+                      <DateTimePickerField granularity="day" value={editCustForm.birth_date}
+                        onChange={v => setEditCustForm(p => ({ ...p, birth_date: v }))} />
+                    </div>
+                    <div className="form-group" style={{ margin: 0, position: "relative" }}>
+                      <label style={{ fontSize: 12 }}>Пол</label>
+                      <button ref={editCustGenderRef} type="button" className="filter-select-box"
+                        style={{ width: "100%", justifyContent: "space-between", padding: "7px 10px", fontSize: 13 }}
+                        onClick={() => setEditCustGenderPopover(p => !p)}>
+                        <span>{GENDER_OPTIONS.find(o => o.value === editCustForm.gender)?.label ?? "— Не указан —"}</span>
+                        <span className="arrow">▼</span>
+                      </button>
+                      {editCustGenderPopover && (
+                        <MultiSelectPopover singleSelect options={GENDER_OPTIONS}
+                          selected={[editCustForm.gender]}
+                          onChange={vals => setEditCustForm(p => ({ ...p, gender: vals[0] ?? "" }))}
+                          visible={true} anchorRef={editCustGenderRef} onClose={() => setEditCustGenderPopover(false)} />
+                      )}
+                    </div>
+                    <div className="checkbox-field-wrapper">
+                      <CheckboxField label="🎖 УБД" checked={editCustForm.is_veteran}
+                        onChange={v => setEditCustForm(p => ({ ...p, is_veteran: v }))} />
+                    </div>
+                  </div>
+                  {editCustError && <div style={{ fontSize: 12, color: "var(--color-primary-red)", marginBottom: 8 }}>{editCustError}</div>}
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button type="button" className="btn btn-secondary-green" onClick={() => { setEditCustOpen(false); setEditCustError(null); }}
+                      style={{ fontSize: 13, padding: "6px 14px" }}>Отмена</button>
+                    <button type="button" className="btn btn-primary-green" onClick={handleEditCustomerSave}
+                      disabled={editCustSaving} style={{ fontSize: 13, padding: "6px 18px" }}>
+                      {editCustSaving ? "Сохранение..." : "Сохранить"}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {!selectedCustomer && (
                 <div ref={dropdownRef} style={{ position: "relative" }}>
                   <div className="form-group">
                     <label className="required-label">Клиент</label>
@@ -673,19 +897,19 @@ const BookingModal = ({ onClose, onSave }) => {
                   {/* Форма быстрого создания клиента */}
                   {showQuickCreate && (
                     <div style={{ marginTop: 8, padding: "14px 16px", background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "#0369a1", marginBottom: 10 }}>➕ Новый клиент</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#0369a1", marginBottom: 10 }}>+ Новый клиент</div>
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
                         <div className="form-group" style={{ margin: 0 }}>
                           <label className="required-label" style={{ fontSize: 12 }}>Имя</label>
                           <input ref={quickFirstNameRef} className="form-input" value={quickForm.first_name}
-                            onChange={e => setQuickForm(p => ({ ...p, first_name: e.target.value }))}
+                            onChange={e => setQuickForm(p => ({ ...p, first_name: capitalizeName(e.target.value) }))}
                             onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleQuickCreateSave(); } if (e.key === "Escape") { setQuickDismissed(true); setTimeout(() => customerInputRef.current?.focus(), 0); } }}
                             placeholder="Имя" autoComplete="off" style={{ fontSize: 13 }} />
                         </div>
                         <div className="form-group" style={{ margin: 0 }}>
                           <label style={{ fontSize: 12 }}>Фамилия</label>
                           <input className="form-input" value={quickForm.last_name}
-                            onChange={e => setQuickForm(p => ({ ...p, last_name: e.target.value }))}
+                            onChange={e => setQuickForm(p => ({ ...p, last_name: capitalizeName(e.target.value) }))}
                             onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleQuickCreateSave(); } if (e.key === "Escape") { setQuickDismissed(true); setTimeout(() => customerInputRef.current?.focus(), 0); } }}
                             placeholder="Необязательно" autoComplete="off" style={{ fontSize: 13 }} />
                         </div>
@@ -773,8 +997,8 @@ const BookingModal = ({ onClose, onSave }) => {
                   { label: "2 нед",  minutes: 20160 },
                 ].map(({ label, minutes, until2100 }) => (
                   <button key={label} type="button"
-                    className={`btn-quick-duration${activeQuickLabel === label ? " active" : ""}`}
-                    onClick={() => { applyQuickDuration(minutes, until2100); setActiveQuickLabel(label); }}
+                    className={`btn-quick-duration${getActiveQuickLabel() === label ? " active" : ""}`}
+                    onClick={() => applyQuickDuration(minutes, until2100)}
                     disabled={!form.booked_start}>
                     {label}
                   </button>
@@ -1073,62 +1297,22 @@ const BookingModal = ({ onClose, onSave }) => {
               </div>
             )}
 
-            {/* ── 6. Залог ── */}
+            {/* ── 7. Предоплата ── */}
             <div className="form-section">
-              <h3>Залог</h3>
+              <h3>Предоплата</h3>
               <div className="form-row">
-                <div className="form-group" style={{ position: "relative" }}>
-                  <label>Тип залога</label>
-                  <button ref={depositTypeRef} type="button" className="filter-select-box"
-                    style={{ width: "100%", justifyContent: "space-between", padding: "7px 10px" }}
-                    onClick={() => setDepositTypePopover(p => !p)}>
-                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {(Array.isArray(form.deposit_type) && form.deposit_type.length > 0 && !form.deposit_type.includes("none"))
-                        ? form.deposit_type.filter(v => v !== "none").map(v => DEPOSIT_TYPES_OPTIONS.find(d => d.value === v)?.label || v).join(", ")
-                        : "Без залога"}
-                    </span>
-                    <span className="arrow">▼</span>
-                  </button>
-                  {depositTypePopover && (
-                    <MultiSelectPopover
-                      options={DEPOSIT_TYPES_OPTIONS}
-                      selected={Array.isArray(form.deposit_type) ? form.deposit_type : [form.deposit_type || "none"]}
-                      onChange={(vals) => {
-                        let result;
-                        if (vals.length === 0) {
-                          result = ["none"];
-                        } else if (vals.includes("none") && vals.length > 1) {
-                          const prevHasNone = Array.isArray(form.deposit_type) && form.deposit_type.includes("none");
-                          result = prevHasNone ? vals.filter(v => v !== "none") : ["none"];
-                        } else {
-                          result = vals;
-                        }
-                        setForm(prev => ({ ...prev, deposit_type: result }));
-                      }}
-                      visible={true} anchorRef={depositTypeRef} onClose={() => setDepositTypePopover(false)} />
-                  )}
+                <div className="form-group">
+                  <label>Сумма предоплаты</label>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <input className="form-input" type="number" min="0" name="prepayment_amount"
+                      value={form.prepayment_amount} onChange={handleChange} placeholder="0" />
+                    <span style={{ fontSize: 13, color: "#6b7280", flexShrink: 0 }}>₴</span>
+                  </div>
                 </div>
-                {Array.isArray(form.deposit_type) && form.deposit_type.includes("money") && (
-                  <div className="form-group">
-                    <label>Сумма залога</label>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <input className="form-input" type="number" min="0" name="deposit_amount"
-                        value={form.deposit_amount} onChange={handleChange} placeholder="500" />
-                      <span style={{ fontSize: 13, color: "#6b7280", flexShrink: 0 }}>₴</span>
-                    </div>
-                  </div>
-                )}
-                {Array.isArray(form.deposit_type) && form.deposit_type.includes("document") && (
-                  <div className="form-group">
-                    <label>Документ (серия и номер)</label>
-                    <input className="form-input" name="deposit_value" value={form.deposit_value}
-                      onChange={handleChange} placeholder="АА 123456" />
-                  </div>
-                )}
               </div>
             </div>
 
-            {/* ── 7. Заметки ── */}
+            {/* ── 8. Заметки ── */}
             <div className="form-section">
               <h3>Заметки</h3>
               <div className="form-group">
@@ -1142,9 +1326,20 @@ const BookingModal = ({ onClose, onSave }) => {
 
         <div className="modal-footer">
           <button type="button" className="btn btn-secondary-green btn-primary-small" onClick={onClose}>Отмена</button>
-          <button type="button" className="btn btn-primary-green btn-primary-small" onClick={handleSubmit} disabled={saving}>
-            {saving ? "Сохранение..." : "Создать бронь"}
-          </button>
+          {editingRental ? (
+            <>
+              <button type="button" className="btn btn-secondary-green btn-primary-small" onClick={handleSubmit} disabled={saving}>
+                {saving ? "Сохранение..." : "Сохранить изменения"}
+              </button>
+              <button type="button" className="btn btn-primary-green btn-primary-small" onClick={handleProceedToIssue} disabled={saving}>
+                {saving ? "Сохранение..." : "Перейти к оформлению ▶"}
+              </button>
+            </>
+          ) : (
+            <button type="button" className="btn btn-primary-green btn-primary-small" onClick={handleSubmit} disabled={saving}>
+              {saving ? "Сохранение..." : "Создать бронь"}
+            </button>
+          )}
         </div>
 
         {/* Поповеры фильтров */}

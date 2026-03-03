@@ -52,8 +52,8 @@ router.get("/:id", async (req, res) => {
 
     const contractResult = await pool.query(`
       SELECT rc.*,
-        c.last_name, c.first_name, c.middle_name, c.phone, c.status as customer_status,
-        c.no_show_count,
+        c.last_name, c.first_name, c.middle_name, c.phone, c.birth_date, c.gender, c.is_veteran,
+        c.status as customer_status, c.no_show_count,
         issued_user.name as issued_by_name,
         received_user.name as received_by_name
       FROM rental_contracts rc
@@ -100,6 +100,7 @@ router.post("/", async (req, res) => {
       customer_id, issued_by,
       booked_start, booked_end,
       deposit_type = "none", deposit_value, deposit_amount,
+      prepayment_amount,
       notes_issue,
       initial_status = "booked",
       items = []
@@ -142,12 +143,13 @@ router.post("/", async (req, res) => {
     // Создаём договор
     const contractResult = await client.query(`
       INSERT INTO rental_contracts
-        (customer_id, issued_by, booked_start, booked_end, status, deposit_type, deposit_value, deposit_amount, notes_issue,
-         actual_start)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+        (customer_id, issued_by, booked_start, booked_end, status, deposit_type, deposit_value, deposit_amount,
+         prepayment_amount, notes_issue, actual_start)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
       RETURNING *
     `, [customer_id, issued_by || null, booked_start || null, booked_end || null,
-        contractStatus, deposit_type, deposit_value || null, deposit_amount || null, notes_issue || null,
+        contractStatus, deposit_type, deposit_value || null, deposit_amount || null,
+        prepayment_amount || null, notes_issue || null,
         contractStatus === "active" ? new Date() : null]);
 
     const contract = contractResult.rows[0];
@@ -207,7 +209,8 @@ router.patch("/:id/status", async (req, res) => {
     await client.query("BEGIN");
 
     const { id } = req.params;
-    const { status, received_by, notes_return, total_price } = req.body;
+    const { status, received_by, notes_return, total_price,
+            issued_by, deposit_type, deposit_amount, deposit_value, notes_issue } = req.body;
 
     const contractCheck = await client.query("SELECT * FROM rental_contracts WHERE id = $1", [id]);
     if (contractCheck.rows.length === 0) throw new Error("Договор не найден");
@@ -215,9 +218,21 @@ router.patch("/:id/status", async (req, res) => {
 
     // При активации — проставляем actual_start, велосипеды → в прокате
     if (status === "active") {
-      await client.query(
-        "UPDATE rental_contracts SET status=$1, actual_start=NOW(), updated_at=NOW() WHERE id=$2",
-        [status, id]
+      await client.query(`
+        UPDATE rental_contracts SET
+          status=$1, actual_start=NOW(), updated_at=NOW(),
+          issued_by      = COALESCE($3, issued_by),
+          deposit_type   = COALESCE($4, deposit_type),
+          deposit_amount = COALESCE($5, deposit_amount),
+          deposit_value  = COALESCE($6, deposit_value),
+          notes_issue    = COALESCE($7, notes_issue)
+        WHERE id=$2`,
+        [status, id,
+         issued_by     || null,
+         deposit_type  || null,
+         deposit_amount != null ? parseFloat(deposit_amount) : null,
+         deposit_value  || null,
+         notes_issue    || null]
       );
       await client.query(
         "UPDATE rental_items SET actual_start=NOW() WHERE contract_id=$1 AND status='active'",
@@ -418,6 +433,122 @@ router.patch("/:contractId/items/:itemId/return", async (req, res) => {
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("Ошибка при возврате позиции:", err);
+    res.status(400).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// PATCH /api/rentals/:id - обновить бронь (поля + позиции), только для status='booked'
+router.patch("/:id", async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const { id } = req.params;
+    const {
+      customer_id, issued_by,
+      booked_start, booked_end,
+      deposit_type = "none", deposit_value, deposit_amount,
+      prepayment_amount,
+      notes_issue,
+      items = []
+    } = req.body;
+
+    const contractCheck = await client.query("SELECT * FROM rental_contracts WHERE id = $1", [id]);
+    if (contractCheck.rows.length === 0) throw new Error("Договор не найден");
+    if (contractCheck.rows[0].status !== "booked") throw new Error("Редактировать можно только забронированный договор");
+
+    if (!customer_id) throw new Error("Клиент обязателен");
+    if (items.length === 0) throw new Error("Добавьте хотя бы одну позицию");
+
+    // Получаем старые велосипеды чтобы сбросить их статус
+    const oldBikeRes = await client.query(
+      "SELECT bike_id FROM rental_items WHERE contract_id = $1 AND bike_id IS NOT NULL", [id]
+    );
+    const oldBikeIds = oldBikeRes.rows.map(r => r.bike_id);
+
+    // Проверяем конфликты для новых велосипедов (исключая текущий договор)
+    for (const item of items) {
+      if (item.item_type === "bike" && item.bike_id && booked_start && booked_end) {
+        const conflict = await client.query(`
+          SELECT rc.id FROM rental_items ri
+          JOIN rental_contracts rc ON ri.contract_id = rc.id
+          WHERE ri.bike_id = $1
+            AND ri.status = 'active'
+            AND rc.status IN ('booked', 'active')
+            AND rc.id != $4
+            AND rc.booked_start < $3
+            AND rc.booked_end > $2
+        `, [item.bike_id, booked_start, booked_end, id]);
+        if (conflict.rows.length > 0) {
+          const bikeInfo = await client.query("SELECT model FROM bikes WHERE id = $1", [item.bike_id]);
+          throw new Error(`Велосипед "${bikeInfo.rows[0]?.model}" уже забронирован на это время (договор #${conflict.rows[0].id})`);
+        }
+      }
+    }
+
+    // Обновляем договор
+    await client.query(`
+      UPDATE rental_contracts SET
+        customer_id=$1, issued_by=$2, booked_start=$3, booked_end=$4,
+        deposit_type=$5, deposit_value=$6, deposit_amount=$7,
+        prepayment_amount=$8, notes_issue=$9, updated_at=NOW()
+      WHERE id=$10
+    `, [customer_id, issued_by || null, booked_start || null, booked_end || null,
+        deposit_type, deposit_value || null, deposit_amount || null,
+        prepayment_amount || null, notes_issue || null, id]);
+
+    // Удаляем старые позиции и сбрасываем статусы велосипедов
+    await client.query("DELETE FROM rental_items WHERE contract_id = $1", [id]);
+    if (oldBikeIds.length > 0) {
+      await client.query(
+        "UPDATE bikes SET condition_status='в наличии', updated_at=NOW() WHERE id = ANY($1::int[])",
+        [oldBikeIds]
+      );
+    }
+
+    // Вставляем новые позиции
+    const newBikeIds = [];
+    for (const item of items) {
+      await client.query(`
+        INSERT INTO rental_items
+          (contract_id, item_type, bike_id, equipment_model_id, equipment_name,
+           tariff_id, tariff_type, price, prepaid, status, quantity,
+           discount_type, discount_percent, discount_notes)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'active',$10,$11,$12,$13)
+      `, [
+        id,
+        item.item_type || "bike",
+        item.bike_id || null,
+        item.equipment_model_id || null,
+        item.equipment_name || null,
+        item.tariff_id || null,
+        item.tariff_type || null,
+        item.price || null,
+        item.prepaid || false,
+        item.quantity || 1,
+        item.discount_type || null,
+        item.discount_percent > 0 ? item.discount_percent : null,
+        item.discount_notes || null,
+      ]);
+      if (item.item_type === "bike" && item.bike_id) newBikeIds.push(parseInt(item.bike_id));
+    }
+
+    // Новые велосипеды → бронь
+    if (newBikeIds.length > 0) {
+      await client.query(
+        "UPDATE bikes SET condition_status='бронь', updated_at=NOW() WHERE id = ANY($1::int[])",
+        [newBikeIds]
+      );
+    }
+
+    await client.query("COMMIT");
+    const updated = await pool.query("SELECT * FROM rental_contracts WHERE id = $1", [id]);
+    res.json(updated.rows[0]);
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("Ошибка при обновлении брони:", err);
     res.status(400).json({ error: err.message });
   } finally {
     client.release();

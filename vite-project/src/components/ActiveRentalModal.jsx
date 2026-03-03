@@ -124,9 +124,10 @@ const getDefault2100 = () => {
   return toLocalStr(d);
 };
 
-const ActiveRentalModal = ({ onClose, onSave }) => {
+const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
   const [form, setForm]           = useState({ ...INITIAL_FORM, booked_start: toLocalStr(new Date()), booked_end: getDefault2100() });
   const [items, setItems]         = useState([]);
+  const [bookingPrepayment, setBookingPrepayment] = useState(null); // предоплата из брони
   const [saving, setSaving]       = useState(false);
   const [error, setError]         = useState(null);
   const [dateError, setDateError]           = useState(null);
@@ -186,13 +187,15 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
   const [quickSaving, setQuickSaving]         = useState(false);
   const [quickError, setQuickError]           = useState(null);
   const [quickExisting, setQuickExisting]     = useState(null);
-  const quickFirstNameRef                     = useRef(null);
+  const quickFirstNameRef                      = useRef(null);
+  const completionLastNameRef                  = useRef(null);
   const prevShowQuickCreate                   = useRef(false);
 
-  // Дозаполнение данных клиента для договора
-  const [completionForm, setCompletionForm]   = useState({ last_name: "", first_name: "", middle_name: "", birth_date: "", gender: "", is_veteran: false });
+  // Дозаполнение / редактирование данных клиента
+  const [completionForm, setCompletionForm]   = useState({ last_name: "", first_name: "", middle_name: "", phone: "", birth_date: "", gender: "", is_veteran: false });
   const [completionSaving, setCompletionSaving] = useState(false);
   const [completionError, setCompletionError]   = useState(null);
+  const [editCustOpen, setEditCustOpen]         = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -210,7 +213,83 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
     }).catch(console.error);
   }, []);
 
-  useEffect(() => { setTimeout(() => customerInputRef.current?.focus(), 50); }, []);
+  useEffect(() => { if (!bookingId) setTimeout(() => customerInputRef.current?.focus(), 50); }, []);
+
+  // Загружаем данные брони если открыто из брони
+  useEffect(() => {
+    if (!bookingId) return;
+    fetch(`/api/rentals/${bookingId}`)
+      .then(r => r.json())
+      .then(rental => {
+        // Клиент
+        const customer = {
+          id: rental.customer_id, first_name: rental.first_name, last_name: rental.last_name,
+          middle_name: rental.middle_name, phone: rental.phone, birth_date: rental.birth_date,
+          is_veteran: rental.is_veteran, no_show_count: rental.no_show_count, status: rental.customer_status || "active",
+        };
+        setSelectedCustomer(customer);
+        setCustomerSearch([rental.last_name, rental.first_name, rental.middle_name].filter(Boolean).join(" "));
+        setCompletionForm({
+          last_name:   rental.last_name   || "",
+          first_name:  rental.first_name  || "",
+          middle_name: rental.middle_name || "",
+          phone:       rental.phone       || "",
+          birth_date:  rental.birth_date  ? rental.birth_date.slice(0, 10) : "",
+          gender:      rental.gender      || "",
+          is_veteran:  rental.is_veteran  || false,
+        });
+
+        // Форма
+        const depType = rental.deposit_type
+          ? rental.deposit_type.split(",").map(s => s.trim()).filter(Boolean)
+          : ["none"];
+        setForm(prev => ({
+          ...prev,
+          customer_id:    rental.customer_id,
+          issued_by:      rental.issued_by     || "",
+          booked_start:   rental.booked_start  ? toLocalStr(new Date(rental.booked_start)) : toLocalStr(new Date()),
+          booked_end:     rental.booked_end    ? toLocalStr(new Date(rental.booked_end))   : getDefault2100(),
+          deposit_type:   depType,
+          deposit_amount: rental.deposit_amount != null ? String(rental.deposit_amount) : "",
+          deposit_value:  rental.deposit_value  || "",
+          notes_issue:    rental.notes_issue    || "",
+        }));
+
+        // Предоплата
+        if (rental.prepayment_amount) setBookingPrepayment(Number(rental.prepayment_amount));
+
+        // Фокус на фамилию если данные клиента неполные
+        if (!rental.last_name || !rental.first_name || !rental.birth_date) {
+          setTimeout(() => completionLastNameRef.current?.focus(), 100);
+        }
+
+        // Позиции
+        if (Array.isArray(rental.items)) {
+          const mappedItems = rental.items.map(item => {
+            const price = parseFloat(item.price) || "";
+            const pct   = item.discount_percent  || 0;
+            return {
+              ...INITIAL_ITEM,
+              _key:               item.id,
+              item_type:          item.item_type,
+              bike_id:            String(item.bike_id            || ""),
+              equipment_model_id: String(item.equipment_model_id || ""),
+              equipment_name:     item.equipment_name || "",
+              tariff_id:          String(item.tariff_id || ""),
+              tariff_type:        item.tariff_type || "hourly",
+              price,
+              final_price:        price !== "" ? computeFinalPrice(price, pct) : "",
+              quantity:           item.quantity    || 1,
+              discount_type:      item.discount_type    || "",
+              discount_percent:   pct,
+              discount_notes:     item.discount_notes   || "",
+            };
+          });
+          setItems(autoApplyDiscounts(customer, mappedItems));
+        }
+      })
+      .catch(console.error);
+  }, [bookingId]);
 
   useEffect(() => {
     const handleClick = (e) => {
@@ -293,10 +372,12 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
       last_name:   customer.last_name   || "",
       first_name:  customer.first_name  || "",
       middle_name: customer.middle_name || "",
+      phone:       customer.phone       || "",
       birth_date:  customer.birth_date  ? customer.birth_date.slice(0, 10) : "",
       gender:      customer.gender      || "",
       is_veteran:  customer.is_veteran  || false,
     });
+    setEditCustOpen(false);
     setCompletionError(null);
     setTimeout(() => filterSearchRef.current?.focus(), 50);
   };
@@ -373,6 +454,8 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
     if (!completionForm.last_name.trim()) { setCompletionError("Укажите фамилию"); return; }
     if (!completionForm.first_name.trim()) { setCompletionError("Укажите имя"); return; }
     if (!completionForm.birth_date) { setCompletionError("Укажите дату рождения"); return; }
+    const phone = normalizePhone(completionForm.phone);
+    if (!phone) { setCompletionError(`Неверный формат телефона. ${PHONE_HINT}`); return; }
     setCompletionSaving(true);
     setCompletionError(null);
     try {
@@ -383,6 +466,7 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
           last_name:   completionForm.last_name.trim(),
           first_name:  completionForm.first_name.trim(),
           middle_name: completionForm.middle_name.trim() || null,
+          phone,
           birth_date:  completionForm.birth_date || null,
           gender:      completionForm.gender     || null,
           is_veteran:  completionForm.is_veteran,
@@ -392,8 +476,10 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
       if (!res.ok) throw new Error(data.error || "Ошибка сохранения");
       const updated = { ...selectedCustomer, ...data };
       setSelectedCustomer(updated);
+      setCustomerSearch([data.last_name, data.first_name, data.middle_name].filter(Boolean).join(" "));
       setCustomers(prev => prev.map(c => c.id === updated.id ? updated : c));
       setItems(prev => autoApplyDiscounts(updated, prev));
+      setEditCustOpen(false);
     } catch (err) {
       setCompletionError(err.message);
     } finally {
@@ -620,6 +706,27 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
         if (!Array.isArray(dt) || dt.length === 0 || dt.includes("none")) return "none";
         return dt.filter(v => v !== "none").join(",");
       })();
+
+      // Активация существующей брони
+      if (bookingId) {
+        const response = await fetch(`/api/rentals/${bookingId}/status`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            status:         "active",
+            issued_by:      form.issued_by     ? parseInt(form.issued_by) : null,
+            deposit_type:   depositType,
+            deposit_amount: form.deposit_amount !== "" ? parseFloat(form.deposit_amount) : null,
+            deposit_value:  form.deposit_value  || null,
+            notes_issue:    form.notes_issue    || null,
+          }),
+        });
+        if (!response.ok) { const data = await response.json(); throw new Error(data.error || "Ошибка"); }
+        onSave(await response.json());
+        return;
+      }
+
+      // Новый договор
       const body = {
         ...form,
         deposit_type: depositType,
@@ -661,12 +768,24 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
     >
       <div className="modal-content" style={{ maxWidth: 920 }} onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>Выдать сейчас</h2>
+          <h2>{bookingId ? `Старт проката — бронь #${bookingId}` : "Выдать сейчас"}</h2>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
 
         <div className="modal-body">
           <div className="modal-form">
+
+            {/* Блок предоплаты из брони */}
+            {bookingPrepayment > 0 && (
+              <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "10px 14px", marginBottom: 4,
+                background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 6, fontSize: 14 }}>
+                <span style={{ fontWeight: 600, color: "#166534" }}>Предоплата: {bookingPrepayment} ₴</span>
+                <span style={{ color: "#6b7280" }}>·</span>
+                <span style={{ color: "#374151" }}>
+                  К доплате: <b>{Math.max(0, Math.round(totalFinal) - bookingPrepayment)} ₴</b>
+                </span>
+              </div>
+            )}
 
             {/* ── 1. Клиент ── */}
             <div className="form-section">
@@ -687,20 +806,24 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
                     if (diff >= 0 && diff <= 7) return <span style={{ color: "#7c3aed", fontSize: 13, fontWeight: 500 }}>🎂 Именинник — скидка −50%!</span>;
                     return null;
                   })()}
-                  <button type="button" onClick={clearCustomer} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: "#6b7280", fontSize: 16, padding: "2px 6px" }} title="Сменить клиента">✕</button>
+                  <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 2 }}>
+                    <button type="button" onClick={() => { setEditCustOpen(p => !p); setCompletionError(null); }}
+                      style={{ background: "none", border: "none", cursor: "pointer", color: "#6b7280", fontSize: 16, lineHeight: 1, padding: "2px 6px", transform: "rotate(135deg)" }} title="Редактировать клиента">✏</button>
+                    <button type="button" onClick={clearCustomer} style={{ background: "none", border: "none", cursor: "pointer", color: "#6b7280", fontSize: 16, lineHeight: 1, padding: "2px 6px" }} title="Сменить клиента">✕</button>
+                  </div>
                 </div>
               )}
 
-              {/* ── Блок дозаполнения данных клиента ── */}
-              {customerNeedsCompletion && (
-                <div style={{ marginTop: 10, padding: "12px 14px", background: "#fffbeb", border: "1px solid #fbbf24", borderRadius: 8 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#92400e", marginBottom: 10 }}>
-                    ⚠️ Для оформления договора нужно дозаполнить данные клиента
+              {/* ── Блок дозаполнения / редактирования данных клиента ── */}
+              {(customerNeedsCompletion || editCustOpen) && selectedCustomer && (
+                <div style={{ marginTop: 10, padding: "12px 14px", background: customerNeedsCompletion ? "#fffbeb" : "#f0fdf4", border: `1px solid ${customerNeedsCompletion ? "#fbbf24" : "#10b981"}`, borderRadius: 8 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: customerNeedsCompletion ? "#92400e" : "#065f46", marginBottom: 10 }}>
+                    {customerNeedsCompletion ? "⚠️ Для оформления договора нужно дозаполнить данные клиента" : <><span style={{ display: "inline-block", transform: "rotate(135deg)" }}>✏</span> Редактирование данных клиента</>}
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
                     <div className="form-group" style={{ margin: 0 }}>
                       <label className="required-label" style={{ fontSize: 12 }}>Фамилия</label>
-                      <input className="form-input" value={completionForm.last_name}
+                      <input ref={completionLastNameRef} className="form-input" value={completionForm.last_name}
                         onChange={e => setCompletionForm(p => ({ ...p, last_name: capName(e.target.value) }))}
                         placeholder="Фамилия" autoComplete="off" style={{ fontSize: 13 }} />
                     </div>
@@ -715,6 +838,12 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
                       <input className="form-input" value={completionForm.middle_name}
                         onChange={e => setCompletionForm(p => ({ ...p, middle_name: capName(e.target.value) }))}
                         placeholder="Необязательно" autoComplete="off" style={{ fontSize: 13 }} />
+                    </div>
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label className="required-label" style={{ fontSize: 12 }}>Телефон</label>
+                      <input className="form-input" value={completionForm.phone}
+                        onChange={e => setCompletionForm(p => ({ ...p, phone: e.target.value }))}
+                        placeholder="+380..." autoComplete="off" style={{ fontSize: 13 }} />
                     </div>
                     <div className="form-group" style={{ margin: 0 }}>
                       <label className="required-label" style={{ fontSize: 12 }}>Дата рождения</label>
@@ -745,10 +874,16 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
                     </div>
                   </div>
                   {completionError && <div style={{ fontSize: 12, color: "var(--color-primary-red)", marginBottom: 8 }}>{completionError}</div>}
-                  <button type="button" className="btn btn-primary-green" onClick={handleCustomerCompletion}
-                    disabled={completionSaving} style={{ fontSize: 13, padding: "6px 18px" }}>
-                    {completionSaving ? "Сохранение..." : "Сохранить данные клиента"}
-                  </button>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {editCustOpen && !customerNeedsCompletion && (
+                      <button type="button" className="btn btn-secondary-green" onClick={() => { setEditCustOpen(false); setCompletionError(null); }}
+                        style={{ fontSize: 13, padding: "6px 14px" }}>Отмена</button>
+                    )}
+                    <button type="button" className="btn btn-primary-green" onClick={handleCustomerCompletion}
+                      disabled={completionSaving} style={{ fontSize: 13, padding: "6px 18px" }}>
+                      {completionSaving ? "Сохранение..." : "Сохранить данные клиента"}
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -784,7 +919,7 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
                   {/* Форма быстрого создания клиента */}
                   {showQuickCreate && (
                     <div style={{ marginTop: 8, padding: "14px 16px", background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "#0369a1", marginBottom: 10 }}>➕ Новый клиент</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#0369a1", marginBottom: 10 }}>+ Новый клиент</div>
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
                         <div className="form-group" style={{ margin: 0 }}>
                           <label className="required-label" style={{ fontSize: 12 }}>Фамилия</label>
@@ -1255,13 +1390,21 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
 
         <div className="modal-footer">
           <button type="button" className="btn btn-secondary-green btn-primary-small" onClick={onClose}>Отмена</button>
+          {(() => {
+            const missing = [
+              !form.customer_id        && '• не выбран клиент',
+              items.length === 0       && '• нет позиций',
+              customerNeedsCompletion  && '• заполните данные клиента',
+            ].filter(Boolean);
+            const printTitle = missing.length > 0
+              ? 'Нельзя распечатать:\n' + missing.join('\n')
+              : items.length > 8
+                ? `${items.length} позиций — может не влезть на 1 страницу`
+                : 'Распечатать договор';
+            return (
           <button type="button" className="btn btn-secondary-green btn-primary-small"
-            disabled={!form.customer_id || items.length === 0 || !!customerNeedsCompletion}
-            title={
-              customerNeedsCompletion ? "Дозаполните данные клиента для договора"
-              : items.length > 8 ? `${items.length} позицій — може не влізти на 1 сторінку`
-              : "Распечатать договор"
-            }
+            disabled={missing.length > 0}
+            title={printTitle}
             onClick={() => {
               const now = new Date();
               const durationMs = new Date(form.booked_end) - new Date(form.booked_start);
@@ -1269,7 +1412,7 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
               const newEnd   = toLocalStr(new Date(now.getTime() + (durationMs > 0 ? durationMs : 0)));
               printContract({ form: { ...form, booked_start: newStart, booked_end: newEnd }, items, selectedCustomer, bikes, equipment, tariffs });
             }}>
-            🖨 Договір
+            🖨 Договор
             {items.length > 0 && (
               <span style={{
                 marginLeft: 5,
@@ -1284,6 +1427,8 @@ const ActiveRentalModal = ({ onClose, onSave }) => {
               </span>
             )}
           </button>
+            );
+          })()}
           <button type="button" className="btn btn-primary-green btn-primary-small" onClick={handleSubmit}
             disabled={saving || !!customerNeedsCompletion}
             title={customerNeedsCompletion ? "Дозаполните данные клиента для договора" : undefined}>
