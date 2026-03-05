@@ -3,6 +3,7 @@ import MultiSelectPopover from "./MultiSelectPopover";
 import DateTimePickerField from "./DateTimePickerField";
 import CheckboxField from "./CheckboxField";
 import { printContract } from "../utils/contractPrint";
+import { toast } from "../utils/toast";
 import { TARIFF_OPTIONS, WHEEL_OPTIONS, heightToFrameRec } from "../constants/bikeFilters";
 import { normalizePhone, PHONE_HINT } from "../constants/phoneUtils";
 import "./Modal.css";
@@ -162,6 +163,7 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
   // Поиск клиента
   const [customerSearch, setCustomerSearch]     = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [customerStats, setCustomerStats]       = useState(null);
   const [showDropdown, setShowDropdown]         = useState(false);
   const [customerFocused, setCustomerFocused]   = useState(-1);
   const customerInputRef                        = useRef(null);
@@ -353,6 +355,15 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
       setQuickForm(prev => ({ ...prev, phone: customerSearch.trim() }));
     }
   }, [customerSearch, showQuickCreate]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Загрузка статистики клиента при выборе
+  useEffect(() => {
+    if (!selectedCustomer?.id) { setCustomerStats(null); return; }
+    fetch(`/api/customers/${selectedCustomer.id}/stats`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => setCustomerStats(data))
+      .catch(() => setCustomerStats(null));
+  }, [selectedCustomer?.id]);
 
   // Авто-сброс ошибки когда условие исправлено
   useEffect(() => {
@@ -800,6 +811,29 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
                       style={{ background: "none", border: "none", cursor: "pointer", color: "#6b7280", fontSize: 16, lineHeight: 1, padding: "2px 6px", transform: "rotate(135deg)" }} title="Редактировать клиента">✏</button>
                     <button type="button" onClick={clearCustomer} style={{ background: "none", border: "none", cursor: "pointer", color: "#6b7280", fontSize: 16, lineHeight: 1, padding: "2px 6px" }} title="Сменить клиента">✕</button>
                   </div>
+                </div>
+              )}
+
+              {/* ── Статистика клиента ── */}
+              {selectedCustomer && customerStats && (parseInt(customerStats.completed) > 0 || parseInt(customerStats.cancelled) > 0 || parseInt(customerStats.no_shows) > 0) && (
+                <div style={{ marginTop: 6, padding: "8px 14px", background: "#f8fafc", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 12, color: "#374151", display: "flex", flexWrap: "wrap", gap: "6px 20px", alignItems: "flex-start" }}>
+                  {parseInt(customerStats.completed) > 0 && (
+                    <span>Прокатов: <b style={{ color: "#059669" }}>{customerStats.completed}</b></span>
+                  )}
+                  {parseInt(customerStats.total_revenue) > 0 && (
+                    <span>Выручка: <b style={{ color: "#059669" }}>{Math.round(customerStats.total_revenue)} ₴</b></span>
+                  )}
+                  {parseInt(customerStats.cancelled) > 0 && (
+                    <span>Отмен: <b style={{ color: "#f59e0b" }}>{customerStats.cancelled}</b></span>
+                  )}
+                  {parseInt(customerStats.no_shows) > 0 && (
+                    <span>Неявок: <b style={{ color: "var(--color-primary-red)" }}>{customerStats.no_shows}</b></span>
+                  )}
+                  {customerStats.top_bikes?.length > 0 && (
+                    <span style={{ width: "100%", color: "#6b7280" }}>
+                      Топ: {customerStats.top_bikes.map(b => `${b.internal_article || b.model} (×${b.times})`).join(", ")}
+                    </span>
+                  )}
                 </div>
               )}
 

@@ -2,6 +2,9 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import MultiSelectPopover from "./MultiSelectPopover";
 import DateTimePickerField from "./DateTimePickerField";
 import CheckboxField from "./CheckboxField";
+import ConfirmModal from "./ConfirmModal";
+import { useConfirm } from "../utils/useConfirm";
+import { toast } from "../utils/toast";
 import { TARIFF_OPTIONS, WHEEL_OPTIONS, heightToFrameRec } from "../constants/bikeFilters";
 import { normalizePhone, PHONE_HINT } from "../constants/phoneUtils";
 import "./Modal.css";
@@ -106,6 +109,7 @@ const formatDt = (dateStr) => {
 const getBikeIcon = (bike) => bike?.model?.toLowerCase().includes("самокат") ? "🛴" : "🚲";
 
 const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue = null }) => {
+  const [confirmProps, showConfirm] = useConfirm();
   const [form, setForm]           = useState(() => ({ ...INITIAL_FORM, booked_start: toLocalStr(new Date()) }));
   const [items, setItems]         = useState([]);
   const [saving, setSaving]       = useState(false);
@@ -150,6 +154,7 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
   // Поиск клиента
   const [customerSearch, setCustomerSearch]     = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [customerStats, setCustomerStats]       = useState(null);
   const [showDropdown, setShowDropdown]         = useState(false);
   const [customerFocused, setCustomerFocused]   = useState(-1);
   const customerInputRef                        = useRef(null);
@@ -334,6 +339,15 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
       setQuickForm(prev => ({ ...prev, phone: customerSearch.trim() }));
     }
   }, [customerSearch, showQuickCreate]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Загрузка статистики клиента при выборе
+  useEffect(() => {
+    if (!selectedCustomer?.id) { setCustomerStats(null); return; }
+    fetch(`/api/customers/${selectedCustomer.id}/stats`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => setCustomerStats(data))
+      .catch(() => setCustomerStats(null));
+  }, [selectedCustomer?.id]);
 
   // Авто-сброс ошибки когда условие исправлено
   useEffect(() => {
@@ -732,6 +746,32 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
     return await response.json();
   };
 
+  const handleCancelBooking = () => {
+    showConfirm({
+      title: `Отменить бронь #${editingRental?.id}?`,
+      message: "Бронь будет отменена, велосипеды освободятся.",
+      confirmLabel: "Отменить бронь",
+      danger: true,
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/rentals/${editingRental.id}/status`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: "cancelled" }),
+          });
+          if (!res.ok) {
+            const data = await res.json();
+            throw new Error(data.error || "Ошибка при отмене");
+          }
+          toast.success(`Бронь #${editingRental.id} отменена`);
+          onSave(null);
+        } catch (err) {
+          toast.error(err.message);
+        }
+      },
+    });
+  };
+
   const handleSubmit = async () => {
     setError(null);
     setSaving(true);
@@ -797,6 +837,29 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
                       style={{ background: "none", border: "none", cursor: "pointer", color: "#6b7280", fontSize: 16, lineHeight: 1, padding: "2px 6px", transform: "rotate(135deg)" }} title="Редактировать клиента">✏</button>
                     <button type="button" onClick={clearCustomer} style={{ background: "none", border: "none", cursor: "pointer", color: "#6b7280", fontSize: 16, lineHeight: 1, padding: "2px 6px" }} title="Сменить клиента">✕</button>
                   </div>
+                </div>
+              )}
+
+              {/* ── Статистика клиента ── */}
+              {selectedCustomer && customerStats && (parseInt(customerStats.completed) > 0 || parseInt(customerStats.cancelled) > 0 || parseInt(customerStats.no_shows) > 0) && (
+                <div style={{ marginTop: 6, padding: "8px 14px", background: "#f8fafc", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 12, color: "#374151", display: "flex", flexWrap: "wrap", gap: "6px 20px", alignItems: "flex-start" }}>
+                  {parseInt(customerStats.completed) > 0 && (
+                    <span>Прокатов: <b style={{ color: "#059669" }}>{customerStats.completed}</b></span>
+                  )}
+                  {parseInt(customerStats.total_revenue) > 0 && (
+                    <span>Выручка: <b style={{ color: "#059669" }}>{Math.round(customerStats.total_revenue)} ₴</b></span>
+                  )}
+                  {parseInt(customerStats.cancelled) > 0 && (
+                    <span>Отмен: <b style={{ color: "#f59e0b" }}>{customerStats.cancelled}</b></span>
+                  )}
+                  {parseInt(customerStats.no_shows) > 0 && (
+                    <span>Неявок: <b style={{ color: "var(--color-primary-red)" }}>{customerStats.no_shows}</b></span>
+                  )}
+                  {customerStats.top_bikes?.length > 0 && (
+                    <span style={{ width: "100%", color: "#6b7280" }}>
+                      Топ: {customerStats.top_bikes.map(b => `${b.internal_article || b.model} (×${b.times})`).join(", ")}
+                    </span>
+                  )}
                 </div>
               )}
 
@@ -1330,9 +1393,14 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
         </div>
 
         <div className="modal-footer">
-          <button type="button" className="btn btn-secondary-green btn-primary-small" onClick={onClose}>Отмена</button>
+          <button type="button" className="btn btn-secondary-green btn-primary-small" onClick={onClose}>Закрыть</button>
           {editingRental ? (
             <>
+              <button type="button" className="btn btn-primary-small" disabled={saving}
+                style={{ background: "var(--color-primary-red)", color: "white", border: "none" }}
+                onClick={handleCancelBooking}>
+                Отменить бронь
+              </button>
               <button type="button" className="btn btn-secondary-green btn-primary-small" onClick={handleSubmit} disabled={saving}>
                 {saving ? "Сохранение..." : "Сохранить изменения"}
               </button>
@@ -1395,6 +1463,7 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
         )}
       </div>
     </div>
+    {confirmProps && <ConfirmModal {...confirmProps} />}
   );
 };
 

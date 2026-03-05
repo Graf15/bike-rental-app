@@ -244,4 +244,41 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
+// GET /api/customers/:id/stats - статистика клиента
+router.get("/:id/stats", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const statsRes = await pool.query(`
+      SELECT
+        COUNT(*) FILTER (WHERE rc.status = 'completed')  AS completed,
+        COUNT(*) FILTER (WHERE rc.status = 'cancelled')  AS cancelled,
+        COUNT(*) FILTER (WHERE rc.status = 'no_show')    AS no_shows,
+        COUNT(*) FILTER (WHERE rc.status IN ('active','booked')) AS active,
+        COALESCE(SUM(ri.paid_amount) FILTER (WHERE rc.status = 'completed'), 0) AS total_revenue
+      FROM rental_contracts rc
+      LEFT JOIN rental_items ri ON ri.contract_id = rc.id
+      WHERE rc.customer_id = $1
+    `, [id]);
+
+    const topBikesRes = await pool.query(`
+      SELECT b.id, b.internal_article, b.model, COUNT(*) AS times
+      FROM rental_items ri
+      JOIN bikes b ON b.id = ri.bike_id
+      JOIN rental_contracts rc ON rc.id = ri.contract_id
+      WHERE rc.customer_id = $1 AND rc.status = 'completed' AND ri.bike_id IS NOT NULL
+      GROUP BY b.id, b.internal_article, b.model
+      ORDER BY times DESC
+      LIMIT 3
+    `, [id]);
+
+    res.json({
+      ...statsRes.rows[0],
+      top_bikes: topBikesRes.rows,
+    });
+  } catch (err) {
+    console.error("Ошибка при загрузке статистики клиента:", err);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
 export default router;
