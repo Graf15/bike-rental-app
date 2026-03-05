@@ -6,7 +6,8 @@ import { printContract } from "../utils/contractPrint";
 import CustomerStatsBlock from "./CustomerStatsBlock";
 import { toast } from "../utils/toast";
 import { TARIFF_OPTIONS, WHEEL_OPTIONS, heightToFrameRec } from "../constants/bikeFilters";
-import { normalizePhone, PHONE_HINT } from "../constants/phoneUtils";
+import { normalizePhone, isValidPhone, PHONE_HINT } from "../constants/phoneUtils";
+const looksLikePhone = (v) => /\d{6,}/.test(v.replace(/\s/g, ""));
 import "./Modal.css";
 import "./BikeTable.css";
 
@@ -944,6 +945,7 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
                             onChange={e => setQuickForm(p => ({ ...p, last_name: capName(e.target.value) }))}
                             onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleQuickCreateSave(); } if (e.key === "Escape") { setQuickDismissed(true); setTimeout(() => customerInputRef.current?.focus(), 0); } }}
                             placeholder="Фамилия" autoComplete="off" style={{ fontSize: 13 }} />
+                          {looksLikePhone(quickForm.last_name) && <div style={{ fontSize: 11, marginTop: 2, color: "var(--color-primary-red)" }}>Похоже на номер телефона</div>}
                         </div>
                         <div className="form-group" style={{ margin: 0 }}>
                           <label className="required-label" style={{ fontSize: 12 }}>Имя</label>
@@ -951,6 +953,7 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
                             onChange={e => setQuickForm(p => ({ ...p, first_name: capName(e.target.value) }))}
                             onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleQuickCreateSave(); } if (e.key === "Escape") { setQuickDismissed(true); setTimeout(() => customerInputRef.current?.focus(), 0); } }}
                             placeholder="Имя" autoComplete="off" style={{ fontSize: 13 }} />
+                          {looksLikePhone(quickForm.first_name) && <div style={{ fontSize: 11, marginTop: 2, color: "var(--color-primary-red)" }}>Похоже на номер телефона</div>}
                         </div>
                         <div className="form-group" style={{ margin: 0 }}>
                           <label style={{ fontSize: 12 }}>Отчество</label>
@@ -965,6 +968,14 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
                             onChange={e => setQuickForm(p => ({ ...p, phone: e.target.value }))}
                             onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleQuickCreateSave(); } if (e.key === "Escape") { setQuickDismissed(true); setTimeout(() => customerInputRef.current?.focus(), 0); } }}
                             placeholder="0XXXXXXXXX" autoComplete="off" style={{ fontSize: 13 }} />
+                          {(() => {
+                            const digits = quickForm.phone.replace(/\D/g, "");
+                            if (digits.length < 6) return null;
+                            const valid = isValidPhone(quickForm.phone);
+                            return <div style={{ fontSize: 11, marginTop: 2, color: valid ? "var(--color-primary-green)" : "var(--color-primary-red)" }}>
+                              {valid ? "✓ Номер корректен" : PHONE_HINT}
+                            </div>;
+                          })()}
                         </div>
                         <div className="form-group" style={{ margin: 0 }}>
                           <label className="required-label" style={{ fontSize: 12 }}>Дата рождения</label>
