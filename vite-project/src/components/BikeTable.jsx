@@ -604,12 +604,12 @@ const BikeTable = ({
           {paginatedBikes.map((bike) => (
             <tr key={bike.id} onDoubleClick={() => onBikeEdit && onBikeEdit(bike)} style={{ cursor: "pointer" }}>
               {visibleColumnsData.map(({ key }) => (
-                <td key={key} data-column={key} style={{ width: columnWidths[key] }}>
+                <td key={key} data-column={key} style={{ width: columnWidths[key], ...(key === 'photo' ? { padding: 3, textAlign: "center", verticalAlign: "middle" } : {}) }}>
                   {key === 'photo' ? (() => {
                      const url = bike.photos?.urls?.[bike.photos?.main ?? 0];
                      return url
-                       ? <img src={url} alt="" loading="lazy" style={{ width: 48, height: 48, objectFit: "cover", borderRadius: 4, display: "block" }} />
-                       : <div style={{ width: 48, height: 48, background: "#e5e7eb", borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>🚲</div>;
+                       ? <img src={url} alt="" loading="lazy" style={{ width: 70, height: 70, objectFit: "cover", borderRadius: 4, display: "block", margin: "0 auto" }} />
+                       : <div style={{ width: 70, height: 70, background: "#e5e7eb", borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, margin: "0 auto" }}>🚲</div>;
                    })() :
                    key === 'last_maintenance_date' ? formatDate(bike[key]) :
                    key === 'condition_status' ? (
