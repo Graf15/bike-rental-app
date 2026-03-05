@@ -129,6 +129,7 @@ const DateTimePickerField = forwardRef(({ value, onChange, minDate, granularity 
       granularity={granularity}
       {...(!isDateOnly && { hourCycle: 24 })}
       shouldCloseOnSelect={isDateOnly}
+      aria-label="Выбор даты"
     >
       <Group ref={groupRef} className="form-input dt-field-group">
         <DateInput>

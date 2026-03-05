@@ -153,7 +153,9 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
   const qtyInputRef             = useRef(null);
 
   // Поиск клиента
-  const [customerSearch, setCustomerSearch]     = useState("");
+  const [customerSearch, setCustomerSearch]         = useState("");
+  const [customerSearching, setCustomerSearching]   = useState(false);
+  const [noResultsConfirmed, setNoResultsConfirmed] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [customerStats, setCustomerStats]       = useState(null);
   const [showDropdown, setShowDropdown]         = useState(false);
@@ -193,12 +195,18 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
 
   // Серверный поиск клиентов по мере ввода
   useEffect(() => {
-    if (customerSearch.length < 2) { setCustomers([]); return; }
+    if (customerSearch.length < 2) { setCustomers([]); setCustomerSearching(false); setNoResultsConfirmed(false); return; }
+    setCustomerSearching(true);
     const timer = setTimeout(() => {
       fetch(`/api/customers?search=${encodeURIComponent(customerSearch)}&limit=10`)
         .then(r => r.json())
-        .then(data => setCustomers(data.rows || []))
-        .catch(() => setCustomers([]));
+        .then(data => {
+          const rows = data.rows || [];
+          setCustomers(rows);
+          setNoResultsConfirmed(rows.length === 0);
+          setCustomerSearching(false);
+        })
+        .catch(() => { setCustomers([]); setNoResultsConfirmed(true); setCustomerSearching(false); });
     }, 200);
     return () => clearTimeout(timer);
   }, [customerSearch]);
@@ -325,7 +333,7 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
   const filteredCustomers = customers;
 
   // Форма автоматически видна когда нет результатов и пользователь не скрыл её вручную
-  const showQuickCreate = customerSearch.length >= 2 && filteredCustomers.length === 0 && !selectedCustomer && !quickDismissed;
+  const showQuickCreate = customerSearch.length >= 2 && noResultsConfirmed && !selectedCustomer && !quickDismissed;
 
   // Предзаполняем/синхронизируем телефон пока форма открыта
   useEffect(() => {
