@@ -202,19 +202,29 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/customers").then(r => r.json()),
       fetch("/api/users").then(r => r.json()),
       fetch("/api/bikes/for-rental").then(r => r.json()),
       fetch("/api/tariffs").then(r => r.json()),
       fetch("/api/equipment").then(r => r.json()),
-    ]).then(([c, u, b, t, e]) => {
-      setCustomers(Array.isArray(c) ? c : []);
+    ]).then(([u, b, t, e]) => {
       setUsers(Array.isArray(u) ? u : []);
       setBikes(Array.isArray(b) ? b : []);
       setTariffs(Array.isArray(t) ? t.filter(x => x.is_active) : []);
       setEquipment(Array.isArray(e) ? e : []);
     }).catch(console.error);
   }, []);
+
+  // Серверный поиск клиентов по мере ввода
+  useEffect(() => {
+    if (customerSearch.length < 2) { setCustomers([]); return; }
+    const timer = setTimeout(() => {
+      fetch(`/api/customers?search=${encodeURIComponent(customerSearch)}&limit=10`)
+        .then(r => r.json())
+        .then(data => setCustomers(data.rows || []))
+        .catch(() => setCustomers([]));
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [customerSearch]);
 
   useEffect(() => { if (!bookingId) setTimeout(() => customerInputRef.current?.focus(), 50); }, []);
 
@@ -336,12 +346,7 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
 
   // ── Клиент ──────────────────────────────────────────────────────────────────
 
-  const filteredCustomers = customerSearch.length >= 2
-    ? customers.filter(c =>
-        `${c.last_name} ${c.first_name} ${c.middle_name || ""} ${c.phone}`
-          .toLowerCase().includes(customerSearch.toLowerCase())
-      ).slice(0, 8)
-    : [];
+  const filteredCustomers = customers;
 
   const showQuickCreate = customerSearch.length >= 2 && filteredCustomers.length === 0 && !selectedCustomer && !quickDismissed;
 
