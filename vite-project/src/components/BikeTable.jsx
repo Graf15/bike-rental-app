@@ -61,7 +61,7 @@ const BikeTable = ({
   const [visibleColumns, setVisibleColumns] = useState(() => {
     const saved = localStorage.getItem('bikeTableVisibleColumns');
     return saved ? JSON.parse(saved) : [
-      'id', 'model', 'internal_article', 'brand_name', 'model_year', 'wheel_size',
+      'id', 'photo', 'model', 'internal_article', 'brand_name', 'model_year', 'wheel_size',
       'frame_size', 'frame_number', 'gender', 'tariff_name', 'last_maintenance_date', 'condition_status', 'notes'
     ];
   });
@@ -69,6 +69,7 @@ const BikeTable = ({
   // Дефолтные ширины столбцов
   const defaultColumnWidths = {
     id: 60,
+    photo: 70,
     model: 200,
     internal_article: 120,
     brand_name: 100,
@@ -94,7 +95,7 @@ const BikeTable = ({
   const [columnOrder, setColumnOrder] = useState(() => {
     const saved = localStorage.getItem('bikeTableColumnOrder');
     return saved ? JSON.parse(saved) : [
-      'id', 'model', 'internal_article', 'brand_name', 'model_year', 'wheel_size',
+      'id', 'photo', 'model', 'internal_article', 'brand_name', 'model_year', 'wheel_size',
       'frame_size', 'frame_number', 'gender', 'tariff_name', 'last_maintenance_date', 'condition_status', 'notes'
     ];
   });
@@ -460,6 +461,7 @@ const BikeTable = ({
 
   const columns = [
     { key: "id", label: "ID" },
+    { key: "photo", label: "Фото" },
     { key: "model", label: "Модель" },
     { key: "internal_article", label: "Внутр. артикул" },
     { key: "brand_name", label: "Бренд" },
@@ -563,7 +565,8 @@ const BikeTable = ({
           <tr>
             {visibleColumnsData.map(({ key }) => (
               <th key={key} data-column={key} style={{ width: columnWidths[key] }}>
-                {key === 'last_maintenance_date' ? (
+                {key === 'photo' ? null :
+               key === 'last_maintenance_date' ? (
                   <DateRangeFilter
                     value={filters[key]}
                     onChange={(value) => updateFilter(key, value)}
@@ -602,7 +605,13 @@ const BikeTable = ({
             <tr key={bike.id} onDoubleClick={() => onBikeEdit && onBikeEdit(bike)} style={{ cursor: "pointer" }}>
               {visibleColumnsData.map(({ key }) => (
                 <td key={key} data-column={key} style={{ width: columnWidths[key] }}>
-                  {key === 'last_maintenance_date' ? formatDate(bike[key]) :
+                  {key === 'photo' ? (() => {
+                     const url = bike.photos?.urls?.[bike.photos?.main ?? 0];
+                     return url
+                       ? <img src={url} alt="" loading="lazy" style={{ width: 48, height: 48, objectFit: "cover", borderRadius: 4, display: "block" }} />
+                       : <div style={{ width: 48, height: 48, background: "#e5e7eb", borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>🚲</div>;
+                   })() :
+                   key === 'last_maintenance_date' ? formatDate(bike[key]) :
                    key === 'condition_status' ? (
                      <BikeStatusPopover
                        bike={bike}
