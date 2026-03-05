@@ -177,7 +177,7 @@ td {
 
 .filter-select-box {
   border: 1px solid #d1d5db;
-  padding: 0px 4px;
+  padding: 6px 6px;
   border-radius: 8px;
   background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
   cursor: pointer;
@@ -187,6 +187,10 @@ td {
   user-select: none;
   transition: all 0.2s ease;
   font-size: 13px;
+}
+
+th .filter-select-box {
+  padding: 3px 4px;
 }
 
 .filter-select-box:hover {

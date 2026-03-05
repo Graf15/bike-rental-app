@@ -1,6 +1,7 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Layout from "./components/Layout";
+import ToastContainer from "./components/ToastContainer";
 import Home from "./pages/Home";
 import Users from "./pages/Users";
 import Parts from "./pages/Parts";
@@ -15,6 +16,7 @@ import "./App.css";
 function App() {
   return (
     <Router>
+      <ToastContainer />
       <Layout>
         <Routes>
           <Route path="/" element={<Home />} />

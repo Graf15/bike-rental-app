@@ -69,6 +69,7 @@ router.get("/:id", async (req, res) => {
     const itemsResult = await pool.query(`
       SELECT ri.*,
         b.model as bike_model, b.internal_article, b.condition_status,
+        b.wheel_size as bike_wheel_size, b.frame_size, b.photos,
         br.name as brand_name,
         em.name as equipment_model_name,
         t.name as tariff_name,
@@ -210,7 +211,8 @@ router.patch("/:id/status", async (req, res) => {
 
     const { id } = req.params;
     const { status, received_by, notes_return, total_price,
-            issued_by, deposit_type, deposit_amount, deposit_value, notes_issue } = req.body;
+            issued_by, deposit_type, deposit_amount, deposit_value, notes_issue,
+            active_item_payments } = req.body;
 
     const contractCheck = await client.query("SELECT * FROM rental_contracts WHERE id = $1", [id]);
     if (contractCheck.rows.length === 0) throw new Error("Договор не найден");
@@ -254,6 +256,18 @@ router.patch("/:id/status", async (req, res) => {
           total_price=COALESCE($4, total_price), updated_at=NOW()
         WHERE id=$5
       `, [status, received_by || null, notes_return || null, total_price || null, id]);
+
+      // Сохраняем paid_amount для активных позиций перед закрытием
+      if (Array.isArray(active_item_payments) && active_item_payments.length > 0) {
+        for (const { id: itemId, paid_amount } of active_item_payments) {
+          if (itemId && paid_amount != null) {
+            await client.query(
+              "UPDATE rental_items SET paid_amount=$1 WHERE id=$2 AND contract_id=$3 AND status='active'",
+              [paid_amount, itemId, id]
+            );
+          }
+        }
+      }
 
       await client.query(`
         UPDATE rental_items SET status='returned', actual_end=NOW(), received_by=$1
@@ -395,23 +409,65 @@ router.patch("/:contractId/items/:itemId/return", async (req, res) => {
     await client.query("BEGIN");
 
     const { contractId, itemId } = req.params;
-    const { received_by, condition_after, status = "returned", loss_charge_amount, notes } = req.body;
+    const {
+      received_by, condition_after, status = "returned", loss_charge_amount, notes,
+      actual_end, paid_amount, quantity_return, discount_type, discount_percent,
+    } = req.body;
 
-    await client.query(`
-      UPDATE rental_items SET
-        status=$1, actual_end=NOW(), received_by=$2,
-        condition_after=$3, loss_charge_amount=$4, notes=$5
-      WHERE id=$6 AND contract_id=$7
-    `, [status, received_by || null, condition_after || null,
-        loss_charge_amount || null, notes || null, itemId, contractId]);
+    // Получаем текущую позицию
+    const itemRes = await client.query(
+      "SELECT * FROM rental_items WHERE id = $1 AND contract_id = $2",
+      [itemId, contractId]
+    );
+    if (itemRes.rows.length === 0) throw new Error("Позиция не найдена");
+    const currentItem = itemRes.rows[0];
 
-    // Если велосипед украден/потерян — обновляем его статус
-    if (status === "stolen") {
-      const item = await client.query("SELECT bike_id FROM rental_items WHERE id = $1", [itemId]);
-      if (item.rows[0]?.bike_id) {
+    const returnTime = actual_end ? new Date(actual_end) : new Date();
+    const qReturn = quantity_return ? parseInt(quantity_return) : null;
+    const isPartial = qReturn && currentItem.item_type === "equipment"
+      && qReturn < currentItem.quantity && qReturn > 0;
+
+    if (isPartial) {
+      // Частичный возврат оборудования: уменьшаем кол-во в активной позиции
+      await client.query(
+        "UPDATE rental_items SET quantity = quantity - $1 WHERE id = $2",
+        [qReturn, itemId]
+      );
+      // Создаём отдельную строку для возвращённой части
+      await client.query(`
+        INSERT INTO rental_items
+          (contract_id, item_type, equipment_model_id, equipment_name, tariff_id, tariff_type,
+           price, status, quantity, actual_start, actual_end, received_by, condition_after, notes, paid_amount, paid_at)
+        SELECT contract_id, item_type, equipment_model_id, equipment_name, tariff_id, tariff_type,
+               price, 'returned', $1, actual_start, $2, $3, $4, $5, $6, $7
+        FROM rental_items WHERE id = $8
+      `, [qReturn, returnTime, received_by || null, condition_after || null, notes || null,
+          paid_amount ? parseFloat(paid_amount) : null, paid_amount ? new Date() : null, itemId]);
+    } else {
+      await client.query(`
+        UPDATE rental_items SET
+          status=$1, actual_end=$2, received_by=$3,
+          condition_after=$4, loss_charge_amount=$5, notes=$6,
+          paid_amount=$7, paid_at=$8,
+          discount_type=COALESCE($9, discount_type),
+          discount_percent=COALESCE($10, discount_percent)
+        WHERE id=$11 AND contract_id=$12
+      `, [status, returnTime, received_by || null, condition_after || null,
+          loss_charge_amount || null, notes || null,
+          paid_amount ? parseFloat(paid_amount) : null,
+          paid_amount ? new Date() : null,
+          discount_type || null,
+          discount_percent != null ? parseFloat(discount_percent) : null,
+          itemId, contractId]);
+
+      // Велосипед → обновляем статус
+      if (currentItem.bike_id) {
+        const newBikeStatus = status === "stolen" ? "украден"
+          : status === "lost" ? "невозврат"
+          : "в наличии";
         await client.query(
-          "UPDATE bikes SET condition_status='украден', updated_at=NOW() WHERE id=$1",
-          [item.rows[0].bike_id]
+          "UPDATE bikes SET condition_status=$1, updated_at=NOW() WHERE id=$2",
+          [newBikeStatus, currentItem.bike_id]
         );
       }
     }
@@ -552,6 +608,22 @@ router.patch("/:id", async (req, res) => {
     res.status(400).json({ error: err.message });
   } finally {
     client.release();
+  }
+});
+
+// PATCH /api/rentals/:id/notes - обновить заметки договора (в любом статусе)
+router.patch("/:id/notes", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { notes_issue } = req.body;
+    await pool.query(
+      "UPDATE rental_contracts SET notes_issue=$1, updated_at=NOW() WHERE id=$2",
+      [notes_issue ?? null, id]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Ошибка при обновлении заметок:", err);
+    res.status(500).json({ error: "Ошибка сервера" });
   }
 });
 

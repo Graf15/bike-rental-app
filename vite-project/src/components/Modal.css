@@ -572,15 +572,17 @@
 
 /* Малые кнопки - используем классы из index.css с дополнениями */
 .btn-primary-small {
-  padding: 6px 12px !important;
-  font-size: 0.875rem !important;
+  padding: 4px 10px !important;
+  font-size: 0.8125rem !important;
   min-width: auto !important;
+  line-height: 1.4 !important;
 }
 
 .btn-secondary-small {
-  padding: 6px 12px !important;
-  font-size: 0.875rem !important;
+  padding: 4px 10px !important;
+  font-size: 0.8125rem !important;
   min-width: auto !important;
+  line-height: 1.4 !important;
   background: #f3f4f6 !important;
   color: #374151 !important;
   border: 1px solid #d1d5db !important;

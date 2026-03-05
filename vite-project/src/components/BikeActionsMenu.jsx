@@ -1,11 +1,14 @@
 import React, { useState, useRef, useEffect } from "react";
 import "./Popover.css";
+import ConfirmModal from "./ConfirmModal";
+import { useConfirm } from "../utils/useConfirm";
 
 const BikeActionsMenu = ({ bike, onEdit, onCopy, onDelete }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const menuRef = useRef(null);
   const triggerRef = useRef(null);
+  const [confirmProps, showConfirm] = useConfirm();
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -60,8 +63,14 @@ const BikeActionsMenu = ({ bike, onEdit, onCopy, onDelete }) => {
         if (onCopy) onCopy(bike);
         break;
       case "delete":
-        if (onDelete && window.confirm(`Удалить ${bike.bike_number || bike.model}?`)) {
-          onDelete(bike.id);
+        if (onDelete) {
+          showConfirm({
+            title: `Удалить ${bike.bike_number || bike.model}?`,
+            message: "Велосипед будет удалён из системы.",
+            confirmLabel: "Удалить",
+            danger: true,
+            onConfirm: () => onDelete(bike.id),
+          });
         }
         break;
     }
@@ -70,6 +79,7 @@ const BikeActionsMenu = ({ bike, onEdit, onCopy, onDelete }) => {
 
 
   return (
+    <>
     <div className="actions-menu-container">
       <button
         ref={triggerRef}
@@ -113,6 +123,8 @@ const BikeActionsMenu = ({ bike, onEdit, onCopy, onDelete }) => {
         </div>
       )}
     </div>
+    {confirmProps && <ConfirmModal {...confirmProps} />}
+    </>
   );
 };
 

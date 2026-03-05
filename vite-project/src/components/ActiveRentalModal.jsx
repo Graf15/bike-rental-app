@@ -549,8 +549,8 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
     return autoApplyDiscounts(selectedCustomer, newItems);
   });
 
-  // Велосипеды: показываем в наличии + бронь (с предупреждением), скрываем в прокате
-  const selectableBikes = bikes.filter(b => b.condition_status !== "в прокате");
+  // Все велосипеды кроме украден/продан/невозврат; "в прокате" показываем как недоступные
+  const selectableBikes = bikes.filter(b => !["украден", "продан", "невозврат"].includes(b.condition_status));
 
   // Фильтрованный список с учётом фильтров
   const heightRec = heightToFrameRec(filterHeight);
@@ -775,17 +775,6 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
         <div className="modal-body">
           <div className="modal-form">
 
-            {/* Блок предоплаты из брони */}
-            {bookingPrepayment > 0 && (
-              <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "10px 14px", marginBottom: 4,
-                background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 6, fontSize: 14 }}>
-                <span style={{ fontWeight: 600, color: "#166534" }}>Предоплата: {bookingPrepayment} ₴</span>
-                <span style={{ color: "#6b7280" }}>·</span>
-                <span style={{ color: "#374151" }}>
-                  К доплате: <b>{Math.max(0, Math.round(totalFinal) - bookingPrepayment)} ₴</b>
-                </span>
-              </div>
-            )}
 
             {/* ── 1. Клиент ── */}
             <div className="form-section">
@@ -853,7 +842,7 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
                     <div className="form-group" style={{ margin: 0, position: "relative" }}>
                       <label style={{ fontSize: 12 }}>Пол</label>
                       <button ref={completionGenderRef} type="button" className="filter-select-box"
-                        style={{ width: "100%", justifyContent: "space-between", padding: "7px 10px", fontSize: 13 }}
+                        style={{ width: "100%", fontSize: 13 }}
                         onClick={() => setCompletionGenderPopover(p => !p)}>
                         <span>{GENDER_OPTIONS.find(o => o.value === completionForm.gender)?.label ?? "— Не указан —"}</span>
                         <span className="arrow">▼</span>
@@ -957,7 +946,7 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
                         <div className="form-group" style={{ margin: 0, position: "relative" }}>
                           <label style={{ fontSize: 12 }}>Пол</label>
                           <button ref={quickGenderRef} type="button" className="filter-select-box"
-                            style={{ width: "100%", justifyContent: "space-between", padding: "7px 10px", fontSize: 13 }}
+                            style={{ width: "100%", fontSize: 13 }}
                             onClick={() => setQuickGenderPopover(p => !p)}>
                             <span>{GENDER_OPTIONS.find(o => o.value === quickForm.gender)?.label ?? "— Не указан —"}</span>
                             <span className="arrow">▼</span>
@@ -1009,18 +998,18 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
 
               {/* Фильтры велосипедов */}
               <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap", alignItems: "center" }}>
-                <div ref={tariffFilterRef}
+                <button type="button" ref={tariffFilterRef}
                   onClick={() => setPopoverKey(prev => prev === "tariff" ? null : "tariff")}
-                  className="filter-select-box" style={{ minWidth: 140, padding: "5px 8px" }}>
+                  className="filter-select-box" style={{ minWidth: 140 }}>
                   {filterTariffs.length > 0 ? filterTariffs.join(", ") : "Все типы"}
                   <span className="arrow">▼</span>
-                </div>
-                <div ref={wheelFilterRef}
+                </button>
+                <button type="button" ref={wheelFilterRef}
                   onClick={() => setPopoverKey(prev => prev === "wheel" ? null : "wheel")}
-                  className="filter-select-box" style={{ minWidth: 130, padding: "5px 8px" }}>
+                  className="filter-select-box" style={{ minWidth: 130 }}>
                   {filterWheels.length > 0 ? filterWheels.map(w => `${w}"`).join(", ") : "Все колёса"}
                   <span className="arrow">▼</span>
-                </div>
+                </button>
                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                   <input className="form-input" type="number" placeholder="Рост см" value={filterHeight}
                     onChange={e => setFilterHeight(e.target.value)} style={{ width: 90, fontSize: 13 }} />
@@ -1045,29 +1034,37 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
                 <div ref={bikeGridRef} onKeyDown={handleGridKeyDown} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 8, maxHeight: 380, overflowY: "auto", marginBottom: 10 }}>
                   {filteredByOptions.map((bike, bIdx) => {
                     const isAdded   = items.some(i => String(i.bike_id) === String(bike.id));
-                    const isBooked  = bike.condition_status === "бронь";
-                    const isFocused = bIdx === gridFocusedIdx;
-                    const photo     = bike.photos?.urls?.length ? bike.photos.urls[bike.photos.main ?? 0] : null;
-                    const conflictEnd = isBooked ? formatConflictTime(bike.conflict_info?.booked_end) : null;
+                    const isFocused   = bIdx === gridFocusedIdx;
+                    const photo       = bike.photos?.urls?.length ? bike.photos.urls[bike.photos.main ?? 0] : null;
+                    const conflictEnd = bike.conflict_info?.booked_end ? formatConflictTime(bike.conflict_info.booked_end) : null;
+                    const isRental    = bike.condition_status === "в прокате";
+                    const isBooked    = bike.condition_status === "бронь";
+                    const isRepairSt  = bike.condition_status === "в ремонте";
+                    const isUnavailable = isRental || isRepairSt;
                     let bgColor = "white", borderColor = "#e5e7eb", statusText = null, statusColor = "#6b7280";
                     if (isAdded)       { bgColor = "#f0fdf4"; borderColor = "#10b981"; statusText = "✓ добавлен"; statusColor = "#059669"; }
-                    else if (isBooked) { bgColor = "#fffbeb"; borderColor = "#fcd34d"; statusText = conflictEnd ? `бронь до ${conflictEnd}` : "есть бронь"; statusColor = "#d97706"; }
+                    else if (isRental) { bgColor = "#fef2f2"; borderColor = "#fca5a5"; statusText = conflictEnd ? `в прокате до ${conflictEnd}` : "в прокате"; statusColor = "#ef4444"; }
+                    else if (isBooked) { bgColor = "#fffbeb"; borderColor = "#fcd34d"; statusText = conflictEnd ? `бронь до ${conflictEnd}` : "забронирован"; statusColor = "#d97706"; }
+                    else if (isRepairSt){ bgColor = "#f9fafb"; borderColor = "#d1d5db"; statusText = "в ремонте"; statusColor = "#9ca3af"; }
                     return (
                       <div key={bike.id}
                         tabIndex={-1}
                         className="grid-card-item"
                         onClick={() => {
                           setGridFocusedIdx(bIdx);
+                          if (isUnavailable) return;
                           if (isAdded) setItems(prev => prev.filter(i => String(i.bike_id) !== String(bike.id)));
                           else addBikeFromList(bike);
                         }}
                         style={{
                           border: `2px solid ${isFocused ? "var(--color-focus-ring)" : borderColor}`,
                           borderRadius: 8, padding: "7px 9px", background: bgColor,
-                          cursor: "pointer", display: "flex", flexDirection: "column", gap: 4,
+                          cursor: isUnavailable ? "not-allowed" : "pointer",
+                          display: "flex", flexDirection: "column", gap: 4,
                           transition: "border-color 0.25s, box-shadow 0.15s",
+                          opacity: isUnavailable ? 0.7 : 1,
                         }}
-                        onMouseEnter={e => { if (!isFocused) e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.12)"; }}
+                        onMouseEnter={e => { if (!isFocused && !isUnavailable) e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.12)"; }}
                         onMouseLeave={e => { if (!isFocused) e.currentTarget.style.boxShadow = ""; }}
                       >
                         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -1218,7 +1215,7 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
                         type="button"
                         ref={(el) => { discountAnchorRefs.current[realIndex] = { current: el }; }}
                         className="filter-select-box"
-                        style={{ fontSize: 11, padding: "8px 8px", minWidth: 100, background: item.discount_percent > 0 ? "#f0fdf4" : undefined, color: item.discount_percent > 0 ? "var(--color-primary-green)" : undefined }}
+                        style={{ fontSize: 11, minWidth: 100, background: item.discount_percent > 0 ? "#f0fdf4" : undefined, color: item.discount_percent > 0 ? "var(--color-primary-green)" : undefined }}
                         onClick={() => setDiscountPopoverIdx(prev => prev === realIndex ? null : realIndex)}>
                         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {DISCOUNT_LABEL[item.discount_type || ""] ?? "Скидка"}
@@ -1262,8 +1259,19 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
                       <span style={{ fontSize: 12, fontWeight: 600, textAlign: "right" }}>−{totalDiscount} ₴</span>
                       <div style={{ gridColumn: "1 / -1", borderTop: "1px solid #444444", margin: "2px 0" }} />
                     </>)}
+                    {bookingPrepayment > 0 && (<>
+                      {totalDiscount > 0 && <>
+                        <span style={{ fontSize: 12, textAlign: "right" }}>Стоимость:</span>
+                        <span style={{ fontSize: 12, textAlign: "right" }}>{Math.round(totalFinal)} ₴</span>
+                      </>}
+                      <span style={{ fontSize: 12, textAlign: "right" }}>Предоплата:</span>
+                      <span style={{ fontSize: 12, fontWeight: 600, textAlign: "right" }}>−{bookingPrepayment} ₴</span>
+                      <div style={{ gridColumn: "1 / -1", borderTop: "1px solid #444444", margin: "2px 0" }} />
+                    </>)}
                     <span style={{ fontSize: 14, fontWeight: 700, color: "#111827", textAlign: "right" }}>Итого:</span>
-                    <span style={{ fontSize: 14, fontWeight: 700, color: "#111827", textAlign: "right" }}>{Math.round(totalFinal)} ₴</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "#111827", textAlign: "right" }}>
+                      {bookingPrepayment > 0 ? Math.max(0, Math.round(totalFinal) - bookingPrepayment) : Math.round(totalFinal)} ₴
+                    </span>
                   </div>
                 </div>
               )}
@@ -1283,7 +1291,7 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
                 <div className="form-group" style={{ position: "relative" }}>
                   <label>Выдал</label>
                   <button ref={issuedByRef} type="button" className="filter-select-box"
-                    style={{ width: "100%", justifyContent: "space-between", padding: "7px 10px" }}
+                    style={{ width: "100%" }}
                     onClick={() => setIssuedByPopover(p => !p)}>
                     <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {users.find(u => String(u.id) === String(form.issued_by))?.name || "— Не указан —"}
@@ -1328,7 +1336,7 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
                 <div className="form-group" style={{ position: "relative" }}>
                   <label>Тип залога</label>
                   <button ref={depositTypeRef} type="button" className="filter-select-box"
-                    style={{ width: "100%", justifyContent: "space-between", padding: "7px 10px" }}
+                    style={{ width: "100%" }}
                     onClick={() => setDepositTypePopover(p => !p)}>
                     <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {(Array.isArray(form.deposit_type) && form.deposit_type.length > 0 && !form.deposit_type.includes("none"))

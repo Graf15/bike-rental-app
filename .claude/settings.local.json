@@ -8,7 +8,17 @@
       "Bash(curl:*)",
       "Bash(node:*)",
       "Bash(rm:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "WebFetch(domain:react-aria.adobe.com)",
+      "WebFetch(domain:react-spectrum.adobe.com)",
+      "Bash(PGPASSWORD=1515 \"/c/Program Files/PostgreSQL/17/bin/psql\":*)",
+      "Bash(PGPASSWORD=1515 \"C:/Program Files/PostgreSQL/17/bin/psql.exe\":*)",
+      "Bash(PGPASSWORD=1515 \"/c/Program Files/PostgreSQL/14/bin/psql.exe\":*)",
+      "Bash(PGPASSWORD=rYRxB7aLT5bh \"/c/Program Files/PostgreSQL/17/bin/psql\":*)",
+      "Bash(PGPASSWORD=rYRxB7aLT5bh \"C:/Program Files/PostgreSQL/17/bin/psql.exe\":*)",
+      "Bash(PGPASSWORD=rYRxB7aLT5bh \"/mnt/c/Program Files/PostgreSQL/17/bin/psql\":*)",
+      "Bash(cmd.exe:*)",
+      "Bash(PGPASSWORD=1515 psql:*)"
     ],
     "deny": []
   }

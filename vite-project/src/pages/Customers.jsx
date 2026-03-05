@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import CustomersTable from "../components/CustomersTable";
 import CustomerModal from "../components/CustomerModal";
+import ConfirmModal from "../components/ConfirmModal";
+import { useConfirm } from "../utils/useConfirm";
 
 const Customers = () => {
   const [customers, setCustomers] = useState([]);
@@ -8,6 +10,7 @@ const Customers = () => {
   const [error, setError] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState(null);
+  const [confirmProps, showConfirm] = useConfirm();
 
   const fetchCustomers = async () => {
     setLoading(true);
@@ -33,18 +36,25 @@ const Customers = () => {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (customerId) => {
-    if (!window.confirm("Удалить клиента?")) return;
-    try {
-      const response = await fetch(`/api/customers/${customerId}`, { method: "DELETE" });
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Ошибка при удалении");
-      }
-      fetchCustomers();
-    } catch (err) {
-      alert(err.message);
-    }
+  const handleDelete = (customerId) => {
+    showConfirm({
+      title: "Удалить клиента?",
+      message: "Клиент будет удалён из базы данных.",
+      confirmLabel: "Удалить",
+      danger: true,
+      onConfirm: async () => {
+        try {
+          const response = await fetch(`/api/customers/${customerId}`, { method: "DELETE" });
+          if (!response.ok) {
+            const data = await response.json();
+            throw new Error(data.error || "Ошибка при удалении");
+          }
+          fetchCustomers();
+        } catch (err) {
+          alert(err.message);
+        }
+      },
+    });
   };
 
   const handleModalClose = () => {
@@ -125,6 +135,7 @@ const Customers = () => {
           onSave={handleModalSave}
         />
       )}
+      {confirmProps && <ConfirmModal {...confirmProps} />}
     </div>
   );
 };

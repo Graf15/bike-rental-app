@@ -497,7 +497,6 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
     const { name, value } = e.target;
     const newStart = name === "booked_start" ? value : form.booked_start;
     const newEnd   = name === "booked_end"   ? value : form.booked_end;
-    setActiveQuickLabel(null);
     setForm(prev => ({ ...prev, [name]: value }));
     if (newStart && newEnd && new Date(newEnd) <= new Date(newStart)) {
       setDateError("Время окончания должно быть позже времени начала"); return;
@@ -767,7 +766,7 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
       onMouseDown={(e) => { mouseDownOnOverlay.current = e.target === e.currentTarget; }}
       onMouseUp={(e)   => { if (mouseDownOnOverlay.current && e.target === e.currentTarget) onClose(); }}
     >
-      <div className="modal-content" style={{ maxWidth: 980 }} onClick={e => e.stopPropagation()}>
+      <div className="modal-content" style={{ maxWidth: 920 }} onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h2>{editingRental ? `Бронь #${editingRental.id}` : "📅 Создать бронь"}</h2>
           <button className="modal-close" onClick={onClose}>✕</button>
@@ -838,7 +837,7 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
                     <div className="form-group" style={{ margin: 0, position: "relative" }}>
                       <label style={{ fontSize: 12 }}>Пол</label>
                       <button ref={editCustGenderRef} type="button" className="filter-select-box"
-                        style={{ width: "100%", justifyContent: "space-between", padding: "7px 10px", fontSize: 13 }}
+                        style={{ width: "100%", fontSize: 13 }}
                         onClick={() => setEditCustGenderPopover(p => !p)}>
                         <span>{GENDER_OPTIONS.find(o => o.value === editCustForm.gender)?.label ?? "— Не указан —"}</span>
                         <span className="arrow">▼</span>
@@ -969,7 +968,7 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
                 <div className="form-group" style={{ position: "relative" }}>
                   <label>Принял заявку</label>
                   <button ref={issuedByRef} type="button" className="filter-select-box"
-                    style={{ width: "100%", justifyContent: "space-between", padding: "7px 10px" }}
+                    style={{ width: "100%" }}
                     onClick={() => setIssuedByPopover(p => !p)}>
                     <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {users.find(u => String(u.id) === String(form.issued_by))?.name || "— Не указан —"}
@@ -1017,18 +1016,18 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
 
               {/* Фильтры подбора */}
               <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap", alignItems: "center" }}>
-                <div ref={tariffFilterRef}
+                <button type="button" ref={tariffFilterRef}
                   onClick={() => setPopoverKey(prev => prev === "tariff" ? null : "tariff")}
-                  className="filter-select-box" style={{ minWidth: 140, padding: "5px 8px" }}>
+                  className="filter-select-box" style={{ minWidth: 140 }}>
                   {filterTariffs.length > 0 ? filterTariffs.join(", ") : "Все типы"}
                   <span className="arrow">▼</span>
-                </div>
-                <div ref={wheelFilterRef}
+                </button>
+                <button type="button" ref={wheelFilterRef}
                   onClick={() => setPopoverKey(prev => prev === "wheel" ? null : "wheel")}
-                  className="filter-select-box" style={{ minWidth: 130, padding: "5px 8px" }}>
+                  className="filter-select-box" style={{ minWidth: 130 }}>
                   {filterWheels.length > 0 ? filterWheels.map(w => `${w}"`).join(", ") : "Все колёса"}
                   <span className="arrow">▼</span>
-                </div>
+                </button>
                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                   <input className="form-input" type="number" placeholder="Рост см" value={filterHeight} onChange={e => setFilterHeight(e.target.value)}
                     style={{ width: 90, fontSize: 13 }} />
@@ -1058,17 +1057,23 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
                   {filteredBikes.map((bike, bIdx) => {
                     const isAdded    = items.some(i => String(i.bike_id) === String(bike.id));
                     const isFocused  = bIdx === gridFocusedIdx;
-                    const isAvail    = bike.is_available !== false;
                     const isBooked   = bike.condition_status === "бронь";
                     const isRepair   = bike.condition_status === "в ремонте";
-                    const conflictEnd = formatDt(bike.conflict_info?.booked_end);
+                    const isRental   = bike.condition_status === "в прокате";
+                    const conflictEnd = bike.conflict_info?.booked_end ? formatDt(bike.conflict_info.booked_end) : null;
                     const photo      = bike.photos?.urls?.length ? bike.photos.urls[bike.photos.main ?? 0] : null;
 
+                    // Если даты заданы и конфликт заканчивается до начала брони — считаем свободным
+                    const freeByStart = conflictEnd && form.booked_start && new Date(bike.conflict_info.booked_end) <= new Date(form.booked_start);
+                    const isUnavailable = !freeByStart && (isRental || isRepair);
+                    const canAdd = !isUnavailable && !isBooked;
+
                     let bgColor = "white", borderColor = "#e5e7eb", statusText = null, statusColor = "#6b7280";
-                    if (isAdded)      { bgColor = "#f0fdf4"; borderColor = "#10b981"; statusText = "✓ добавлен"; statusColor = "#059669"; }
-                    else if (!isAvail && !isBooked) { bgColor = "#fef2f2"; borderColor = "#fca5a5"; statusText = "занят"; statusColor = "#ef4444"; }
-                    else if (isBooked) { bgColor = "#fffbeb"; borderColor = "#fcd34d"; statusText = conflictEnd ? `бронь до ${conflictEnd}` : "есть бронь"; statusColor = "#d97706"; }
-                    else if (isRepair) { bgColor = "#f9fafb"; borderColor = "#d1d5db"; statusText = "в ремонте"; statusColor = "#9ca3af"; }
+                    if (isAdded)         { bgColor = "#f0fdf4"; borderColor = "#10b981"; statusText = "✓ добавлен"; statusColor = "#059669"; }
+                    else if (freeByStart){ bgColor = "white";   borderColor = "#e5e7eb"; statusText = `освободится ${conflictEnd}`; statusColor = "#059669"; }
+                    else if (isRental)   { bgColor = "#fef2f2"; borderColor = "#fca5a5"; statusText = conflictEnd ? `в прокате до ${conflictEnd}` : "в прокате"; statusColor = "#ef4444"; }
+                    else if (isBooked)   { bgColor = "#fffbeb"; borderColor = "#fcd34d"; statusText = conflictEnd ? `бронь до ${conflictEnd}` : "забронирован"; statusColor = "#d97706"; }
+                    else if (isRepair)   { bgColor = "#f9fafb"; borderColor = "#d1d5db"; statusText = "в ремонте"; statusColor = "#9ca3af"; }
 
                     return (
                       <div key={bike.id}
@@ -1078,19 +1083,19 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
                           setGridFocusedIdx(bIdx);
                           if (isAdded) {
                             setItems(prev => prev.filter(i => String(i.bike_id) !== String(bike.id)));
-                          } else if (isAvail && !isRepair) {
+                          } else if (canAdd) {
                             addBikeFromList(bike);
                           }
                         }}
                         style={{
                           border: `2px solid ${isFocused ? "var(--color-focus-ring)" : borderColor}`,
                           borderRadius: 8, padding: "7px 9px",
-                          background: bgColor, cursor: isAdded ? "pointer" : (!isAvail && !isBooked) || isRepair ? "not-allowed" : "pointer",
+                          background: bgColor, cursor: isUnavailable ? "not-allowed" : "pointer",
                           display: "flex", flexDirection: "column", gap: 4,
                           transition: "border-color 0.25s, box-shadow 0.15s",
-                          opacity: (!isAvail && !isBooked) || isRepair ? 0.7 : 1,
+                          opacity: isUnavailable ? 0.7 : 1,
                         }}
-                        onMouseEnter={e => { if (!isFocused && (isAdded || (isAvail && !isRepair))) e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.12)"; }}
+                        onMouseEnter={e => { if (!isFocused && !isUnavailable) e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.12)"; }}
                         onMouseLeave={e => { if (!isFocused) e.currentTarget.style.boxShadow = ""; }}
                       >
                         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -1246,7 +1251,7 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
                           type="button"
                           ref={(el) => { discountAnchorRefs.current[realIndex] = { current: el }; }}
                           className="filter-select-box"
-                          style={{ fontSize: 11, padding: "8px 8px", minWidth: 100, background: item.discount_percent > 0 ? "#f0fdf4" : undefined, color: item.discount_percent > 0 ? "var(--color-primary-green)" : undefined }}
+                          style={{ fontSize: 11, minWidth: 100, background: item.discount_percent > 0 ? "#f0fdf4" : undefined, color: item.discount_percent > 0 ? "var(--color-primary-green)" : undefined }}
                           onClick={() => setDiscountPopoverIdx(prev => prev === realIndex ? null : realIndex)}>
                           <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                             {DISCOUNT_LABEL[item.discount_type || ""] ?? "Скидка"}

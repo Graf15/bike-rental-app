@@ -3,6 +3,8 @@ import RentalsTable from "../components/RentalsTable";
 import ActiveRentalModal from "../components/ActiveRentalModal";
 import BookingModal from "../components/BookingModal";
 import RentalViewModal from "../components/RentalViewModal";
+import ConfirmModal from "../components/ConfirmModal";
+import { useConfirm } from "../utils/useConfirm";
 
 const Rentals = () => {
   const [rentals, setRentals] = useState([]);
@@ -14,6 +16,7 @@ const Rentals = () => {
   const [activatingBooking, setActivatingBooking]   = useState(null);
   const [editingBooking, setEditingBooking]         = useState(null);
   const [statusFilter, setStatusFilter]             = useState([]);
+  const [confirmProps, showConfirm] = useConfirm();
 
   const handleStatClick = (statuses) => {
     setStatusFilter(prev =>
@@ -40,18 +43,25 @@ const Rentals = () => {
     fetchRentals();
   }, []);
 
-  const handleDelete = async (rentalId) => {
-    if (!window.confirm("Удалить договор? Удаление возможно только для статуса «Забронирован».")) return;
-    try {
-      const response = await fetch(`/api/rentals/${rentalId}`, { method: "DELETE" });
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Ошибка при удалении");
-      }
-      fetchRentals();
-    } catch (err) {
-      alert(err.message);
-    }
+  const handleDelete = (rentalId) => {
+    showConfirm({
+      title: "Удалить договор?",
+      message: "Удаление возможно только для статуса «Забронирован».",
+      confirmLabel: "Удалить",
+      danger: true,
+      onConfirm: async () => {
+        try {
+          const response = await fetch(`/api/rentals/${rentalId}`, { method: "DELETE" });
+          if (!response.ok) {
+            const data = await response.json();
+            throw new Error(data.error || "Ошибка при удалении");
+          }
+          fetchRentals();
+        } catch (err) {
+          alert(err.message);
+        }
+      },
+    });
   };
 
   // После создания — открываем карточку договора для немедленной активации
@@ -166,7 +176,7 @@ const Rentals = () => {
       {activatingBooking && (
         <ActiveRentalModal
           bookingId={activatingBooking.id}
-          onClose={() => setActivatingBooking(null)}
+          onClose={() => { setActivatingBooking(null); fetchRentals(); }}
           onSave={() => { setActivatingBooking(null); fetchRentals(); }}
         />
       )}
@@ -178,6 +188,7 @@ const Rentals = () => {
           onUpdate={fetchRentals}
         />
       )}
+      {confirmProps && <ConfirmModal {...confirmProps} />}
     </div>
   );
 };

@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import TariffsTable from "../components/TariffsTable";
 import TariffModal from "../components/TariffModal";
+import ConfirmModal from "../components/ConfirmModal";
+import { useConfirm } from "../utils/useConfirm";
 
 const Tariffs = () => {
   const [tariffs, setTariffs] = useState([]);
@@ -8,6 +10,7 @@ const Tariffs = () => {
   const [error, setError] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTariff, setEditingTariff] = useState(null);
+  const [confirmProps, showConfirm] = useConfirm();
 
   const fetchTariffs = async () => {
     setLoading(true);
@@ -33,18 +36,25 @@ const Tariffs = () => {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (tariffId) => {
-    if (!window.confirm("Удалить тариф?")) return;
-    try {
-      const response = await fetch(`/api/tariffs/${tariffId}`, { method: "DELETE" });
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Ошибка при удалении");
-      }
-      fetchTariffs();
-    } catch (err) {
-      alert(err.message);
-    }
+  const handleDelete = (tariffId) => {
+    showConfirm({
+      title: "Удалить тариф?",
+      message: "Тариф будет удалён. Велосипеды с этим тарифом могут потерять привязку.",
+      confirmLabel: "Удалить",
+      danger: true,
+      onConfirm: async () => {
+        try {
+          const response = await fetch(`/api/tariffs/${tariffId}`, { method: "DELETE" });
+          if (!response.ok) {
+            const data = await response.json();
+            throw new Error(data.error || "Ошибка при удалении");
+          }
+          fetchTariffs();
+        } catch (err) {
+          alert(err.message);
+        }
+      },
+    });
   };
 
   const handleToggleActive = async (tariff) => {
@@ -129,6 +139,7 @@ const Tariffs = () => {
           onSave={handleModalSave}
         />
       )}
+      {confirmProps && <ConfirmModal {...confirmProps} />}
     </div>
   );
 };

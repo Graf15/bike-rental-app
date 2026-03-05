@@ -23,9 +23,10 @@ router.get("/", async (req, res) => {
   }
 });
 
-// GET /api/bikes/for-rental?start=&end= - велосипеды для выбора в договоре проката
+// GET /api/bikes/for-rental?start=&end=&exclude_contract_id= - велосипеды для выбора в договоре проката
 router.get("/for-rental", async (req, res) => {
-  const { start, end } = req.query;
+  const { start, end, exclude_contract_id } = req.query;
+  const excludeId = exclude_contract_id ? parseInt(exclude_contract_id) : null;
   try {
     const result = await pool.query(`
       SELECT
@@ -41,6 +42,7 @@ router.get("/for-rental", async (req, res) => {
             WHERE ri.bike_id = b.id
               AND rc.status IN ('active', 'booked')
               AND ri.status = 'active'
+              AND ($3::int IS NULL OR rc.id != $3::int)
               AND rc.booked_start < $2::timestamptz
               AND COALESCE(rc.booked_end, rc.booked_start + INTERVAL '24 hours') > $1::timestamptz
           )
@@ -57,6 +59,7 @@ router.get("/for-rental", async (req, res) => {
           WHERE ri.bike_id = b.id
             AND rc.status IN ('active', 'booked')
             AND ri.status = 'active'
+            AND ($3::int IS NULL OR rc.id != $3::int)
           ORDER BY rc.booked_start
           LIMIT 1
         ) AS conflict_info
@@ -73,7 +76,7 @@ router.get("/for-rental", async (req, res) => {
           ELSE 5
         END,
         b.internal_article
-    `, [start || null, end || null]);
+    `, [start || null, end || null, excludeId]);
     res.json(result.rows);
   } catch (err) {
     console.error("Ошибка при получении велосипедов для проката:", err);
