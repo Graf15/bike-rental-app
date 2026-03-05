@@ -559,7 +559,7 @@ const RentalViewModal = ({ rental: initialRental, onClose, onUpdate }) => {
                     {isBike ? (
                       <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
                         {photo
-                          ? <img src={photo} alt="" style={{ width: 36, height: 36, objectFit: "cover", borderRadius: 4, flexShrink: 0 }} />
+                          ? <img src={photo} alt="" loading="lazy" style={{ width: 36, height: 36, objectFit: "cover", borderRadius: 4, flexShrink: 0 }} />
                           : <div style={{ width: 36, height: 36, background: "#e5e7eb", borderRadius: 4, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>{bikeIcon}</div>
                         }
                         <div style={{ fontSize: 12, lineHeight: 1.4, minWidth: 0, flex: 1 }}>
@@ -812,7 +812,7 @@ const RentalViewModal = ({ rental: initialRental, onClose, onUpdate }) => {
                                 >
                                   <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                                     {photo
-                                      ? <img src={photo} alt="" style={{ width: 60, height: 60, objectFit: "cover", borderRadius: 6, flexShrink: 0 }} />
+                                      ? <img src={photo} alt="" loading="lazy" style={{ width: 60, height: 60, objectFit: "cover", borderRadius: 6, flexShrink: 0 }} />
                                       : <div style={{ width: 60, height: 60, background: "#e5e7eb", borderRadius: 6, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26 }}>{getBikeIcon(b)}</div>
                                     }
                                     <div style={{ minWidth: 0 }}>

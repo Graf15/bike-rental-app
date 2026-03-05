@@ -3,6 +3,7 @@ import MultiSelectPopover from "./MultiSelectPopover";
 import DateTimePickerField from "./DateTimePickerField";
 import CheckboxField from "./CheckboxField";
 import { printContract } from "../utils/contractPrint";
+import CustomerStatsBlock from "./CustomerStatsBlock";
 import { toast } from "../utils/toast";
 import { TARIFF_OPTIONS, WHEEL_OPTIONS, heightToFrameRec } from "../constants/bikeFilters";
 import { normalizePhone, PHONE_HINT } from "../constants/phoneUtils";
@@ -815,27 +816,7 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
               )}
 
               {/* ── Статистика клиента ── */}
-              {selectedCustomer && customerStats && (parseInt(customerStats.completed) > 0 || parseInt(customerStats.cancelled) > 0 || parseInt(customerStats.no_shows) > 0) && (
-                <div style={{ marginTop: 6, padding: "8px 14px", background: "#f8fafc", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 12, color: "#374151", display: "flex", flexWrap: "wrap", gap: "6px 20px", alignItems: "flex-start" }}>
-                  {parseInt(customerStats.completed) > 0 && (
-                    <span>Прокатов: <b style={{ color: "#059669" }}>{customerStats.completed}</b></span>
-                  )}
-                  {parseInt(customerStats.total_revenue) > 0 && (
-                    <span>Выручка: <b style={{ color: "#059669" }}>{Math.round(customerStats.total_revenue)} ₴</b></span>
-                  )}
-                  {parseInt(customerStats.cancelled) > 0 && (
-                    <span>Отмен: <b style={{ color: "#f59e0b" }}>{customerStats.cancelled}</b></span>
-                  )}
-                  {parseInt(customerStats.no_shows) > 0 && (
-                    <span>Неявок: <b style={{ color: "var(--color-primary-red)" }}>{customerStats.no_shows}</b></span>
-                  )}
-                  {customerStats.top_bikes?.length > 0 && (
-                    <span style={{ width: "100%", color: "#6b7280" }}>
-                      Топ: {customerStats.top_bikes.map(b => `${b.internal_article || b.model} (×${b.times})`).join(", ")}
-                    </span>
-                  )}
-                </div>
-              )}
+              {selectedCustomer && <CustomerStatsBlock stats={customerStats} />}
 
               {/* ── Блок дозаполнения / редактирования данных клиента ── */}
               {(customerNeedsCompletion || editCustOpen) && selectedCustomer && (
@@ -1103,7 +1084,7 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
                       >
                         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                           {photo
-                            ? <img src={photo} alt="" style={{ width: 60, height: 60, objectFit: "cover", borderRadius: 6, flexShrink: 0 }} />
+                            ? <img src={photo} alt="" loading="lazy" style={{ width: 60, height: 60, objectFit: "cover", borderRadius: 6, flexShrink: 0 }} />
                             : <div style={{ width: 60, height: 60, background: "#e5e7eb", borderRadius: 6, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26 }}>{getBikeIcon(bike)}</div>
                           }
                           <div style={{ minWidth: 0 }}>
@@ -1205,7 +1186,7 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
                       const photo = bike.photos?.urls?.length ? bike.photos.urls[bike.photos.main ?? 0] : null;
                       return (
                         <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
-                          {photo ? <img src={photo} alt="" style={{ width: 36, height: 36, objectFit: "cover", borderRadius: 4, flexShrink: 0 }} />
+                          {photo ? <img src={photo} alt="" loading="lazy" style={{ width: 36, height: 36, objectFit: "cover", borderRadius: 4, flexShrink: 0 }} />
                             : <div style={{ width: 36, height: 36, background: "#e5e7eb", borderRadius: 4, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>{getBikeIcon(bike)}</div>}
                           <div style={{ fontSize: 12, lineHeight: 1.4, minWidth: 0, flex: 1 }}>
                             <div style={{ display: "flex", gap: 6, alignItems: "baseline", flexWrap: "wrap" }}>
@@ -1431,7 +1412,6 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
         </div>
 
         <div className="modal-footer">
-          <button type="button" className="btn btn-secondary-green btn-primary-small" onClick={onClose}>Отмена</button>
           {(() => {
             const missing = [
               !form.customer_id        && '• не выбран клиент',

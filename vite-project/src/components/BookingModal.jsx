@@ -3,6 +3,7 @@ import MultiSelectPopover from "./MultiSelectPopover";
 import DateTimePickerField from "./DateTimePickerField";
 import CheckboxField from "./CheckboxField";
 import ConfirmModal from "./ConfirmModal";
+import CustomerStatsBlock from "./CustomerStatsBlock";
 import { useConfirm } from "../utils/useConfirm";
 import { toast } from "../utils/toast";
 import { TARIFF_OPTIONS, WHEEL_OPTIONS, heightToFrameRec } from "../constants/bikeFilters";
@@ -801,6 +802,7 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
   const hasDateRange = form.booked_start && form.booked_end && !dateError;
 
   return (
+    <>
     <div
       className="modal-overlay"
       onMouseDown={(e) => { mouseDownOnOverlay.current = e.target === e.currentTarget; }}
@@ -841,27 +843,7 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
               )}
 
               {/* ── Статистика клиента ── */}
-              {selectedCustomer && customerStats && (parseInt(customerStats.completed) > 0 || parseInt(customerStats.cancelled) > 0 || parseInt(customerStats.no_shows) > 0) && (
-                <div style={{ marginTop: 6, padding: "8px 14px", background: "#f8fafc", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 12, color: "#374151", display: "flex", flexWrap: "wrap", gap: "6px 20px", alignItems: "flex-start" }}>
-                  {parseInt(customerStats.completed) > 0 && (
-                    <span>Прокатов: <b style={{ color: "#059669" }}>{customerStats.completed}</b></span>
-                  )}
-                  {parseInt(customerStats.total_revenue) > 0 && (
-                    <span>Выручка: <b style={{ color: "#059669" }}>{Math.round(customerStats.total_revenue)} ₴</b></span>
-                  )}
-                  {parseInt(customerStats.cancelled) > 0 && (
-                    <span>Отмен: <b style={{ color: "#f59e0b" }}>{customerStats.cancelled}</b></span>
-                  )}
-                  {parseInt(customerStats.no_shows) > 0 && (
-                    <span>Неявок: <b style={{ color: "var(--color-primary-red)" }}>{customerStats.no_shows}</b></span>
-                  )}
-                  {customerStats.top_bikes?.length > 0 && (
-                    <span style={{ width: "100%", color: "#6b7280" }}>
-                      Топ: {customerStats.top_bikes.map(b => `${b.internal_article || b.model} (×${b.times})`).join(", ")}
-                    </span>
-                  )}
-                </div>
-              )}
+              {selectedCustomer && <CustomerStatsBlock stats={customerStats} />}
 
               {/* ── Редактирование клиента ── */}
               {editCustOpen && selectedCustomer && (
@@ -1067,7 +1049,7 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
                 ))}
               </div>
               {hasDateRange && (
-                <div style={{ fontSize: 12, color: "#059669", marginTop: 6 }}>
+                <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 6 }}>
                   ✓ Показаны велосипеды, свободные в указанный период
                 </div>
               )}
@@ -1163,7 +1145,7 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
                       >
                         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                           {photo
-                            ? <img src={photo} alt="" style={{ width: 60, height: 60, objectFit: "cover", borderRadius: 6, flexShrink: 0 }} />
+                            ? <img src={photo} alt="" loading="lazy" style={{ width: 60, height: 60, objectFit: "cover", borderRadius: 6, flexShrink: 0 }} />
                             : <div style={{ width: 60, height: 60, background: "#e5e7eb", borderRadius: 6, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26 }}>{getBikeIcon(bike)}</div>
                           }
                           <div style={{ minWidth: 0 }}>
@@ -1271,7 +1253,7 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
                         const photo = bike.photos?.urls?.length ? bike.photos.urls[bike.photos.main ?? 0] : null;
                         return (
                           <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
-                            {photo ? <img src={photo} alt="" style={{ width: 36, height: 36, objectFit: "cover", borderRadius: 4, flexShrink: 0 }} />
+                            {photo ? <img src={photo} alt="" loading="lazy" style={{ width: 36, height: 36, objectFit: "cover", borderRadius: 4, flexShrink: 0 }} />
                               : <div style={{ width: 36, height: 36, background: "#e5e7eb", borderRadius: 4, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>{getBikeIcon(bike)}</div>}
                             <div style={{ fontSize: 12, lineHeight: 1.4, minWidth: 0, flex: 1 }}>
                               <div style={{ display: "flex", gap: 6, alignItems: "baseline" }}>
@@ -1393,11 +1375,12 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
         </div>
 
         <div className="modal-footer">
-          <button type="button" className="btn btn-secondary-green btn-primary-small" onClick={onClose}>Закрыть</button>
           {editingRental ? (
             <>
               <button type="button" className="btn btn-primary-small" disabled={saving}
-                style={{ background: "var(--color-primary-red)", color: "white", border: "none" }}
+                style={{ background: "white", color: "var(--color-primary-red)", border: "1px solid var(--color-primary-red)", transition: "background 0.15s, color 0.15s" }}
+                onMouseEnter={e => { e.currentTarget.style.background = "var(--color-primary-red)"; e.currentTarget.style.color = "white"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "white"; e.currentTarget.style.color = "var(--color-primary-red)"; }}
                 onClick={handleCancelBooking}>
                 Отменить бронь
               </button>
@@ -1464,6 +1447,7 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
       </div>
     </div>
     {confirmProps && <ConfirmModal {...confirmProps} />}
+    </>
   );
 };
 
