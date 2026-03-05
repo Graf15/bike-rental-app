@@ -6,8 +6,13 @@ import RentalViewModal from "../components/RentalViewModal";
 import ConfirmModal from "../components/ConfirmModal";
 import { useConfirm } from "../utils/useConfirm";
 
+const LIMIT = 100;
+
 const Rentals = () => {
   const [rentals, setRentals] = useState([]);
+  const [counts, setCounts]   = useState({ active: 0, booked: 0, overdue: 0, total: 0 });
+  const [page, setPage]       = useState(1);
+  const [totalRows, setTotalRows] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isActiveModalOpen, setIsActiveModalOpen]   = useState(false);
@@ -19,18 +24,23 @@ const Rentals = () => {
   const [confirmProps, showConfirm] = useConfirm();
 
   const handleStatClick = (statuses) => {
+    setPage(1);
     setStatusFilter(prev =>
       JSON.stringify(prev) === JSON.stringify(statuses) ? [] : statuses
     );
   };
 
-  const fetchRentals = async () => {
+  const fetchRentals = async (currentPage = page, currentFilter = statusFilter) => {
     setLoading(true);
     try {
-      const response = await fetch("/api/rentals");
+      const params = new URLSearchParams({ page: currentPage, limit: LIMIT });
+      if (currentFilter.length === 1) params.set("status", currentFilter[0]);
+      const response = await fetch(`/api/rentals?${params}`);
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const data = await response.json();
-      setRentals(data);
+      setRentals(data.rows);
+      setCounts(data.counts);
+      setTotalRows(data.total);
     } catch (err) {
       console.error("Ошибка при загрузке договоров:", err);
       setError(err.message);
@@ -40,7 +50,20 @@ const Rentals = () => {
   };
 
   useEffect(() => {
-    fetchRentals();
+    fetchRentals(page, statusFilter);
+  }, [page, statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Открыть договор по ?open=ID из ссылки (например из статистики клиента)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const openId = params.get("open");
+    if (!openId) return;
+    fetch(`/api/rentals/${openId}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(rental => { if (rental) setViewingRental(rental); })
+      .catch(() => {});
+    // Убираем параметр из URL чтобы не мешал при обновлении
+    window.history.replaceState({}, "", "/rentals");
   }, []);
 
   const handleDelete = (rentalId) => {
@@ -79,9 +102,7 @@ const Rentals = () => {
     else setViewingRental(rental);
   };
 
-  const activeCount  = rentals.filter(r => r.status === "active").length;
-  const bookedCount  = rentals.filter(r => r.status === "booked").length;
-  const overdueCount = rentals.filter(r => r.status === "overdue" || r.status === "no_show").length;
+  const totalPages = Math.ceil(totalRows / LIMIT);
 
   if (loading) return <div className="loading">Загрузка...</div>;
   if (error) return <div className="error">Ошибка: {error}</div>;
@@ -96,10 +117,10 @@ const Rentals = () => {
         <div className="header-right">
           <div className="header-stats">
             {[
-              { statuses: ["active"],              color: "var(--color-primary-green)", count: activeCount,    label: "Активных" },
-              { statuses: ["booked"],              color: "var(--color-primary-blue)",  count: bookedCount,    label: "Забронировано" },
-              { statuses: ["overdue", "no_show"],  color: "var(--color-primary-red)",   count: overdueCount,   label: "Просрочено" },
-              { statuses: [],                      color: "#9ca3af",                     count: rentals.length, label: "Всего" },
+              { statuses: ["active"],              color: "var(--color-primary-green)", count: counts.active,  label: "Активных" },
+              { statuses: ["booked"],              color: "var(--color-primary-blue)",  count: counts.booked,  label: "Забронировано" },
+              { statuses: ["overdue", "no_show"],  color: "var(--color-primary-red)",   count: counts.overdue, label: "Просрочено" },
+              { statuses: [],                      color: "#9ca3af",                     count: counts.total,   label: "Всего" },
             ].map(({ statuses, color, count, label }) => {
               const isActive = statuses.length > 0 && JSON.stringify(statusFilter) === JSON.stringify(statuses);
               return (
@@ -146,6 +167,28 @@ const Rentals = () => {
         onRentalOpen={handleOpenRental}
         statusFilter={statusFilter}
       />
+
+      {totalPages > 1 && (
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, padding: "16px 0", fontSize: 14, color: "#6b7280" }}>
+          <button
+            className="btn btn-secondary-green"
+            style={{ padding: "4px 14px", fontSize: 13 }}
+            disabled={page <= 1}
+            onClick={() => setPage(p => p - 1)}
+          >
+            ← Назад
+          </button>
+          <span>Страница {page} из {totalPages}</span>
+          <button
+            className="btn btn-secondary-green"
+            style={{ padding: "4px 14px", fontSize: 13 }}
+            disabled={page >= totalPages}
+            onClick={() => setPage(p => p + 1)}
+          >
+            Вперёд →
+          </button>
+        </div>
+      )}
 
       {isActiveModalOpen && (
         <ActiveRentalModal

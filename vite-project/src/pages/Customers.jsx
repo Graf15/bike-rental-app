@@ -4,21 +4,29 @@ import CustomerModal from "../components/CustomerModal";
 import ConfirmModal from "../components/ConfirmModal";
 import { useConfirm } from "../utils/useConfirm";
 
+const LIMIT = 100;
+
 const Customers = () => {
   const [customers, setCustomers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [counts, setCounts]       = useState({ active: 0, restricted: 0, total: 0 });
+  const [page, setPage]           = useState(1);
+  const [totalRows, setTotalRows] = useState(0);
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState(null);
+  const [isModalOpen, setIsModalOpen]       = useState(false);
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [confirmProps, showConfirm] = useConfirm();
 
-  const fetchCustomers = async () => {
+  const fetchCustomers = async (currentPage = page) => {
     setLoading(true);
     try {
-      const response = await fetch("/api/customers");
+      const params = new URLSearchParams({ page: currentPage, limit: LIMIT });
+      const response = await fetch(`/api/customers?${params}`);
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const data = await response.json();
-      setCustomers(data);
+      setCustomers(data.rows);
+      setCounts(data.counts);
+      setTotalRows(data.total);
     } catch (err) {
       console.error("Ошибка при загрузке клиентов:", err);
       setError(err.message);
@@ -28,8 +36,8 @@ const Customers = () => {
   };
 
   useEffect(() => {
-    fetchCustomers();
-  }, []);
+    fetchCustomers(page);
+  }, [page]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleEdit = (customer) => {
     setEditingCustomer(customer);
@@ -49,7 +57,7 @@ const Customers = () => {
             const data = await response.json();
             throw new Error(data.error || "Ошибка при удалении");
           }
-          fetchCustomers();
+          fetchCustomers(page);
         } catch (err) {
           alert(err.message);
         }
@@ -64,11 +72,10 @@ const Customers = () => {
 
   const handleModalSave = () => {
     handleModalClose();
-    fetchCustomers();
+    fetchCustomers(page);
   };
 
-  const activeCount = customers.filter(c => c.status === "active").length;
-  const restrictedCount = customers.filter(c => c.status !== "active").length;
+  const totalPages = Math.ceil(totalRows / LIMIT);
 
   if (loading) return <div className="loading">Загрузка...</div>;
   if (error) return <div className="error">Ошибка: {error}</div>;
@@ -86,7 +93,7 @@ const Customers = () => {
               <div className="stat-content">
                 <div className="status-indicator" style={{ background: "var(--color-primary-green)" }}></div>
                 <div className="stat-info">
-                  <span className="stat-number">{activeCount}</span>
+                  <span className="stat-number">{counts.active}</span>
                   <span className="stat-label">Активных</span>
                 </div>
               </div>
@@ -95,7 +102,7 @@ const Customers = () => {
               <div className="stat-content">
                 <div className="status-indicator" style={{ background: "var(--color-primary-orange)" }}></div>
                 <div className="stat-info">
-                  <span className="stat-number">{restrictedCount}</span>
+                  <span className="stat-number">{counts.restricted}</span>
                   <span className="stat-label">С огранич.</span>
                 </div>
               </div>
@@ -104,7 +111,7 @@ const Customers = () => {
               <div className="stat-content">
                 <div className="status-indicator" style={{ background: "var(--color-primary-blue)" }}></div>
                 <div className="stat-info">
-                  <span className="stat-number">{customers.length}</span>
+                  <span className="stat-number">{counts.total}</span>
                   <span className="stat-label">Всего</span>
                 </div>
               </div>
@@ -123,10 +130,32 @@ const Customers = () => {
 
       <CustomersTable
         customers={customers}
-        onCustomerUpdate={fetchCustomers}
+        onCustomerUpdate={() => fetchCustomers(page)}
         onCustomerEdit={handleEdit}
         onCustomerDelete={handleDelete}
       />
+
+      {totalPages > 1 && (
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, padding: "16px 0", fontSize: 14, color: "#6b7280" }}>
+          <button
+            className="btn btn-secondary-green"
+            style={{ padding: "4px 14px", fontSize: 13 }}
+            disabled={page <= 1}
+            onClick={() => setPage(p => p - 1)}
+          >
+            ← Назад
+          </button>
+          <span>Страница {page} из {totalPages}</span>
+          <button
+            className="btn btn-secondary-green"
+            style={{ padding: "4px 14px", fontSize: 13 }}
+            disabled={page >= totalPages}
+            onClick={() => setPage(p => p + 1)}
+          >
+            Вперёд →
+          </button>
+        </div>
+      )}
 
       {isModalOpen && (
         <CustomerModal
