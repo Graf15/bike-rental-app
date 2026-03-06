@@ -39,12 +39,12 @@ const formatDate = (dateString) => {
 
 const STATUS_LABELS = {
   booked: "Забронирован", active: "Активен", completed: "Завершён",
-  cancelled: "Отменён", no_show: "Не явился", overdue: "Просрочен",
+  cancelled: "Отменён", no_show: "Не явился", overdue: "Опаздывает",
 };
 const STATUS_COLORS = {
   booked: "status-badge status-badge-blue", active: "status-badge status-badge-green",
-  completed: "status-badge", cancelled: "status-badge status-badge-orange",
-  no_show: "status-badge status-badge-red", overdue: "status-badge status-badge-red",
+  completed: "status-badge", cancelled: "status-badge status-badge-gray",
+  no_show: "status-badge status-badge-red", overdue: "status-badge status-badge-orange",
 };
 const ITEM_STATUS_LABELS = {
   returned: "Возвращено", overdue: "Просрочено",
@@ -115,7 +115,7 @@ const RentalViewModal = ({ rental: initialRental, onClose, onUpdate }) => {
     const now = new Date().toISOString();
     Promise.all(activeItems.map(async item => {
       const start = item.actual_start || rental.actual_start || rental.booked_start;
-      if (!start) return null;
+      if (!start || start >= now) return null;
       try {
         const res = await fetch("/api/calculate/price", {
           method: "POST",

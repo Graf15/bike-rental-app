@@ -57,7 +57,7 @@ router.get("/for-rental", async (req, res) => {
           FROM rental_items ri
           JOIN rental_contracts rc ON ri.contract_id = rc.id
           WHERE ri.bike_id = b.id
-            AND rc.status IN ('active', 'booked', 'no_show')
+            AND rc.status IN ('active', 'booked', 'overdue', 'no_show')
             AND ri.status = 'active'
             AND ($3::int IS NULL OR rc.id != $3::int)
           ORDER BY rc.booked_start

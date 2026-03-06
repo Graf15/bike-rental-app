@@ -22,9 +22,9 @@ const STATUS_COLORS = {
   booked:    "status-badge status-badge-blue",
   active:    "status-badge status-badge-green",
   completed: "status-badge",
-  cancelled: "status-badge status-badge-orange",
+  cancelled: "status-badge status-badge-gray",
   no_show:   "status-badge status-badge-red",
-  overdue:   "status-badge status-badge-red",
+  overdue:   "status-badge status-badge-orange",
 };
 
 const ColumnResizer = ({ onMouseDown }) => (

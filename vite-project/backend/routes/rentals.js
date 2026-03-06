@@ -19,7 +19,7 @@ router.get("/overdue-alerts", async (req, res) => {
       FROM rental_contracts rc
       JOIN customers c ON c.id = rc.customer_id
       LEFT JOIN rental_items ri ON ri.contract_id = rc.id AND ri.status = 'active'
-      WHERE rc.status = 'no_show'
+      WHERE rc.status = 'overdue'
         AND rc.actual_start IS NULL
         AND rc.penalty_applied = FALSE
         AND rc.booked_start < NOW() - INTERVAL '15 minutes'
@@ -87,7 +87,7 @@ router.get("/", async (req, res) => {
         COUNT(*) as total,
         COUNT(*) FILTER (WHERE status = 'active')  as active,
         COUNT(*) FILTER (WHERE status = 'booked')  as booked,
-        COUNT(*) FILTER (WHERE status IN ('overdue','no_show')) as overdue
+        COUNT(*) FILTER (WHERE status = 'overdue') as overdue
       FROM rental_contracts
       ${countWhereSQL}
     `, countParams);

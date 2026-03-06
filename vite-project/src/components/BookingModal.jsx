@@ -1164,7 +1164,7 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
                     const isUnavailable = !freeByStart && (isRental || isRepair);
                     const canAdd = !isUnavailable && !isBooked;
 
-                    const isNoShow = bike.conflict_info?.status === "no_show";
+                    const isNoShow = ["no_show", "overdue"].includes(bike.conflict_info?.status);
                     let bgColor = "white", borderColor = "#e5e7eb", statusText = null, statusColor = "#6b7280";
                     if (isAdded)         { bgColor = "#f0fdf4"; borderColor = "#10b981"; statusText = "✓ добавлен"; statusColor = "#059669"; }
                     else if (freeByStart){ bgColor = "white";   borderColor = "#e5e7eb"; statusText = `освободится ${conflictEnd}`; statusColor = "#059669"; }

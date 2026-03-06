@@ -1079,7 +1079,7 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
                     const isRental    = bike.condition_status === "в прокате";
                     const isBooked    = bike.condition_status === "бронь";
                     const isRepairSt  = bike.condition_status === "в ремонте";
-                    const isNoShow    = bike.conflict_info?.status === "no_show";
+                    const isNoShow    = ["no_show", "overdue"].includes(bike.conflict_info?.status);
                     const isUnavailable = isRental || isRepairSt;
                     let bgColor = "white", borderColor = "#e5e7eb", statusText = null, statusColor = "#6b7280";
                     if (isAdded)       { bgColor = "#f0fdf4"; borderColor = "#10b981"; statusText = "✓ добавлен"; statusColor = "#059669"; }

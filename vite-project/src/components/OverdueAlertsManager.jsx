@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import ConfirmModal from "./ConfirmModal";
 import { useConfirm } from "../utils/useConfirm";
 import { toast } from "../utils/toast";
@@ -45,6 +46,8 @@ export default function OverdueAlertsManager() {
   const [pendingAlert, setPendingAlert] = useState(null); // текущий диалог
   const queueRef = useRef([]);                            // очередь диалогов
   const [confirmProps, showConfirm] = useConfirm();
+  const [hoveredBtn, setHoveredBtn] = useState(null);
+  const navigate = useNavigate();
 
   const showNextInQueue = () => {
     if (queueRef.current.length === 0) return;
@@ -70,6 +73,7 @@ export default function OverdueAlertsManager() {
       });
       if (!res.ok) throw new Error("Ошибка запроса");
       clearShownStage(alert.id);
+      window.dispatchEvent(new CustomEvent("rentals-changed"));
       if (action === "no_show") {
         toast.warn(`Бронь #${alert.id} (${customerName(alert)}): зафиксирована неявка`);
       } else {
@@ -120,6 +124,12 @@ export default function OverdueAlertsManager() {
   const stage = getStage(parseFloat(pendingAlert.minutes_overdue));
   const bikes = pendingAlert.bikes?.map(b => b.internal_article).filter(Boolean).join(", ") || "—";
   const isUrgent = stage === 3;
+  const accentColor = isUrgent ? "var(--color-primary-red)" : "var(--color-primary-orange)";
+
+  const btnBase = {
+    padding: "9px 16px", borderRadius: 7, cursor: "pointer",
+    fontSize: 14, textAlign: "left", transition: "background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s",
+  };
 
   return (
     <>
@@ -128,35 +138,63 @@ export default function OverdueAlertsManager() {
         display: "flex", alignItems: "center", justifyContent: "center",
       }}>
         <div style={{
-          background: "white", borderRadius: 12, padding: "28px 32px", maxWidth: 440, width: "100%",
+          background: "white", borderRadius: 12, padding: "28px 32px", maxWidth: 460, width: "100%",
           boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
-          borderTop: `4px solid ${isUrgent ? "var(--color-primary-red)" : "#f59e0b"}`,
+          borderTop: `4px solid ${accentColor}`,
         }}>
           <div style={{ fontSize: 22, marginBottom: 6 }}>{isUrgent ? "🔴" : "⏰"}</div>
           <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>
             {customerName(pendingAlert)} — {stageLabel(stage)}
           </div>
-          <div style={{ color: "#6b7280", fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
+          <div style={{ color: "#6b7280", fontSize: 13, marginBottom: 4, lineHeight: 1.6 }}>
             Бронь #{pendingAlert.id} · начало в {formatTime(pendingAlert.booked_start)}<br />
+            {pendingAlert.phone && <span>📞 {pendingAlert.phone}<br /></span>}
             Велосипеды: {bikes}
           </div>
+          <button
+            onClick={() => { setPendingAlert(null); navigate(`/rentals?open=${pendingAlert.id}`); }}
+            style={{ background: "none", border: "none", padding: 0, color: "var(--color-primary-green)", fontSize: 13, cursor: "pointer", marginBottom: 16, textDecoration: "underline" }}
+          >
+            Открыть договор →
+          </button>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <button
               onClick={() => handleAction(pendingAlert, "wait")}
-              style={{ padding: "9px 16px", borderRadius: 7, border: "1px solid #d1d5db", background: "white", cursor: "pointer", fontSize: 14, textAlign: "left" }}
+              onMouseEnter={() => setHoveredBtn("wait")}
+              onMouseLeave={() => setHoveredBtn(null)}
+              style={{
+                ...btnBase, border: "1px solid #d1d5db",
+                background: hoveredBtn === "wait" ? "#f9fafb" : "white",
+                color: "#374151",
+                boxShadow: hoveredBtn === "wait" ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
+              }}
             >
               ⏳ Ожидаем, клиент предупредил
             </button>
             <button
               onClick={() => handleAction(pendingAlert, "cancel")}
-              style={{ padding: "9px 16px", borderRadius: 7, border: "1px solid var(--color-primary-red)", background: "white", color: "var(--color-primary-red)", cursor: "pointer", fontSize: 14, textAlign: "left" }}
+              onMouseEnter={() => setHoveredBtn("cancel")}
+              onMouseLeave={() => setHoveredBtn(null)}
+              style={{
+                ...btnBase, border: `1px solid var(--color-primary-orange)`,
+                background: hoveredBtn === "cancel" ? "var(--color-primary-orange-light-background)" : "white",
+                color: "var(--color-primary-orange-hover)",
+                fontWeight: hoveredBtn === "cancel" ? 600 : 400,
+              }}
             >
               Отменить бронь (без штрафа)
             </button>
             <button
               onClick={() => handleAction(pendingAlert, "no_show")}
-              style={{ padding: "9px 16px", borderRadius: 7, border: "none", background: isUrgent ? "var(--color-primary-red)" : "#f59e0b", color: "white", cursor: "pointer", fontSize: 14, fontWeight: 600, textAlign: "left" }}
+              onMouseEnter={() => setHoveredBtn("no_show")}
+              onMouseLeave={() => setHoveredBtn(null)}
+              style={{
+                ...btnBase, border: "none", fontWeight: 600,
+                background: hoveredBtn === "no_show" ? "#c0392b" : "var(--color-primary-red)",
+                color: "white",
+                boxShadow: hoveredBtn === "no_show" ? "0 2px 8px rgba(192,57,43,0.35)" : "none",
+              }}
             >
               Не явился — зафиксировать неявку (+штраф)
             </button>

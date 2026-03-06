@@ -3,9 +3,25 @@ import pool from "../db.js";
 
 const router = express.Router();
 
-// GET /api/customers - получить всех клиентов
+// GET /api/customers - клиенты с пагинацией и поиском
 router.get("/", async (req, res) => {
   try {
+    const { search, status, page = 1, limit = 50 } = req.query;
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+
+    let where = [];
+    let params = [];
+    let i = 1;
+
+    if (status) { where.push(`c.status = $${i++}`); params.push(status); }
+    if (search && search.length >= 2) {
+      where.push(`(c.last_name ILIKE $${i} OR c.first_name ILIKE $${i} OR c.phone ILIKE $${i})`);
+      params.push(`%${search}%`); i++;
+    }
+
+    const whereSQL = where.length ? `WHERE ${where.join(" AND ")}` : "";
+
+    const dataParams = [...params, parseInt(limit), offset];
     const result = await pool.query(`
       SELECT
         c.*,
@@ -14,10 +30,32 @@ router.get("/", async (req, res) => {
         COUNT(DISTINCT rc.id) FILTER (WHERE rc.status = 'cancelled') as cancelled_count
       FROM customers c
       LEFT JOIN rental_contracts rc ON c.id = rc.customer_id
+      ${whereSQL}
       GROUP BY c.id
       ORDER BY c.id DESC
+      LIMIT $${i++} OFFSET $${i++}
+    `, dataParams);
+
+    // Счётчики для стат-карт (без фильтра поиска для точности)
+    const totalResult = await pool.query(`
+      SELECT
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE status = 'active') as active,
+        COUNT(*) FILTER (WHERE status != 'active') as restricted
+      FROM customers
     `);
-    res.json(result.rows);
+
+    res.json({
+      rows: result.rows,
+      total: parseInt(totalResult.rows[0].total),
+      page: parseInt(page),
+      limit: parseInt(limit),
+      counts: {
+        active:     parseInt(totalResult.rows[0].active),
+        restricted: parseInt(totalResult.rows[0].restricted),
+        total:      parseInt(totalResult.rows[0].total),
+      },
+    });
   } catch (err) {
     console.error("Ошибка при получении клиентов:", err);
     res.status(500).json({ error: "Ошибка сервера" });
@@ -250,23 +288,36 @@ router.get("/:id/stats", async (req, res) => {
   try {
     const statsRes = await pool.query(`
       SELECT
-        COUNT(*) FILTER (WHERE rc.status = 'completed')  AS completed,
-        COUNT(*) FILTER (WHERE rc.status = 'cancelled')  AS cancelled,
-        COUNT(*) FILTER (WHERE rc.status = 'no_show')    AS no_shows,
-        COUNT(*) FILTER (WHERE rc.status IN ('active','booked')) AS active,
-        COALESCE(SUM(ri.paid_amount) FILTER (WHERE rc.status = 'completed'), 0) AS total_revenue
-      FROM rental_contracts rc
-      LEFT JOIN rental_items ri ON ri.contract_id = rc.id
-      WHERE rc.customer_id = $1
+        COUNT(*) FILTER (WHERE status = 'completed')           AS completed,
+        COUNT(*) FILTER (WHERE status IN ('active','overdue')) AS active,
+        COUNT(*) FILTER (WHERE status = 'booked')             AS booked,
+        COUNT(*) FILTER (WHERE status = 'cancelled')          AS cancelled,
+        COUNT(*) FILTER (WHERE status = 'no_show')            AS no_shows,
+        COALESCE((
+          SELECT SUM(ri.paid_amount) FROM rental_items ri
+          JOIN rental_contracts rc2 ON rc2.id = ri.contract_id
+          WHERE rc2.customer_id = $1 AND rc2.status = 'completed'
+        ), 0) AS total_revenue,
+        (SELECT json_build_object('id', id, 'date', actual_end) FROM rental_contracts
+          WHERE customer_id = $1 AND status = 'completed' ORDER BY actual_end DESC LIMIT 1) AS last_completed,
+        (SELECT json_build_object('id', id, 'date', updated_at) FROM rental_contracts
+          WHERE customer_id = $1 AND status = 'cancelled' ORDER BY updated_at DESC LIMIT 1) AS last_cancelled,
+        (SELECT json_build_object('id', id, 'date', updated_at) FROM rental_contracts
+          WHERE customer_id = $1 AND status = 'no_show' ORDER BY updated_at DESC LIMIT 1) AS last_no_show,
+        (SELECT json_build_object('id', id, 'date', booked_start) FROM rental_contracts
+          WHERE customer_id = $1 AND status = 'booked' ORDER BY created_at DESC LIMIT 1) AS last_booked
+      FROM rental_contracts
+      WHERE customer_id = $1
     `, [id]);
 
     const topBikesRes = await pool.query(`
-      SELECT b.id, b.internal_article, b.model, COUNT(*) AS times
+      SELECT b.id, b.internal_article, b.model, b.frame_size, t.name AS tariff_name, COUNT(*) AS times
       FROM rental_items ri
       JOIN bikes b ON b.id = ri.bike_id
       JOIN rental_contracts rc ON rc.id = ri.contract_id
+      LEFT JOIN tariffs t ON t.id = b.tariff_id
       WHERE rc.customer_id = $1 AND rc.status = 'completed' AND ri.bike_id IS NOT NULL
-      GROUP BY b.id, b.internal_article, b.model
+      GROUP BY b.id, b.internal_article, b.model, b.frame_size, t.name
       ORDER BY times DESC
       LIMIT 3
     `, [id]);

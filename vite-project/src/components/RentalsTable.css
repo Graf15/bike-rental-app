@@ -1,9 +1,9 @@
 /* Цветовая маркировка строк по статусу */
 .rental-row--overdue td {
-  background-color: var(--color-primary-red-light-background);
+  background-color: var(--color-primary-orange-light-background);
 }
 .rental-row--overdue:hover td {
-  background-color: #fecaca !important;
+  background-color: var(--color-primary-orange-light) !important;
 }
 .rental-row--no_show td {
   background-color: var(--color-primary-red-light-background);

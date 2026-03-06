@@ -556,6 +556,12 @@ tr:hover {
   background-color: var(--color-primary-purple-light-background);
 }
 
+.status-badge-gray {
+  color: #6b7280;
+  border-color: #d1d5db;
+  background-color: #f3f4f6;
+}
+
 /* Контейнер для поля с кнопкой "+" */
 .input-with-button {
   display: flex;

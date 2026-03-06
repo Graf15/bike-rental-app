@@ -38,7 +38,7 @@ export const RENTAL_OPTIONS = {
     { value: "completed", label: "Завершён" },
     { value: "cancelled", label: "Отменён" },
     { value: "no_show",   label: "Не явился" },
-    { value: "overdue",   label: "Просрочен" },
+    { value: "overdue",   label: "Опаздывает" },
   ],
   deposit_type: [
     { value: "none",     label: "Без залога" },

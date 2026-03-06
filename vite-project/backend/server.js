@@ -48,8 +48,8 @@ app.use("/api/equipment", equipmentRouter);
 app.listen(PORT, () => {
   console.log(`Сервер запущен на http://localhost:${PORT}`);
 
-  // Фоновая обработка просроченных броней каждые 5 минут
+  // Фоновая обработка просроченных броней каждую минуту
   processOverdueBookings(); // запуск сразу при старте
-  setInterval(processOverdueBookings, 5 * 60 * 1000);
-  console.log("[overdue] Фоновый job запущен (каждые 5 мин)");
+  setInterval(processOverdueBookings, 60 * 1000);
+  console.log("[overdue] Фоновый job запущен (каждую минуту)");
 });
