@@ -764,7 +764,7 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
   const handleCancelBooking = () => {
     showConfirm({
       title: `Отменить бронь #${editingRental?.id}?`,
-      message: "Бронь будет отменена, велосипеды освободятся.",
+      message: "Бронь будет отменена без штрафа для клиента.",
       confirmLabel: "Отменить бронь",
       danger: true,
       onConfirm: async () => {
@@ -779,6 +779,33 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
             throw new Error(data.error || "Ошибка при отмене");
           }
           toast.success(`Бронь #${editingRental.id} отменена`);
+          onSave(null);
+        } catch (err) {
+          toast.error(err.message);
+        }
+      },
+    });
+  };
+
+  const handleNoShow = () => {
+    const customer = selectedCustomer;
+    showConfirm({
+      title: "Клиент не явился?",
+      message: `${customer ? `${customer.last_name || ""} ${customer.first_name || ""}`.trim() + " — " : ""}неявка будет записана в карточку клиента. При 2 неявках — автоблокировка броней.`,
+      confirmLabel: "Не явился (+штраф)",
+      danger: true,
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/rentals/${editingRental.id}/status`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: "no_show" }),
+          });
+          if (!res.ok) {
+            const data = await res.json();
+            throw new Error(data.error || "Ошибка");
+          }
+          toast.warn(`Бронь #${editingRental.id}: зафиксирована неявка`);
           onSave(null);
         } catch (err) {
           toast.error(err.message);
@@ -1137,11 +1164,13 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
                     const isUnavailable = !freeByStart && (isRental || isRepair);
                     const canAdd = !isUnavailable && !isBooked;
 
+                    const isNoShow = bike.conflict_info?.status === "no_show";
                     let bgColor = "white", borderColor = "#e5e7eb", statusText = null, statusColor = "#6b7280";
                     if (isAdded)         { bgColor = "#f0fdf4"; borderColor = "#10b981"; statusText = "✓ добавлен"; statusColor = "#059669"; }
                     else if (freeByStart){ bgColor = "white";   borderColor = "#e5e7eb"; statusText = `освободится ${conflictEnd}`; statusColor = "#059669"; }
                     else if (isRental)   { bgColor = "#fef2f2"; borderColor = "#fca5a5"; statusText = conflictEnd ? `в прокате до ${conflictEnd}` : "в прокате"; statusColor = "#ef4444"; }
                     else if (isBooked)   { bgColor = "#fffbeb"; borderColor = "#fcd34d"; statusText = conflictEnd ? `бронь до ${conflictEnd}` : "забронирован"; statusColor = "#d97706"; }
+                    else if (isNoShow)   { bgColor = "#fffbeb"; borderColor = "#fcd34d"; statusText = "⚠️ бронь просрочена"; statusColor = "#d97706"; }
                     else if (isRepair)   { bgColor = "#f9fafb"; borderColor = "#d1d5db"; statusText = "в ремонте"; statusColor = "#9ca3af"; }
 
                     return (
@@ -1406,7 +1435,14 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
                 onMouseEnter={e => { e.currentTarget.style.background = "var(--color-primary-red)"; e.currentTarget.style.color = "white"; }}
                 onMouseLeave={e => { e.currentTarget.style.background = "white"; e.currentTarget.style.color = "var(--color-primary-red)"; }}
                 onClick={handleCancelBooking}>
-                Отменить бронь
+                Отменить (без штрафа)
+              </button>
+              <button type="button" className="btn btn-primary-small" disabled={saving}
+                style={{ background: "white", color: "#f59e0b", border: "1px solid #f59e0b", transition: "background 0.15s, color 0.15s" }}
+                onMouseEnter={e => { e.currentTarget.style.background = "#f59e0b"; e.currentTarget.style.color = "white"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "white"; e.currentTarget.style.color = "#f59e0b"; }}
+                onClick={handleNoShow}>
+                Не явился
               </button>
               <button type="button" className="btn btn-secondary-green btn-primary-small" onClick={handleSubmit} disabled={saving}>
                 {saving ? "Сохранение..." : "Сохранить изменения"}

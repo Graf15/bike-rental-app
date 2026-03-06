@@ -3,10 +3,11 @@ import pool from "../db.js";
 
 const router = express.Router();
 
-// GET /api/rentals - все договоры с краткой инфо
+// GET /api/rentals - договоры с пагинацией и счётчиками статусов
 router.get("/", async (req, res) => {
   try {
-    const { status, customer_id, date_from, date_to } = req.query;
+    const { status, customer_id, date_from, date_to, page = 1, limit = 100 } = req.query;
+    const offset = (parseInt(page) - 1) * parseInt(limit);
 
     let where = [];
     let params = [];
@@ -19,6 +20,8 @@ router.get("/", async (req, res) => {
 
     const whereSQL = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
+    // Основные данные с пагинацией
+    const dataParams = [...params, parseInt(limit), offset];
     const result = await pool.query(`
       SELECT
         rc.*,
@@ -36,9 +39,40 @@ router.get("/", async (req, res) => {
       ${whereSQL}
       GROUP BY rc.id, c.id, issued_user.id
       ORDER BY rc.id DESC
-    `, params);
+      LIMIT $${i++} OFFSET $${i++}
+    `, dataParams);
 
-    res.json(result.rows);
+    // Счётчики статусов (всегда по всем записям, без фильтра статуса)
+    const countWhere = [];
+    const countParams = [];
+    let ci = 1;
+    if (customer_id) { countWhere.push(`customer_id = $${ci++}`); countParams.push(customer_id); }
+    if (date_from) { countWhere.push(`booked_start >= $${ci++}`); countParams.push(date_from); }
+    if (date_to) { countWhere.push(`booked_start <= $${ci++}`); countParams.push(date_to); }
+    const countWhereSQL = countWhere.length ? `WHERE ${countWhere.join(" AND ")}` : "";
+
+    const countsResult = await pool.query(`
+      SELECT
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE status = 'active')  as active,
+        COUNT(*) FILTER (WHERE status = 'booked')  as booked,
+        COUNT(*) FILTER (WHERE status IN ('overdue','no_show')) as overdue
+      FROM rental_contracts
+      ${countWhereSQL}
+    `, countParams);
+
+    res.json({
+      rows: result.rows,
+      total: parseInt(countsResult.rows[0].total),
+      page: parseInt(page),
+      limit: parseInt(limit),
+      counts: {
+        active:  parseInt(countsResult.rows[0].active),
+        booked:  parseInt(countsResult.rows[0].booked),
+        overdue: parseInt(countsResult.rows[0].overdue),
+        total:   parseInt(countsResult.rows[0].total),
+      },
+    });
   } catch (err) {
     console.error("Ошибка при получении договоров:", err);
     res.status(500).json({ error: "Ошибка сервера" });
@@ -282,10 +316,10 @@ router.patch("/:id/status", async (req, res) => {
       `, [id]);
     }
 
-    // При no_show — счётчик клиента, велосипеды → в наличии
+    // При no_show — счётчик клиента, велосипеды → в наличии, penalty_applied=true
     else if (status === "no_show") {
       await client.query(
-        "UPDATE rental_contracts SET status=$1, updated_at=NOW() WHERE id=$2",
+        "UPDATE rental_contracts SET status=$1, penalty_applied=TRUE, updated_at=NOW() WHERE id=$2",
         [status, id]
       );
       await client.query(

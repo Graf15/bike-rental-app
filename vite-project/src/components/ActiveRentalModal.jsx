@@ -1079,11 +1079,13 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
                     const isRental    = bike.condition_status === "в прокате";
                     const isBooked    = bike.condition_status === "бронь";
                     const isRepairSt  = bike.condition_status === "в ремонте";
+                    const isNoShow    = bike.conflict_info?.status === "no_show";
                     const isUnavailable = isRental || isRepairSt;
                     let bgColor = "white", borderColor = "#e5e7eb", statusText = null, statusColor = "#6b7280";
                     if (isAdded)       { bgColor = "#f0fdf4"; borderColor = "#10b981"; statusText = "✓ добавлен"; statusColor = "#059669"; }
                     else if (isRental) { bgColor = "#fef2f2"; borderColor = "#fca5a5"; statusText = conflictEnd ? `в прокате до ${conflictEnd}` : "в прокате"; statusColor = "#ef4444"; }
                     else if (isBooked) { bgColor = "#fffbeb"; borderColor = "#fcd34d"; statusText = conflictEnd ? `бронь до ${conflictEnd}` : "забронирован"; statusColor = "#d97706"; }
+                    else if (isNoShow) { bgColor = "#fffbeb"; borderColor = "#fcd34d"; statusText = "⚠️ бронь просрочена"; statusColor = "#d97706"; }
                     else if (isRepairSt){ bgColor = "#f9fafb"; borderColor = "#d1d5db"; statusText = "в ремонте"; statusColor = "#9ca3af"; }
                     return (
                       <div key={bike.id}

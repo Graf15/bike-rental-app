@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import { processOverdueBookings } from "./jobs/processOverdue.js";
 import bikesRoutes from "./routes/bikes.js";
 import usersRouter from "./routes/users.js";
 import maintenanceRouter from "./routes/maintenance.js";
@@ -46,4 +47,9 @@ app.use("/api/equipment", equipmentRouter);
 
 app.listen(PORT, () => {
   console.log(`Сервер запущен на http://localhost:${PORT}`);
+
+  // Фоновая обработка просроченных броней каждые 5 минут
+  processOverdueBookings(); // запуск сразу при старте
+  setInterval(processOverdueBookings, 5 * 60 * 1000);
+  console.log("[overdue] Фоновый job запущен (каждые 5 мин)");
 });
