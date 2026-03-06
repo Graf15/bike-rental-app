@@ -3,19 +3,18 @@ import pool from "../db.js";
 /**
  * Фоновая обработка просроченных броней.
  *
- * Сценарий:
- *  +15 мин после booked_start: booked → no_show (промежуточный, без штрафа)
- *  +30 мин после booked_start: no_show (авто) → финальный: штраф клиенту + освобождение велосипедов
+ * Стадии (считаются от booked_start):
+ *  +15 мин: booked → no_show (промежуточный, менеджер получает уведомление)
+ *  +2 часа: no_show + penalty_applied=false → авто-штраф (если менеджер не отреагировал)
  *
- * penalty_applied = false означает что штраф ещё не применён (авто-переход на 15 мин).
- * penalty_applied = true  означает что штраф уже применён (вручную или авто на 30 мин).
+ * Уведомления на +15/+30/+60 мин показывает фронтенд через polling /api/rentals/overdue-alerts.
  */
 export async function processOverdueBookings() {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
 
-    // ── 1. booked → no_show через 15 минут ───────────────────────────────────
+    // ── 1. booked → no_show через 15 минут (промежуточный статус) ────────────
     const marked = await client.query(`
       UPDATE rental_contracts
       SET status = 'no_show', updated_at = NOW()
@@ -27,18 +26,17 @@ export async function processOverdueBookings() {
       console.log(`[overdue] Помечено как no_show: ${marked.rows.map(r => r.id).join(", ")}`);
     }
 
-    // ── 2. no_show (авто, без штрафа) → финальный через 30 минут ─────────────
+    // ── 2. Авто-штраф через 2 часа если менеджер не отреагировал ─────────────
     const toClose = await client.query(`
       SELECT rc.id, rc.customer_id
       FROM rental_contracts rc
       WHERE rc.status = 'no_show'
         AND rc.actual_start IS NULL
         AND rc.penalty_applied = FALSE
-        AND rc.booked_start < NOW() - INTERVAL '30 minutes'
+        AND rc.booked_start < NOW() - INTERVAL '2 hours'
     `);
 
     for (const { id, customer_id } of toClose.rows) {
-      // Освобождаем велосипеды и оборудование
       await client.query(`
         UPDATE bikes SET condition_status = 'в наличии', updated_at = NOW()
         WHERE id IN (
@@ -46,13 +44,11 @@ export async function processOverdueBookings() {
         )
       `, [id]);
 
-      // Штраф: счётчик неявок
       await client.query(
         "UPDATE customers SET no_show_count = no_show_count + 1, updated_at = NOW() WHERE id = $1",
         [customer_id]
       );
 
-      // Автоблокировка при 2+ неявках
       await client.query(`
         UPDATE customers SET status = 'no_booking',
           restriction_reason = 'Автоблокировка: 2 и более неявок по брони',
@@ -60,19 +56,18 @@ export async function processOverdueBookings() {
         WHERE id = $1 AND no_show_count >= 2 AND status = 'active'
       `, [customer_id]);
 
-      // Помечаем штраф применён
       await client.query(
         "UPDATE rental_contracts SET penalty_applied = TRUE, updated_at = NOW() WHERE id = $1",
         [id]
       );
 
-      console.log(`[overdue] Авто-закрыта бронь #${id}, клиент #${customer_id} получил штраф`);
+      console.log(`[overdue] Авто-штраф бронь #${id}, клиент #${customer_id} (2+ часа без реакции)`);
     }
 
     await client.query("COMMIT");
   } catch (err) {
     await client.query("ROLLBACK");
-    console.error("[overdue] Ошибка при обработке просроченных броней:", err.message);
+    console.error("[overdue] Ошибка:", err.message);
   } finally {
     client.release();
   }

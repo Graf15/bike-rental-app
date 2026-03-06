@@ -3,6 +3,37 @@ import pool from "../db.js";
 
 const router = express.Router();
 
+// GET /api/rentals/overdue-alerts - просроченные брони для уведомлений менеджера
+router.get("/overdue-alerts", async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        rc.id, rc.booked_start, rc.booked_end,
+        c.last_name, c.first_name, c.phone,
+        EXTRACT(EPOCH FROM (NOW() - rc.booked_start)) / 60 AS minutes_overdue,
+        json_agg(
+          json_build_object('bike_id', ri.bike_id, 'internal_article',
+            (SELECT internal_article FROM bikes WHERE id = ri.bike_id))
+          ORDER BY ri.id
+        ) FILTER (WHERE ri.bike_id IS NOT NULL) AS bikes
+      FROM rental_contracts rc
+      JOIN customers c ON c.id = rc.customer_id
+      LEFT JOIN rental_items ri ON ri.contract_id = rc.id AND ri.status = 'active'
+      WHERE rc.status = 'no_show'
+        AND rc.actual_start IS NULL
+        AND rc.penalty_applied = FALSE
+        AND rc.booked_start < NOW() - INTERVAL '15 minutes'
+        AND rc.booked_start > NOW() - INTERVAL '2 hours'
+      GROUP BY rc.id, rc.booked_start, rc.booked_end, c.last_name, c.first_name, c.phone
+      ORDER BY rc.booked_start
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Ошибка при получении overdue-alerts:", err);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
 // GET /api/rentals - договоры с пагинацией и счётчиками статусов
 router.get("/", async (req, res) => {
   try {

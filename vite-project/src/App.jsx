@@ -2,6 +2,7 @@ import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Layout from "./components/Layout";
 import ToastContainer from "./components/ToastContainer";
+import OverdueAlertsManager from "./components/OverdueAlertsManager";
 import Home from "./pages/Home";
 import Users from "./pages/Users";
 import Parts from "./pages/Parts";
@@ -17,6 +18,7 @@ function App() {
   return (
     <Router>
       <ToastContainer />
+      <OverdueAlertsManager />
       <Layout>
         <Routes>
           <Route path="/" element={<Home />} />
