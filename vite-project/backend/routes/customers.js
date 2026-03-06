@@ -6,17 +6,59 @@ const router = express.Router();
 // GET /api/customers - клиенты с пагинацией и поиском
 router.get("/", async (req, res) => {
   try {
-    const { search, status, page = 1, limit = 50 } = req.query;
+    const {
+      search,
+      status, gender, is_veteran,
+      last_name, first_name, middle_name, phone, restriction_reason, notes,
+      id: filterId, height_cm, birth_date, created_at,
+      page = 1, limit = 50,
+    } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
     let where = [];
     let params = [];
     let i = 1;
 
-    if (status) { where.push(`c.status = $${i++}`); params.push(status); }
-    if (search && search.length >= 2) {
-      where.push(`(c.last_name ILIKE $${i} OR c.first_name ILIKE $${i} OR c.phone ILIKE $${i})`);
+    // Глобальный OR-поиск (используется из модалок)
+    if (search?.length >= 2) {
+      where.push(`(c.last_name ILIKE $${i} OR c.first_name ILIKE $${i} OR c.middle_name ILIKE $${i} OR c.phone ILIKE $${i})`);
       params.push(`%${search}%`); i++;
+    }
+
+    // Текстовые колонки — ILIKE
+    for (const [col, val] of [
+      ["last_name", last_name], ["first_name", first_name], ["middle_name", middle_name],
+      ["phone", phone], ["restriction_reason", restriction_reason], ["notes", notes],
+    ]) {
+      if (val) { where.push(`c.${col} ILIKE $${i++}`); params.push(`%${val}%`); }
+    }
+
+    // id и height_cm — частичное совпадение по тексту
+    if (filterId)   { where.push(`c.id::text LIKE $${i++}`);       params.push(`%${filterId}%`); }
+    if (height_cm)  { where.push(`c.height_cm::text LIKE $${i++}`); params.push(`%${height_cm}%`); }
+
+    // Даты — ILIKE по текстовому представлению
+    if (birth_date) { where.push(`c.birth_date::text ILIKE $${i++}`);  params.push(`%${birth_date}%`); }
+    if (created_at) { where.push(`c.created_at::text ILIKE $${i++}`);  params.push(`%${created_at}%`); }
+
+    // Статус — одно значение или несколько через запятую
+    if (status) {
+      const vals = status.split(",").filter(Boolean);
+      if (vals.length === 1) { where.push(`c.status = $${i++}`); params.push(vals[0]); }
+      else { where.push(`c.status IN (${vals.map(() => `$${i++}`).join(",")})`); params.push(...vals); }
+    }
+
+    // Пол — одно или несколько
+    if (gender) {
+      const vals = gender.split(",").filter(Boolean);
+      if (vals.length === 1) { where.push(`c.gender = $${i++}`); params.push(vals[0]); }
+      else { where.push(`c.gender IN (${vals.map(() => `$${i++}`).join(",")})`); params.push(...vals); }
+    }
+
+    // УБД — "true"/"false"
+    if (is_veteran !== undefined && is_veteran !== "") {
+      where.push(`c.is_veteran = $${i++}`);
+      params.push(is_veteran === "true");
     }
 
     const whereSQL = where.length ? `WHERE ${where.join(" AND ")}` : "";
@@ -131,7 +173,7 @@ router.post("/", async (req, res) => {
   } catch (err) {
     if (err.code === "23505" && err.constraint === "customers_phone_unique") {
       const existing = await pool.query(
-        "SELECT id, first_name, last_name, phone, status, is_veteran, no_show_count, birth_date FROM customers WHERE phone = $1",
+        "SELECT id, first_name, last_name, phone, status, is_veteran, birth_date FROM customers WHERE phone = $1",
         [req.body.phone]
       );
       return res.status(409).json({
@@ -227,19 +269,6 @@ router.patch("/:id", async (req, res) => {
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "Клиент не найден" });
-    }
-
-    // Автоблокировка при 2+ неявках
-    if (fields.hasOwnProperty('no_show_count')) {
-      const customer = result.rows[0];
-      if (customer.no_show_count >= 2 && customer.status === 'active') {
-        await pool.query(
-          `UPDATE customers SET status = 'no_booking', restriction_reason = 'Автоблокировка: 2 неявки по брони', updated_at = NOW() WHERE id = $1`,
-          [id]
-        );
-        const updated = await pool.query('SELECT * FROM customers WHERE id = $1', [id]);
-        return res.json(updated.rows[0]);
-      }
     }
 
     res.json(result.rows[0]);

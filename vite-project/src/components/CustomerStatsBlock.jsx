@@ -46,7 +46,7 @@ const CustomerStatsBlock = ({ stats }) => {
         <span>Броней: <b>{booked}</b></span>
       )}
       {parseInt(cancelled) > 0 && (
-        <span style={{ color: "#f59e0b" }}>Отмен: <b>{cancelled}</b></span>
+        <span style={{ color: "#9ca3af" }}>Отмен: <b>{cancelled}</b></span>
       )}
       {parseInt(no_shows) > 0 && (
         <span style={{ color: "var(--color-primary-red)" }}>Неявок: <b>{no_shows}</b></span>
@@ -56,7 +56,7 @@ const CustomerStatsBlock = ({ stats }) => {
       {(last_completed || last_cancelled || last_no_show || last_booked) && (
         <div style={{ width: "100%", display: "flex", flexWrap: "wrap", gap: "4px 16px", marginTop: 2, paddingTop: 6, borderTop: "1px solid #e5e7eb", color: "#6b7280" }}>
           <LastLink label="Последний завершённый" entry={last_completed} />
-          <LastLink label="Последняя отмена" entry={last_cancelled} color="#f59e0b" />
+          <LastLink label="Последняя отмена" entry={last_cancelled} />
           <LastLink label="Последняя неявка" entry={last_no_show} color="var(--color-primary-red)" />
           <LastLink label="Последняя бронь" entry={last_booked} />
         </div>

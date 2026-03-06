@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import "./Modal.css";
 import "./CustomerModal.css";
 import { normalizePhone, PHONE_HINT } from "../constants/phoneUtils";
+import { toast } from "../utils/toast";
 
 const INITIAL_FORM = {
   last_name: "",
@@ -21,10 +22,15 @@ const CustomerModal = ({ customer, onClose, onSave }) => {
   const [form, setForm] = useState(INITIAL_FORM);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [errorSection, setErrorSection] = useState(null);
   const [existingCustomer, setExistingCustomer] = useState(null);
   const mouseDownOnOverlay = useRef(false);
 
   const isEdit = !!(customer && customer.id);
+
+  useEffect(() => {
+    if (errorSection === "personal" && form.first_name.trim() && form.phone) setErrorSection(null);
+  }, [form.first_name, form.phone, errorSection]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (customer) {
@@ -55,15 +61,18 @@ const CustomerModal = ({ customer, onClose, onSave }) => {
     e.preventDefault();
     setError(null);
     setExistingCustomer(null);
+    setErrorSection(null);
 
     if (!form.first_name.trim()) {
-      setError("Заполните обязательное поле: имя");
+      setErrorSection("personal");
+      toast.error("Заполните обязательное поле: имя");
       return;
     }
 
     const phone = normalizePhone(form.phone);
     if (!phone) {
-      setError(`Неверный формат телефона. ${PHONE_HINT}`);
+      setErrorSection("personal");
+      toast.error(`Неверный формат телефона. ${PHONE_HINT}`);
       return;
     }
 
@@ -93,6 +102,7 @@ const CustomerModal = ({ customer, onClose, onSave }) => {
       onSave();
     } catch (err) {
       setError(err.message);
+      toast.error(err.message);
     } finally {
       setSaving(false);
     }
@@ -108,7 +118,7 @@ const CustomerModal = ({ customer, onClose, onSave }) => {
 
         <div className="modal-body">
           <form onSubmit={handleSubmit} className="modal-form">
-            <div className="form-section">
+            <div className={`form-section${errorSection === "personal" ? " form-section--error" : ""}`}>
               <h3>Личные данные</h3>
               <div className="form-row">
                 <div className="form-group">

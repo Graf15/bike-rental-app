@@ -132,7 +132,7 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
   const [items, setItems]         = useState([]);
   const [bookingPrepayment, setBookingPrepayment] = useState(null); // предоплата из брони
   const [saving, setSaving]       = useState(false);
-  const [error, setError]         = useState(null);
+  const [errorSection, setErrorSection] = useState(null);
   const [dateError, setDateError]           = useState(null);
   const [activeQuickLabel, setActiveQuickLabel] = useState(null);
   const mouseDownOnOverlay        = useRef(false);
@@ -380,12 +380,13 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
       .catch(() => setCustomerStats(null));
   }, [selectedCustomer?.id]);
 
-  // Авто-сброс ошибки когда условие исправлено
+  // Авто-сброс подсветки секции когда условие исправлено
   useEffect(() => {
-    if (!error) return;
-    if (error.includes("клиента") && form.customer_id) setError(null);
-    if ((error.includes("позиц") || error.includes("велосипед")) && items.length > 0) setError(null);
-  }, [form.customer_id, items.length]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!errorSection) return;
+    if (errorSection === "customer" && form.customer_id) setErrorSection(null);
+    if (errorSection === "bikes" && items.length > 0) setErrorSection(null);
+    if (errorSection === "dates" && !dateError) setErrorSection(null);
+  }, [form.customer_id, items.length, dateError, errorSection]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCustomerSelect = (customer) => {
     setSelectedCustomer(customer);
@@ -720,10 +721,10 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
   // ── Отправка ─────────────────────────────────────────────────────────────────
 
   const handleSubmit = async () => {
-    setError(null);
-    if (!form.customer_id)  { setError("Выберите клиента"); return; }
-    if (items.length === 0) { setError("Добавьте хотя бы одну позицию"); return; }
-    if (dateError)          { setError(dateError); return; }
+    setErrorSection(null);
+    if (!form.customer_id)  { setErrorSection("customer"); toast.error("Выберите клиента"); return; }
+    if (items.length === 0) { setErrorSection("bikes"); toast.error("Добавьте хотя бы одну позицию"); return; }
+    if (dateError)          { setErrorSection("dates"); toast.error(dateError); return; }
 
     setSaving(true);
     try {
@@ -778,7 +779,7 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
       if (!response.ok) { const data = await response.json(); throw new Error(data.error || "Ошибка"); }
       onSave(await response.json());
     } catch (err) {
-      setError(err.message);
+      toast.error(err.message);
     } finally {
       setSaving(false);
     }
@@ -803,7 +804,7 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
 
 
             {/* ── 1. Клиент ── */}
-            <div className="form-section">
+            <div className={`form-section${errorSection === "customer" ? " form-section--error" : ""}`}>
               {selectedCustomer && (
                 <div style={{ padding: "10px 14px", background: "#f0fdf4", border: "1px solid #10b981", borderRadius: 6, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                   <span style={{ fontWeight: 600, color: "#065f46" }}>
@@ -811,7 +812,6 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
                   </span>
                   <span style={{ color: "#047857" }}>{selectedCustomer.phone}</span>
                   {selectedCustomer.is_veteran && <span style={{ color: "var(--color-primary-blue)", fontSize: 13, fontWeight: 500 }}>🎖 УБД — скидка −20%</span>}
-                  {selectedCustomer.no_show_count > 0 && <span style={{ color: "var(--color-primary-orange)", fontSize: 13, fontWeight: 500 }}>⚠ Неявок: {selectedCustomer.no_show_count}</span>}
                   {selectedCustomer.status !== "active" && <span style={{ color: "var(--color-primary-red)", fontWeight: 500 }}>⛔ {selectedCustomer.status === "no_booking" ? "Запрет брони" : "Запрет выдачи"}</span>}
                   {(() => {
                     if (!selectedCustomer.birth_date) return null;
@@ -1033,7 +1033,7 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
             </div>
 
             {/* ── 2. Позиции ── */}
-            <div className="form-section">
+            <div className={`form-section${errorSection === "bikes" ? " form-section--error" : ""}`}>
 
               {/* Фильтры велосипедов */}
               <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap", alignItems: "center" }}>
@@ -1085,7 +1085,11 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
                     if (isAdded)       { bgColor = "#f0fdf4"; borderColor = "#10b981"; statusText = "✓ добавлен"; statusColor = "#059669"; }
                     else if (isRental) { bgColor = "#fef2f2"; borderColor = "#fca5a5"; statusText = conflictEnd ? `в прокате до ${conflictEnd}` : "в прокате"; statusColor = "#ef4444"; }
                     else if (isBooked) { bgColor = "#fffbeb"; borderColor = "#fcd34d"; statusText = conflictEnd ? `бронь до ${conflictEnd}` : "забронирован"; statusColor = "#d97706"; }
-                    else if (isNoShow) { bgColor = "#fffbeb"; borderColor = "#fcd34d"; statusText = "⚠️ бронь просрочена"; statusColor = "#d97706"; }
+                    else if (isNoShow) {
+                      bgColor = "#fffbeb"; borderColor = "#fcd34d"; statusColor = "#d97706";
+                      const t = bike.conflict_info.booked_start ? new Date(bike.conflict_info.booked_start).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }) : null;
+                      statusText = <span>⚠️ опаздывает{t ? ` с ${t}` : ""} · <span onClick={e => { e.stopPropagation(); window.open(`/rentals?open=${bike.conflict_info.contract_id}`, "_blank"); }} style={{ textDecoration: "underline", cursor: "pointer" }}>договор #{bike.conflict_info.contract_id}</span></span>;
+                    }
                     else if (isRepairSt){ bgColor = "#f9fafb"; borderColor = "#d1d5db"; statusText = "в ремонте"; statusColor = "#9ca3af"; }
                     return (
                       <div key={bike.id}
@@ -1319,7 +1323,7 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
             </div>
 
             {/* ── 3. Время ── */}
-            <div className="form-section">
+            <div className={`form-section${errorSection === "dates" ? " form-section--error" : ""}`}>
               <h3>Возврат и менеджер</h3>
               <div className="form-row" style={{ gridTemplateColumns: "1fr 1fr" }}>
                 <div className="form-group">
@@ -1433,7 +1437,6 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
               </div>
             </div>
 
-            {error && <div className="error-message">{error}</div>}
           </div>
         </div>
 

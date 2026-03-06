@@ -37,17 +37,64 @@ router.get("/overdue-alerts", async (req, res) => {
 // GET /api/rentals - договоры с пагинацией и счётчиками статусов
 router.get("/", async (req, res) => {
   try {
-    const { status, customer_id, date_from, date_to, page = 1, limit = 100 } = req.query;
+    const {
+      status, customer_id, date_from, date_to,
+      id: filterId, customer_name, phone,
+      booked_start, booked_end, bike_models,
+      deposit_type, deposit_value, total_price,
+      issued_by_name, notes_issue,
+      page = 1, limit = 100,
+    } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
     let where = [];
     let params = [];
     let i = 1;
 
-    if (status) { where.push(`rc.status = $${i++}`); params.push(status); }
+    // Статус — одно или несколько через запятую
+    if (status) {
+      const vals = status.split(",").filter(Boolean);
+      if (vals.length === 1) { where.push(`rc.status = $${i++}`); params.push(vals[0]); }
+      else { where.push(`rc.status IN (${vals.map(() => `$${i++}`).join(",")})`); params.push(...vals); }
+    }
     if (customer_id) { where.push(`rc.customer_id = $${i++}`); params.push(customer_id); }
     if (date_from) { where.push(`rc.booked_start >= $${i++}`); params.push(date_from); }
-    if (date_to) { where.push(`rc.booked_start <= $${i++}`); params.push(date_to); }
+    if (date_to)   { where.push(`rc.booked_start <= $${i++}`); params.push(date_to); }
+
+    // Колонка id
+    if (filterId) { where.push(`rc.id::text LIKE $${i++}`); params.push(`%${filterId}%`); }
+
+    // Клиент (ФИО)
+    if (customer_name) {
+      where.push(`(c.last_name ILIKE $${i} OR c.first_name ILIKE $${i} OR c.middle_name ILIKE $${i})`);
+      params.push(`%${customer_name}%`); i++;
+    }
+
+    // Телефон
+    if (phone) { where.push(`c.phone ILIKE $${i++}`); params.push(`%${phone}%`); }
+
+    // Даты — текстовый поиск
+    if (booked_start) { where.push(`rc.booked_start::text ILIKE $${i++}`); params.push(`%${booked_start}%`); }
+    if (booked_end)   { where.push(`rc.booked_end::text ILIKE $${i++}`);   params.push(`%${booked_end}%`); }
+
+    // Модели велосипедов — EXISTS по rental_items
+    if (bike_models) {
+      where.push(`EXISTS (SELECT 1 FROM rental_items ri2 JOIN bikes b2 ON ri2.bike_id = b2.id WHERE ri2.contract_id = rc.id AND (b2.model ILIKE $${i} OR b2.internal_article ILIKE $${i}))`);
+      params.push(`%${bike_models}%`); i++;
+    }
+
+    // Залог
+    if (deposit_type) {
+      const vals = deposit_type.split(",").filter(Boolean);
+      if (vals.length === 1) { where.push(`rc.deposit_type = $${i++}`); params.push(vals[0]); }
+      else { where.push(`rc.deposit_type IN (${vals.map(() => `$${i++}`).join(",")})`); params.push(...vals); }
+    }
+
+    // Текстовые поля
+    if (deposit_value)  { where.push(`rc.deposit_value ILIKE $${i++}`);             params.push(`%${deposit_value}%`); }
+    if (total_price)    { where.push(`rc.total_price::text LIKE $${i++}`);           params.push(`%${total_price}%`); }
+    if (issued_by_name) { where.push(`issued_user.name ILIKE $${i++}`);              params.push(`%${issued_by_name}%`); }
+    if (notes_issue)    { where.push(`rc.notes_issue ILIKE $${i++}`);                params.push(`%${notes_issue}%`); }
 
     const whereSQL = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
@@ -61,7 +108,13 @@ router.get("/", async (req, res) => {
         COUNT(ri.id) as items_count,
         COUNT(ri.id) FILTER (WHERE ri.status = 'active') as active_items_count,
         COUNT(ri.id) FILTER (WHERE ri.item_type = 'bike') as bikes_count,
-        STRING_AGG(b.model, ', ') FILTER (WHERE ri.item_type = 'bike') as bike_models
+        STRING_AGG(
+          CASE
+            WHEN b.internal_article IS NOT NULL THEN '№' || b.internal_article || COALESCE(' · ' || b.model, '')
+            ELSE COALESCE(b.model, '?')
+          END,
+          E'\n'
+        ) FILTER (WHERE ri.item_type = 'bike') as bike_models
       FROM rental_contracts rc
       JOIN customers c ON rc.customer_id = c.id
       LEFT JOIN users issued_user ON rc.issued_by = issued_user.id
@@ -118,7 +171,8 @@ router.get("/:id", async (req, res) => {
     const contractResult = await pool.query(`
       SELECT rc.*,
         c.last_name, c.first_name, c.middle_name, c.phone, c.birth_date, c.gender, c.is_veteran,
-        c.status as customer_status, c.no_show_count,
+        c.status as customer_status,
+        (SELECT COUNT(*) FROM rental_contracts WHERE customer_id = c.id AND status = 'no_show') as no_show_count,
         issued_user.name as issued_by_name,
         received_user.name as received_by_name
       FROM rental_contracts rc
@@ -179,7 +233,7 @@ router.post("/", async (req, res) => {
 
     // Проверяем статус клиента
     const customerCheck = await client.query(
-      "SELECT status, no_show_count FROM customers WHERE id = $1", [customer_id]
+      "SELECT status FROM customers WHERE id = $1", [customer_id]
     );
     if (customerCheck.rows.length === 0) throw new Error("Клиент не найден");
     const customer = customerCheck.rows[0];
@@ -353,15 +407,12 @@ router.patch("/:id/status", async (req, res) => {
         "UPDATE rental_contracts SET status=$1, penalty_applied=TRUE, updated_at=NOW() WHERE id=$2",
         [status, id]
       );
-      await client.query(
-        "UPDATE customers SET no_show_count = no_show_count + 1, updated_at=NOW() WHERE id=$1",
-        [contract.customer_id]
-      );
       await client.query(`
         UPDATE customers SET status='no_booking',
           restriction_reason='Автоблокировка: 2 и более неявок по брони',
           updated_at=NOW()
-        WHERE id=$1 AND no_show_count >= 2 AND status = 'active'
+        WHERE id=$1 AND status = 'active'
+          AND (SELECT COUNT(*) FROM rental_contracts WHERE customer_id = $1 AND status = 'no_show') >= 2
       `, [contract.customer_id]);
       await client.query(`
         UPDATE bikes SET condition_status='в наличии', updated_at=NOW()

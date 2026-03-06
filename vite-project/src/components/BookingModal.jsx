@@ -115,7 +115,7 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
   const [form, setForm]           = useState(() => ({ ...INITIAL_FORM, booked_start: toLocalStr(new Date()) }));
   const [items, setItems]         = useState([]);
   const [saving, setSaving]       = useState(false);
-  const [error, setError]         = useState(null);
+  const [errorSection, setErrorSection] = useState(null);
   const [dateError, setDateError]           = useState(null);
   // Редактирование клиента
   const [editCustOpen, setEditCustOpen]         = useState(false);
@@ -364,14 +364,13 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
       .catch(() => setCustomerStats(null));
   }, [selectedCustomer?.id]);
 
-  // Авто-сброс ошибки когда условие исправлено
+  // Авто-сброс подсветки секции когда условие исправлено
   useEffect(() => {
-    if (!error) return;
-    if (error.includes("клиента") && form.customer_id) setError(null);
-    if ((error.includes("позиц") || error.includes("велосипед")) && items.length > 0) setError(null);
-    if (error.includes("начала") && form.booked_start) setError(null);
-    if (error.includes("окончания") && form.booked_end) setError(null);
-  }, [form.customer_id, form.booked_start, form.booked_end, items.length]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!errorSection) return;
+    if (errorSection === "customer" && form.customer_id) setErrorSection(null);
+    if (errorSection === "dates" && form.booked_start && form.booked_end && !dateError) setErrorSection(null);
+    if (errorSection === "bikes" && items.length > 0) setErrorSection(null);
+  }, [form.customer_id, form.booked_start, form.booked_end, items.length, dateError, errorSection]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCustomerSelect = (customer) => {
     setSelectedCustomer(customer);
@@ -722,11 +721,9 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
   // ── Отправка ─────────────────────────────────────────────────────────────────
 
   const validateAndSave = async () => {
-    if (!form.customer_id)  throw new Error("Выберите клиента");
-    if (!form.booked_start) throw new Error("Укажите время начала брони");
-    if (!form.booked_end)   throw new Error("Укажите время окончания брони");
-    if (dateError)          throw new Error(dateError);
-    if (items.length === 0) throw new Error("Добавьте хотя бы один велосипед или оборудование");
+    if (!form.customer_id)  { setErrorSection("customer"); throw new Error("Выберите клиента"); }
+    if (!form.booked_start || !form.booked_end || dateError) { setErrorSection("dates"); throw new Error(dateError || (!form.booked_start ? "Укажите время начала брони" : "Укажите время окончания брони")); }
+    if (items.length === 0) { setErrorSection("bikes"); throw new Error("Добавьте хотя бы один велосипед или оборудование"); }
 
     const depositType = (() => {
       const dt = form.deposit_type;
@@ -815,25 +812,25 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
   };
 
   const handleSubmit = async () => {
-    setError(null);
+    setErrorSection(null);
     setSaving(true);
     try {
       const saved = await validateAndSave();
       onSave(saved);
     } catch (err) {
-      setError(err.message);
+      toast.error(err.message);
       setSaving(false);
     }
   };
 
   const handleProceedToIssue = async () => {
-    setError(null);
+    setErrorSection(null);
     setSaving(true);
     try {
       const saved = await validateAndSave();
       onProceedToIssue(saved);
     } catch (err) {
-      setError(err.message);
+      toast.error(err.message);
       setSaving(false);
     }
   };
@@ -859,13 +856,12 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
           <div className="modal-form">
 
             {/* ── 1. Клиент ── */}
-            <div className="form-section">
+            <div className={`form-section${errorSection === "customer" ? " form-section--error" : ""}`}>
               {selectedCustomer && (
                 <div style={{ padding: "10px 14px", background: "#f0fdf4", border: "1px solid #10b981", borderRadius: 6, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                   <span style={{ fontWeight: 600, color: "#065f46" }}>{[selectedCustomer.last_name, selectedCustomer.first_name, selectedCustomer.middle_name].filter(Boolean).join(" ")}</span>
                   <span style={{ color: "#047857" }}>{selectedCustomer.phone}</span>
                   {selectedCustomer.is_veteran && <span style={{ color: "var(--color-primary-blue)", fontSize: 13, fontWeight: 500 }}>🎖 УБД — скидка −20%</span>}
-                  {selectedCustomer.no_show_count > 0 && <span style={{ color: "var(--color-primary-orange)", fontSize: 13, fontWeight: 500 }}>⚠ Неявок: {selectedCustomer.no_show_count}</span>}
                   {selectedCustomer.status !== "active" && <span style={{ color: "var(--color-primary-red)", fontWeight: 500 }}>⛔ {selectedCustomer.status === "no_booking" ? "Запрет брони" : "Запрет выдачи"}</span>}
                   {(() => {
                     if (!selectedCustomer.birth_date) return null;
@@ -1046,7 +1042,7 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
             </div>
 
             {/* ── 2. Период брони ── */}
-            <div className="form-section">
+            <div className={`form-section${errorSection === "dates" ? " form-section--error" : ""}`}>
               <h3>Период</h3>
               <div className="form-row" style={{ gridTemplateColumns: "1fr 1fr 1fr" }}>
                 <div className="form-group">
@@ -1107,7 +1103,7 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
             </div>
 
             {/* ── 3. Подбор велосипедов ── */}
-            <div className="form-section">
+            <div className={`form-section${errorSection === "bikes" ? " form-section--error" : ""}`}>
               <h3>Велосипеды</h3>
 
               {/* Фильтры подбора */}
@@ -1170,7 +1166,11 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
                     else if (freeByStart){ bgColor = "white";   borderColor = "#e5e7eb"; statusText = `освободится ${conflictEnd}`; statusColor = "#059669"; }
                     else if (isRental)   { bgColor = "#fef2f2"; borderColor = "#fca5a5"; statusText = conflictEnd ? `в прокате до ${conflictEnd}` : "в прокате"; statusColor = "#ef4444"; }
                     else if (isBooked)   { bgColor = "#fffbeb"; borderColor = "#fcd34d"; statusText = conflictEnd ? `бронь до ${conflictEnd}` : "забронирован"; statusColor = "#d97706"; }
-                    else if (isNoShow)   { bgColor = "#fffbeb"; borderColor = "#fcd34d"; statusText = "⚠️ бронь просрочена"; statusColor = "#d97706"; }
+                    else if (isNoShow) {
+                      bgColor = "#fffbeb"; borderColor = "#fcd34d"; statusColor = "#d97706";
+                      const t = bike.conflict_info.booked_start ? new Date(bike.conflict_info.booked_start).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }) : null;
+                      statusText = <span>⚠️ опаздывает{t ? ` с ${t}` : ""} · <span onClick={e => { e.stopPropagation(); window.open(`/rentals?open=${bike.conflict_info.contract_id}`, "_blank"); }} style={{ textDecoration: "underline", cursor: "pointer" }}>договор #{bike.conflict_info.contract_id}</span></span>;
+                    }
                     else if (isRepair)   { bgColor = "#f9fafb"; borderColor = "#d1d5db"; statusText = "в ремонте"; statusColor = "#9ca3af"; }
 
                     return (
@@ -1423,7 +1423,6 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
               </div>
             </div>
 
-            {error && <div className="error-message">{error}</div>}
           </div>
         </div>
 
@@ -1434,15 +1433,15 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
                 style={{ background: "white", color: "var(--color-primary-red)", border: "1px solid var(--color-primary-red)", transition: "background 0.15s, color 0.15s" }}
                 onMouseEnter={e => { e.currentTarget.style.background = "var(--color-primary-red)"; e.currentTarget.style.color = "white"; }}
                 onMouseLeave={e => { e.currentTarget.style.background = "white"; e.currentTarget.style.color = "var(--color-primary-red)"; }}
-                onClick={handleCancelBooking}>
-                Отменить (без штрафа)
-              </button>
-              <button type="button" className="btn btn-primary-small" disabled={saving}
-                style={{ background: "white", color: "#f59e0b", border: "1px solid #f59e0b", transition: "background 0.15s, color 0.15s" }}
-                onMouseEnter={e => { e.currentTarget.style.background = "#f59e0b"; e.currentTarget.style.color = "white"; }}
-                onMouseLeave={e => { e.currentTarget.style.background = "white"; e.currentTarget.style.color = "#f59e0b"; }}
                 onClick={handleNoShow}>
                 Не явился
+              </button>
+              <button type="button" className="btn btn-primary-small" disabled={saving}
+                style={{ background: "white", color: "#6b7280", border: "1px solid #d1d5db", transition: "background 0.15s, color 0.15s" }}
+                onMouseEnter={e => { e.currentTarget.style.background = "#f3f4f6"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "white"; }}
+                onClick={handleCancelBooking}>
+                Отменить (без штрафа)
               </button>
               <button type="button" className="btn btn-secondary-green btn-primary-small" onClick={handleSubmit} disabled={saving}>
                 {saving ? "Сохранение..." : "Сохранить изменения"}

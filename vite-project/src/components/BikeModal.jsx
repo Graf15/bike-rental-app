@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BIKE_OPTIONS } from '../constants/selectOptions';
 import AddBrandModal from './AddBrandModal';
 import './Modal.css';
+import { toast } from '../utils/toast';
 
 const BikeModal = ({ isOpen, onClose, onSubmit, mode = 'create', bikeData = null }) => {
   const [formData, setFormData] = useState({
@@ -232,7 +233,9 @@ const BikeModal = ({ isOpen, onClose, onSubmit, mode = 'create', bikeData = null
       setExchangeRate(null);
       setLastChangedCurrency(null);
     } catch (error) {
-      setError(error.message || (mode === 'edit' ? 'Ошибка при обновлении велосипеда' : 'Ошибка при создании велосипеда'));
+      const msg = error.message || (mode === 'edit' ? 'Ошибка при обновлении велосипеда' : 'Ошибка при создании велосипеда');
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }

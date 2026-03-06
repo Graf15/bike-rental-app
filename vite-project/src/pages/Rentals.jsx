@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import RentalsTable from "../components/RentalsTable";
 import ActiveRentalModal from "../components/ActiveRentalModal";
@@ -14,29 +14,39 @@ const Rentals = () => {
   const [counts, setCounts]   = useState({ active: 0, booked: 0, overdue: 0, total: 0 });
   const [page, setPage]       = useState(1);
   const [totalRows, setTotalRows] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [fetching, setFetching] = useState(false);
   const [error, setError] = useState(null);
   const [isActiveModalOpen, setIsActiveModalOpen]   = useState(false);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [viewingRental, setViewingRental]           = useState(null);
   const [activatingBooking, setActivatingBooking]   = useState(null);
   const [editingBooking, setEditingBooking]         = useState(null);
-  const [statusFilter, setStatusFilter]             = useState([]);
+  const [statusFilter, setStatusFilter] = useState([]);
+  const [serverFilters, setServerFilters] = useState({});
   const [confirmProps, showConfirm] = useConfirm();
   const [searchParams, setSearchParams] = useSearchParams();
+  const debounceRef = useRef(null);
 
-  const handleStatClick = (statuses) => {
-    setPage(1);
-    setStatusFilter(prev =>
-      JSON.stringify(prev) === JSON.stringify(statuses) ? [] : statuses
-    );
+  const buildParams = (currentPage, statFilter, colFilters) => {
+    const params = new URLSearchParams({ page: currentPage, limit: LIMIT });
+    // Статус из шапки (stat card) имеет приоритет над колоночным фильтром
+    const statusVal = colFilters.status?.length > 0 ? colFilters.status : statFilter;
+    if (statusVal?.length > 0) params.set("status", statusVal.join(","));
+
+    const textCols = ["id", "customer_name", "phone", "booked_start", "booked_end",
+                      "bike_models", "deposit_value", "total_price", "issued_by_name", "notes_issue"];
+    for (const col of textCols) {
+      if (colFilters[col]) params.set(col, colFilters[col]);
+    }
+    if (colFilters.deposit_type?.length > 0) params.set("deposit_type", colFilters.deposit_type.join(","));
+    return params;
   };
 
-  const fetchRentals = async (currentPage = page, currentFilter = statusFilter) => {
-    setLoading(true);
+  const fetchRentals = async (currentPage = page, statFilter = statusFilter, colFilters = serverFilters) => {
+    setFetching(true);
     try {
-      const params = new URLSearchParams({ page: currentPage, limit: LIMIT });
-      if (currentFilter.length === 1) params.set("status", currentFilter[0]);
+      const params = buildParams(currentPage, statFilter, colFilters);
       const response = await fetch(`/api/rentals?${params}`);
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const data = await response.json();
@@ -47,19 +57,36 @@ const Rentals = () => {
       console.error("Ошибка при загрузке договоров:", err);
       setError(err.message);
     } finally {
-      setLoading(false);
+      setInitialLoading(false);
+      setFetching(false);
     }
   };
 
-  useEffect(() => {
-    fetchRentals(page, statusFilter);
-  }, [page, statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+  const handleServerSearch = (filters) => {
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setPage(1);
+      setServerFilters(filters);
+    }, 300);
+  };
+
+  const handleStatClick = (statuses) => {
+    setPage(1);
+    setServerFilters({});
+    setStatusFilter(prev =>
+      JSON.stringify(prev) === JSON.stringify(statuses) ? [] : statuses
+    );
+  };
 
   useEffect(() => {
-    const handler = () => fetchRentals(page, statusFilter);
+    fetchRentals(page, statusFilter, serverFilters);
+  }, [page, statusFilter, serverFilters]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const handler = () => fetchRentals(page, statusFilter, serverFilters);
     window.addEventListener("rentals-changed", handler);
     return () => window.removeEventListener("rentals-changed", handler);
-  }, [page, statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [page, statusFilter, serverFilters]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Открыть договор по ?open=ID из ссылки (например из OverdueAlertsManager)
   useEffect(() => {
@@ -110,7 +137,7 @@ const Rentals = () => {
 
   const totalPages = Math.ceil(totalRows / LIMIT);
 
-  if (loading) return <div className="loading">Загрузка...</div>;
+  if (initialLoading) return <div className="loading">Загрузка...</div>;
   if (error) return <div className="error">Ошибка: {error}</div>;
 
   return (
@@ -165,6 +192,9 @@ const Rentals = () => {
         </div>
       </div>
 
+      <div style={{ textAlign: "center", padding: "6px 0", fontSize: 13, color: "#9ca3af", visibility: fetching ? "visible" : "hidden" }}>
+        Поиск...
+      </div>
       <RentalsTable
         rentals={rentals}
         onRentalUpdate={fetchRentals}
@@ -172,6 +202,7 @@ const Rentals = () => {
         onRentalDelete={handleDelete}
         onRentalOpen={handleOpenRental}
         statusFilter={statusFilter}
+        onServerSearch={handleServerSearch}
       />
 
       {totalPages > 1 && (

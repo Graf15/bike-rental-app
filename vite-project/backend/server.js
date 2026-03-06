@@ -20,11 +20,10 @@ const PORT = 3001;
 app.use(cors());
 app.use(express.json());
 
-// Middleware для логирования всех запросов
+const ts = () => new Date().toLocaleString("uk-UA", { timeZone: "Europe/Kyiv", hour12: false });
+
 app.use((req, res, next) => {
-  console.log(`=== ALL REQUESTS ===`);
-  console.log(`${req.method} ${req.url}`);
-  console.log(`Path: ${req.path}`);
+  console.log(`[${ts()}] ${req.method} ${req.url}`);
   next();
 });
 

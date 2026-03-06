@@ -46,16 +46,12 @@ export async function processOverdueBookings() {
         )
       `, [id]);
 
-      await client.query(
-        "UPDATE customers SET no_show_count = no_show_count + 1, updated_at = NOW() WHERE id = $1",
-        [customer_id]
-      );
-
       await client.query(`
         UPDATE customers SET status = 'no_booking',
           restriction_reason = 'Автоблокировка: 2 и более неявок по брони',
           updated_at = NOW()
-        WHERE id = $1 AND no_show_count >= 2 AND status = 'active'
+        WHERE id = $1 AND status = 'active'
+          AND (SELECT COUNT(*) FROM rental_contracts WHERE customer_id = $1 AND status = 'no_show') >= 2
       `, [customer_id]);
 
       await client.query(

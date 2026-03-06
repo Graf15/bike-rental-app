@@ -353,8 +353,8 @@ const RentalViewModal = ({ rental: initialRental, onClose, onUpdate }) => {
 
   const canActivate   = rental.status === "booked";
   const canComplete   = rental.status === "active" || rental.status === "overdue";
-  const canCancel     = rental.status === "booked";
-  const canNoShow     = rental.status === "booked";
+  const canCancel     = rental.status === "booked" || rental.status === "overdue";
+  const canNoShow     = rental.status === "booked" || rental.status === "overdue";
 
   const isActive      = rental.status === "active" || rental.status === "overdue";
 
@@ -387,7 +387,7 @@ const RentalViewModal = ({ rental: initialRental, onClose, onUpdate }) => {
                 </div>
                 <div style={{ color: "#6b7280", fontSize: 13, marginTop: 2 }}>{rental.phone}</div>
                 {rental.no_show_count > 0 && (
-                  <div style={{ color: "var(--color-primary-orange)", fontSize: 12, marginTop: 4, fontWeight: 500 }}>
+                  <div style={{ color: rental.no_show_count >= 2 ? "var(--color-primary-red)" : "var(--color-primary-orange)", fontSize: 12, marginTop: 4, fontWeight: 500 }}>
                     ⚠ Неявок: {rental.no_show_count}
                   </div>
                 )}
@@ -1061,7 +1061,7 @@ const RentalViewModal = ({ rental: initialRental, onClose, onUpdate }) => {
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {canNoShow && (
               <button type="button" className="btn btn-primary-small"
-                style={{ background: "var(--color-primary-orange)", color: "white", border: "none", borderRadius: 6, cursor: "pointer", padding: "6px 14px", fontSize: "0.875rem", fontWeight: 500 }}
+                style={{ background: "var(--color-primary-red)", color: "white", border: "none", borderRadius: 6, cursor: "pointer", padding: "6px 14px", fontSize: "0.875rem", fontWeight: 500 }}
                 onClick={() => showConfirm({ title: "Не явился", message: "Отметить клиента как «Не явился»? Счётчик неявок увеличится.", confirmLabel: "Отметить", danger: true, onConfirm: () => handleStatusChange("no_show") })}
                 disabled={saving}>
                 Не явился

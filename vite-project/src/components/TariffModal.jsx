@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import "./Modal.css";
 import "./TariffModal.css";
+import { toast } from "../utils/toast";
 
 const PRICE_FIELDS = [
   "price_first_hour", "price_next_hour", "price_day", "price_24h",
@@ -42,7 +43,7 @@ const PriceInput = ({ label, name, value, onChange, placeholder }) => (
 const TariffModal = ({ tariff, onClose, onSave }) => {
   const [form, setForm] = useState(INITIAL_FORM);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
+  const [errorSection, setErrorSection] = useState(null);
   const mouseDownOnOverlay = useRef(false);
 
   const isEdit = !!(tariff && tariff.id);
@@ -69,8 +70,8 @@ const TariffModal = ({ tariff, onClose, onSave }) => {
   const toNum = (val) => (val !== "" && val != null ? parseFloat(val) : null);
 
   const handleSubmit = async () => {
-    setError(null);
-    if (!form.name.trim()) { setError("Введите название тарифа"); return; }
+    setErrorSection(null);
+    if (!form.name.trim()) { setErrorSection("name"); toast.error("Введите название тарифа"); return; }
 
     const body = { ...form };
     PRICE_FIELDS.forEach(k => { body[k] = toNum(form[k]); });
@@ -103,7 +104,7 @@ const TariffModal = ({ tariff, onClose, onSave }) => {
       }
       onSave();
     } catch (err) {
-      setError(err.message);
+      toast.error(err.message);
     } finally {
       setSaving(false);
     }
@@ -125,7 +126,7 @@ const TariffModal = ({ tariff, onClose, onSave }) => {
           <div className="modal-form">
 
             {/* Основное */}
-            <div className="form-section">
+            <div className={`form-section${errorSection === "name" ? " form-section--error" : ""}`}>
               <h3>Основное</h3>
               <div className="form-group">
                 <label className="required-label">Название</label>
@@ -215,7 +216,6 @@ const TariffModal = ({ tariff, onClose, onSave }) => {
               </div>
             </div>
 
-            {error && <div className="error-message">{error}</div>}
           </div>
         </div>
 

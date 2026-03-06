@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import CustomersTable from "../components/CustomersTable";
 import CustomerModal from "../components/CustomerModal";
 import ConfirmModal from "../components/ConfirmModal";
@@ -11,16 +11,31 @@ const Customers = () => {
   const [counts, setCounts]       = useState({ active: 0, restricted: 0, total: 0 });
   const [page, setPage]           = useState(1);
   const [totalRows, setTotalRows] = useState(0);
-  const [loading, setLoading]     = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true); // только первый раз
+  const [fetching, setFetching]             = useState(false);
   const [error, setError]         = useState(null);
   const [isModalOpen, setIsModalOpen]       = useState(false);
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [confirmProps, showConfirm] = useConfirm();
+  const [serverFilters, setServerFilters] = useState({});
+  const debounceRef = useRef(null);
 
-  const fetchCustomers = async (currentPage = page) => {
-    setLoading(true);
+  const buildParams = (currentPage, filters) => {
+    const params = new URLSearchParams({ page: currentPage, limit: LIMIT });
+    const textCols = ["last_name", "first_name", "middle_name", "phone", "restriction_reason", "notes", "id", "height_cm", "birth_date", "created_at"];
+    for (const col of textCols) {
+      if (filters[col]) params.set(col, filters[col]);
+    }
+    if (filters.status?.length > 0)     params.set("status",     filters.status.join(","));
+    if (filters.gender?.length > 0)     params.set("gender",     filters.gender.join(","));
+    if (filters.is_veteran?.length === 1) params.set("is_veteran", filters.is_veteran[0] === "да" ? "true" : "false");
+    return params;
+  };
+
+  const fetchCustomers = async (currentPage = page, filters = serverFilters) => {
+    setFetching(true);
     try {
-      const params = new URLSearchParams({ page: currentPage, limit: LIMIT });
+      const params = buildParams(currentPage, filters);
       const response = await fetch(`/api/customers?${params}`);
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const data = await response.json();
@@ -31,13 +46,22 @@ const Customers = () => {
       console.error("Ошибка при загрузке клиентов:", err);
       setError(err.message);
     } finally {
-      setLoading(false);
+      setInitialLoading(false);
+      setFetching(false);
     }
   };
 
   useEffect(() => {
-    fetchCustomers(page);
-  }, [page]); // eslint-disable-line react-hooks/exhaustive-deps
+    fetchCustomers(page, serverFilters);
+  }, [page, serverFilters]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleServerSearch = (filters) => {
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setPage(1);
+      setServerFilters(filters);
+    }, 300);
+  };
 
   const handleEdit = (customer) => {
     setEditingCustomer(customer);
@@ -77,7 +101,7 @@ const Customers = () => {
 
   const totalPages = Math.ceil(totalRows / LIMIT);
 
-  if (loading) return <div className="loading">Загрузка...</div>;
+  if (initialLoading) return <div className="loading">Загрузка...</div>;
   if (error) return <div className="error">Ошибка: {error}</div>;
 
   return (
@@ -128,11 +152,15 @@ const Customers = () => {
         </div>
       </div>
 
+      <div style={{ textAlign: "center", padding: "6px 0", fontSize: 13, color: "#9ca3af", visibility: fetching ? "visible" : "hidden" }}>
+        Поиск...
+      </div>
       <CustomersTable
         customers={customers}
         onCustomerUpdate={() => fetchCustomers(page)}
         onCustomerEdit={handleEdit}
         onCustomerDelete={handleDelete}
+        onServerSearch={handleServerSearch}
       />
 
       {totalPages > 1 && (

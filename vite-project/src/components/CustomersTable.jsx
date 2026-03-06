@@ -41,7 +41,14 @@ const ColumnResizer = ({ onMouseDown }) => (
   />
 );
 
-const CustomersTable = ({ customers, onCustomerUpdate, onCustomerEdit, onCustomerDelete }) => {
+// Колонки которые фильтруются на сервере (не вычисляемые агрегаты)
+const SERVER_FILTER_KEYS = new Set([
+  "id", "last_name", "first_name", "middle_name", "phone",
+  "birth_date", "gender", "height_cm", "is_veteran",
+  "status", "restriction_reason", "notes", "created_at",
+]);
+
+const CustomersTable = ({ customers, onCustomerUpdate, onCustomerEdit, onCustomerDelete, onServerSearch }) => {
   const [sortColumn, setSortColumn] = useState(null);
   const [sortAsc, setSortAsc] = useState(true);
   const [filters, setFilters] = useState({});
@@ -226,11 +233,21 @@ const CustomersTable = ({ customers, onCustomerUpdate, onCustomerEdit, onCustome
   };
 
   const updateFilter = (field, value) => {
-    setFilters((prev) => ({ ...prev, [field]: value }));
+    setFilters((prev) => {
+      const next = { ...prev, [field]: value };
+      if (onServerSearch && SERVER_FILTER_KEYS.has(field)) {
+        onServerSearch(next);
+      }
+      return next;
+    });
     setCurrentPage(1);
   };
 
-  const clearAllFilters = () => { setFilters({}); setCurrentPage(1); };
+  const clearAllFilters = () => {
+    setFilters({});
+    setCurrentPage(1);
+    if (onServerSearch) onServerSearch({});
+  };
 
   const hasActiveFilters = Object.entries(filters).some(([, value]) => {
     if (!value) return false;

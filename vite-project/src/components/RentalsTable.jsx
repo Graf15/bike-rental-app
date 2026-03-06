@@ -31,7 +31,14 @@ const ColumnResizer = ({ onMouseDown }) => (
   <div className="column-resizer" onMouseDown={onMouseDown} onClick={(e) => e.stopPropagation()} />
 );
 
-const RentalsTable = ({ rentals, onRentalUpdate, onRentalEdit, onRentalDelete, onRentalOpen, statusFilter }) => {
+const SERVER_FILTER_KEYS = new Set([
+  "id", "customer_name", "phone", "status",
+  "booked_start", "booked_end", "bike_models",
+  "deposit_type", "deposit_value", "total_price",
+  "issued_by_name", "notes_issue",
+]);
+
+const RentalsTable = ({ rentals, onRentalUpdate, onRentalEdit, onRentalDelete, onRentalOpen, statusFilter, onServerSearch }) => {
   const [sortColumn, setSortColumn] = useState("id");
   const [sortAsc, setSortAsc] = useState(false);
   const [filters, setFilters] = useState({});
@@ -142,8 +149,15 @@ const RentalsTable = ({ rentals, onRentalUpdate, onRentalEdit, onRentalDelete, o
   }, [columnWidths, columnOrder]);
 
   const handleSort = (col) => { if (sortColumn === col) setSortAsc(!sortAsc); else { setSortColumn(col); setSortAsc(true); } };
-  const updateFilter = (field, value) => { setFilters(p => ({ ...p, [field]: value })); setCurrentPage(1); };
-  const clearAllFilters = () => { setFilters({}); setCurrentPage(1); };
+  const updateFilter = (field, value) => {
+    setFilters(p => {
+      const next = { ...p, [field]: value };
+      if (onServerSearch && SERVER_FILTER_KEYS.has(field)) onServerSearch(next);
+      return next;
+    });
+    setCurrentPage(1);
+  };
+  const clearAllFilters = () => { setFilters({}); setCurrentPage(1); if (onServerSearch) onServerSearch({}); };
   const hasActiveFilters = Object.values(filters).some(v => Array.isArray(v) ? v.length > 0 : !!v);
 
   const toggleColumnVisibility = (key) => {
@@ -210,6 +224,12 @@ const RentalsTable = ({ rentals, onRentalUpdate, onRentalEdit, onRentalDelete, o
     if (key === "deposit_type") return DEPOSIT_LABELS[r.deposit_type] || r.deposit_type || "—";
     if (key === "booked_start" || key === "booked_end") return formatDate(r[key]);
     if (key === "bikes_count") return r.bikes_count || "—";
+    if (key === "bike_models") {
+      if (!r.bike_models) return "—";
+      const lines = r.bike_models.split("\n").filter(Boolean);
+      if (lines.length === 1) return lines[0];
+      return <>{lines.map((l, i) => <div key={i} style={{ fontSize: 12, lineHeight: 1.5 }}>{l}</div>)}</>;
+    }
     if (key === "total_price") return r.total_price ? `${r.total_price} грн` : "—";
     return r[key] || "—";
   };

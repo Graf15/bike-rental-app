@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './Modal.css';
+import { toast } from '../utils/toast';
 
 const MaintenanceEventModal = ({
   isOpen,
@@ -23,7 +24,7 @@ const MaintenanceEventModal = ({
   const [selectedBike, setSelectedBike] = useState(null);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [errorSection, setErrorSection] = useState(null);
 
   // Состояние для поиска велосипедов
   const [showBikeSearch, setShowBikeSearch] = useState(!selectedBikeId && mode === 'create');
@@ -123,6 +124,10 @@ const MaintenanceEventModal = ({
     return () => clearTimeout(timeoutId);
   }, [bikeSearchQuery]);
 
+  useEffect(() => {
+    if (errorSection === 'bike' && formData.bike_id) setErrorSection(null);
+  }, [formData.bike_id, errorSection]);
+
   // Выбор велосипеда из результатов поиска
   const selectBike = (bike) => {
     setSelectedBike(bike);
@@ -175,18 +180,19 @@ const MaintenanceEventModal = ({
     e.preventDefault();
 
     if (!formData.bike_id) {
-      setError('Пожалуйста, выберите велосипед');
+      setErrorSection('bike');
+      toast.error('Пожалуйста, выберите велосипед');
       return;
     }
 
     setLoading(true);
-    setError('');
+    setErrorSection(null);
 
     try {
       await onSubmit(formData);
       handleClose();
     } catch (error) {
-      setError(error.message || 'Произошла ошибка при сохранении');
+      toast.error(error.message || 'Произошла ошибка при сохранении');
     } finally {
       setLoading(false);
     }
@@ -207,15 +213,10 @@ const MaintenanceEventModal = ({
         </div>
 
         <div className="modal-body">
-          {error && (
-            <div className="error-message">
-              {error}
-            </div>
-          )}
-
+  
           <form className="modal-form" onSubmit={handleSubmit}>
             {/* Секция выбора велосипеда */}
-            <div className="form-section">
+            <div className={`form-section${errorSection === 'bike' ? ' form-section--error' : ''}`}>
               <h3>Велосипед</h3>
 
               {showBikeSearch ? (
