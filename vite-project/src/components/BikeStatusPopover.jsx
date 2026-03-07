@@ -8,10 +8,10 @@ const BikeStatusPopover = ({ bike, onStatusChange }) => {
   const triggerRef = useRef(null);
 
   const statuses = [
-    { value: "в наличии", label: "в наличии", color: "green" },
-    { value: "в прокате", label: "в прокате", color: "blue" },
+    { value: "в наличии", label: "в наличии", color: "" },
+    { value: "в прокате", label: "в прокате", color: "green" },
     { value: "в ремонте", label: "в ремонте", color: "orange" },
-    { value: "бронь", label: "бронь", color: "purple" },
+    { value: "бронь", label: "бронь", color: "blue" },
     { value: "продан", label: "продан", color: "red" },
     { value: "украден", label: "украден", color: "red" },
     { value: "невозврат", label: "невозврат", color: "red" },
@@ -21,7 +21,7 @@ const BikeStatusPopover = ({ bike, onStatusChange }) => {
 
   const getStatusBadgeClass = (status) => {
     const statusObj = statuses.find(s => s.value === status);
-    if (!statusObj) return "status-badge";
+    if (!statusObj || !statusObj.color) return "status-badge";
     return `status-badge status-badge-${statusObj.color}`;
   };
 

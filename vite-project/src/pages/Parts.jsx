@@ -1,3 +1,4 @@
+import { apiFetch } from "../utils/api";
 import React, { useState, useEffect } from "react";
 import PartsTable from "../components/PartsTable";
 import "./Parts.css";
@@ -14,7 +15,7 @@ const Parts = () => {
   const fetchParts = async () => {
     try {
       setLoading(true);
-      const response = await fetch("/api/parts");
+      const response = await apiFetch("/api/parts");
       if (!response.ok) {
         throw new Error("Ошибка при загрузке запчастей");
       }

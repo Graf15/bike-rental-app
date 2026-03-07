@@ -2,9 +2,12 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import BikeActionsMenu from "./BikeActionsMenu";
 import TableControls from "./TableControls";
 import MultiSelectPopover from "./MultiSelectPopover";
+import DateRangePickerFilter from "./DateRangePickerFilter";
 import { CUSTOMER_OPTIONS } from "../constants/selectOptions";
 import "./BikeTable.css";
 import "./CustomersTable.css";
+
+const DATE_RANGE_KEYS = new Set(["birth_date", "created_at"]);
 
 const formatDate = (dateString) => {
   if (!dateString) return "—";
@@ -272,6 +275,14 @@ const CustomersTable = ({ customers, onCustomerUpdate, onCustomerEdit, onCustome
   const filteredCustomers = customers.filter((c) =>
     Object.entries(filters).every(([key, value]) => {
       if (!value || (Array.isArray(value) && value.length === 0)) return true;
+      // Фильтр по диапазону дат
+      if (DATE_RANGE_KEYS.has(key) && typeof value === "object" && !Array.isArray(value)) {
+        const d = c[key] ? new Date(c[key]) : null;
+        if (!d || isNaN(d)) return !value.from && !value.to;
+        if (value.from && d < new Date(value.from)) return false;
+        if (value.to   && d > new Date(value.to + "T23:59:59")) return false;
+        return true;
+      }
       if (key === "is_veteran") return Array.isArray(value) && value.includes(c[key] ? "да" : "нет");
       if (Array.isArray(value)) return value.includes(c[key]);
       return String(c[key] || "").toLowerCase().includes(value.toLowerCase());
@@ -390,7 +401,12 @@ const CustomersTable = ({ customers, onCustomerUpdate, onCustomerEdit, onCustome
             <tr>
               {visibleColumnsData.map(({ key }) => (
                 <th key={key} data-column={key} style={{ width: columnWidths[key] }}>
-                  {selectOptions[key] ? (
+                  {DATE_RANGE_KEYS.has(key) ? (
+                    <DateRangePickerFilter
+                      value={filters[key] || null}
+                      onChange={(v) => updateFilter(key, v)}
+                    />
+                  ) : selectOptions[key] ? (
                     <div
                       ref={(el) => (anchorRefs.current[key] = el)}
                       onClick={() => setPopoverInfo({ key, visible: popoverInfo.key !== key || !popoverInfo.visible })}

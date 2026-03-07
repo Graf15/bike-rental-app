@@ -1,5 +1,7 @@
+import { apiFetch } from "../utils/api";
 import React, { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { toast } from "../utils/toast";
 import RentalsTable from "../components/RentalsTable";
 import ActiveRentalModal from "../components/ActiveRentalModal";
 import BookingModal from "../components/BookingModal";
@@ -47,7 +49,7 @@ const Rentals = () => {
     setFetching(true);
     try {
       const params = buildParams(currentPage, statFilter, colFilters);
-      const response = await fetch(`/api/rentals?${params}`);
+      const response = await apiFetch(`/api/rentals?${params}`);
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const data = await response.json();
       setRentals(data.rows);
@@ -92,9 +94,13 @@ const Rentals = () => {
   useEffect(() => {
     const openId = searchParams.get("open");
     if (!openId) return;
-    fetch(`/api/rentals/${openId}`)
+    apiFetch(`/api/rentals/${openId}`)
       .then(r => r.ok ? r.json() : null)
-      .then(rental => { if (rental) setViewingRental(rental); })
+      .then(rental => {
+        if (!rental) return;
+        if (rental.status === "booked" || rental.status === "overdue") setEditingBooking(rental);
+        else setViewingRental(rental);
+      })
       .catch(() => {});
     setSearchParams({}, { replace: true });
   }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -107,7 +113,7 @@ const Rentals = () => {
       danger: true,
       onConfirm: async () => {
         try {
-          const response = await fetch(`/api/rentals/${rentalId}`, { method: "DELETE" });
+          const response = await apiFetch(`/api/rentals/${rentalId}`, { method: "DELETE" });
           if (!response.ok) {
             const data = await response.json();
             throw new Error(data.error || "Ошибка при удалении");
@@ -120,18 +126,15 @@ const Rentals = () => {
     });
   };
 
-  // После создания — открываем карточку договора для немедленной активации
   const handleCreateSave = (createdContract) => {
     setIsActiveModalOpen(false);
     setIsBookingModalOpen(false);
     fetchRentals();
-    if (createdContract?.id) {
-      setViewingRental(createdContract);
-    }
+    toast.success(`Бронь #${createdContract?.id} создана`);
   };
 
   const handleOpenRental = (rental) => {
-    if (rental.status === "booked") setEditingBooking(rental);
+    if (rental.status === "booked" || rental.status === "overdue") setEditingBooking(rental);
     else setViewingRental(rental);
   };
 

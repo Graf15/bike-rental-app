@@ -1,9 +1,10 @@
+import { apiFetch } from "../utils/api";
 import { useState, useRef, useEffect, useCallback } from "react";
 import BikeStatusPopover from "./BikeStatusPopover";
 import BikeActionsMenu from "./BikeActionsMenu";
 import TableControls from "./TableControls";
 import MultiSelectPopover from "./MultiSelectPopover";
-import DateRangeFilter from "./DateRangeFilter";
+import DateRangePickerFilter from "./DateRangePickerFilter";
 import { BIKE_OPTIONS } from "../constants/selectOptions";
 import "./BikeTable.css";
 
@@ -351,7 +352,7 @@ const BikeTable = ({
 
   const handleStatusChange = async (bikeId, newStatus, field = 'condition_status') => {
     try {
-      const response = await fetch(`/api/bikes/${bikeId}`, {
+      const response = await apiFetch(`/api/bikes/${bikeId}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -387,7 +388,7 @@ const BikeTable = ({
     } else if (onBikeUpdate) {
       // Fallback если onBikeDelete не передан
       try {
-        const response = await fetch(`/api/bikes/${bikeId}`, {
+        const response = await apiFetch(`/api/bikes/${bikeId}`, {
           method: "DELETE",
         });
 
@@ -567,10 +568,9 @@ const BikeTable = ({
               <th key={key} data-column={key} style={{ width: columnWidths[key] }}>
                 {key === 'photo' ? null :
                key === 'last_maintenance_date' ? (
-                  <DateRangeFilter
+                  <DateRangePickerFilter
                     value={filters[key]}
                     onChange={(value) => updateFilter(key, value)}
-                    anchorRef={(el) => (anchorRefs.current[key] = el)}
                   />
                 ) : selectOptions[key] ? (
                   <div

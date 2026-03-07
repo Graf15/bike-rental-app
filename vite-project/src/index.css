@@ -523,7 +523,10 @@ tr:hover {
   padding: 4px 8px;
   border-radius: 8px;
   font-size: 12px;
-  border: 1px solid;
+  font-weight: 400;
+  border: 1px solid #d1d5db;
+  background-color: transparent;
+  color: #374151;
 }
 
 .status-badge-green {

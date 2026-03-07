@@ -1,3 +1,4 @@
+import { apiFetch } from "../utils/api";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import MultiSelectPopover from "./MultiSelectPopover";
 import DateTimePickerField from "./DateTimePickerField";
@@ -205,10 +206,10 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/users").then(r => r.json()),
-      fetch("/api/bikes/for-rental").then(r => r.json()),
-      fetch("/api/tariffs").then(r => r.json()),
-      fetch("/api/equipment").then(r => r.json()),
+      apiFetch("/api/users").then(r => r.json()),
+      apiFetch("/api/bikes/for-rental").then(r => r.json()),
+      apiFetch("/api/tariffs").then(r => r.json()),
+      apiFetch("/api/equipment").then(r => r.json()),
     ]).then(([u, b, t, e]) => {
       setUsers(Array.isArray(u) ? u : []);
       setBikes(Array.isArray(b) ? b : []);
@@ -222,7 +223,7 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
     if (customerSearch.length < 2) { setCustomers([]); setCustomerSearching(false); setNoResultsConfirmed(false); return; }
     setCustomerSearching(true);
     const timer = setTimeout(() => {
-      fetch(`/api/customers?search=${encodeURIComponent(customerSearch)}&limit=10`)
+      apiFetch(`/api/customers?search=${encodeURIComponent(customerSearch)}&limit=10`)
         .then(r => r.json())
         .then(data => {
           const rows = data.rows || [];
@@ -240,7 +241,7 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
   // Загружаем данные брони если открыто из брони
   useEffect(() => {
     if (!bookingId) return;
-    fetch(`/api/rentals/${bookingId}`)
+    apiFetch(`/api/rentals/${bookingId}`)
       .then(r => r.json())
       .then(rental => {
         // Клиент
@@ -328,7 +329,7 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
     const start = new Date(start_time), end = new Date(end_time);
     if (isNaN(start) || isNaN(end) || end <= start) return null;
     try {
-      const r = await fetch("/api/calculate/price", {
+      const r = await apiFetch("/api/calculate/price", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tariff_id, start_time, end_time }),
@@ -374,7 +375,7 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
   // Загрузка статистики клиента при выборе
   useEffect(() => {
     if (!selectedCustomer?.id) { setCustomerStats(null); return; }
-    fetch(`/api/customers/${selectedCustomer.id}/stats`)
+    apiFetch(`/api/customers/${selectedCustomer.id}/stats`)
       .then(r => r.ok ? r.json() : null)
       .then(data => setCustomerStats(data))
       .catch(() => setCustomerStats(null));
@@ -448,7 +449,7 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
     if (!phone) { setQuickError(`Неверный формат телефона. ${PHONE_HINT}`); return; }
     setQuickSaving(true);
     try {
-      const res = await fetch("/api/customers", {
+      const res = await apiFetch("/api/customers", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           last_name:   quickForm.last_name.trim(),
@@ -486,7 +487,7 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
     setCompletionSaving(true);
     setCompletionError(null);
     try {
-      const res = await fetch(`/api/customers/${selectedCustomer.id}`, {
+      const res = await apiFetch(`/api/customers/${selectedCustomer.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -736,7 +737,7 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
 
       // Активация существующей брони
       if (bookingId) {
-        const response = await fetch(`/api/rentals/${bookingId}/status`, {
+        const response = await apiFetch(`/api/rentals/${bookingId}/status`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -773,7 +774,7 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
           discount_notes:     i.discount_notes      || null,
         })),
       };
-      const response = await fetch("/api/rentals", {
+      const response = await apiFetch("/api/rentals", {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
       });
       if (!response.ok) { const data = await response.json(); throw new Error(data.error || "Ошибка"); }

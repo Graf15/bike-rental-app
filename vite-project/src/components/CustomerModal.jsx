@@ -1,3 +1,4 @@
+import { apiFetch } from "../utils/api";
 import React, { useState, useEffect, useRef } from "react";
 import "./Modal.css";
 import "./CustomerModal.css";
@@ -81,7 +82,7 @@ const CustomerModal = ({ customer, onClose, onSave }) => {
       const url = isEdit ? `/api/customers/${customer.id}` : "/api/customers";
       const method = isEdit ? "PUT" : "POST";
 
-      const response = await fetch(url, {
+      const response = await apiFetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

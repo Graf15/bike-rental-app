@@ -1,3 +1,4 @@
+import { apiFetch } from "../utils/api";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import MultiSelectPopover from "./MultiSelectPopover";
 import DateTimePickerField from "./DateTimePickerField";
@@ -184,9 +185,9 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/users").then(r => r.json()),
-      fetch("/api/tariffs").then(r => r.json()),
-      fetch("/api/equipment").then(r => r.json()),
+      apiFetch("/api/users").then(r => r.json()),
+      apiFetch("/api/tariffs").then(r => r.json()),
+      apiFetch("/api/equipment").then(r => r.json()),
     ]).then(([u, t, e]) => {
       setUsers(Array.isArray(u) ? u : []);
       setTariffs(Array.isArray(t) ? t.filter(x => x.is_active) : []);
@@ -199,7 +200,7 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
     if (customerSearch.length < 2) { setCustomers([]); setCustomerSearching(false); setNoResultsConfirmed(false); return; }
     setCustomerSearching(true);
     const timer = setTimeout(() => {
-      fetch(`/api/customers?search=${encodeURIComponent(customerSearch)}&limit=10`)
+      apiFetch(`/api/customers?search=${encodeURIComponent(customerSearch)}&limit=10`)
         .then(r => r.json())
         .then(data => {
           const rows = data.rows || [];
@@ -228,19 +229,19 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
       // без дат — грузим без фильтра по времени
       const url = "/api/bikes/for-rental";
       setBikesLoading(true);
-      fetch(url).then(r => r.json()).then(b => setAllBikes(Array.isArray(b) ? b : [])).catch(console.error).finally(() => setBikesLoading(false));
+      apiFetch(url).then(r => r.json()).then(b => setAllBikes(Array.isArray(b) ? b : [])).catch(console.error).finally(() => setBikesLoading(false));
       return;
     }
     if (dateError) return;
     setBikesLoading(true);
     const url = `/api/bikes/for-rental?start=${encodeURIComponent(form.booked_start)}&end=${encodeURIComponent(form.booked_end)}`;
-    fetch(url).then(r => r.json()).then(b => setAllBikes(Array.isArray(b) ? b : [])).catch(console.error).finally(() => setBikesLoading(false));
+    apiFetch(url).then(r => r.json()).then(b => setAllBikes(Array.isArray(b) ? b : [])).catch(console.error).finally(() => setBikesLoading(false));
   }, [form.booked_start, form.booked_end, dateError]);
 
   // Загружаем данные редактируемой брони (pre-fill)
   useEffect(() => {
     if (!editingRental) return;
-    fetch(`/api/rentals/${editingRental.id}`)
+    apiFetch(`/api/rentals/${editingRental.id}`)
       .then(r => r.json())
       .then(rental => {
         setForm({
@@ -305,7 +306,7 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
     const start = new Date(start_time), end = new Date(end_time);
     if (isNaN(start) || isNaN(end) || end <= start) return null;
     try {
-      const r = await fetch("/api/calculate/price", {
+      const r = await apiFetch("/api/calculate/price", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tariff_id, start_time, end_time }),
       });
@@ -358,7 +359,7 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
   // Загрузка статистики клиента при выборе
   useEffect(() => {
     if (!selectedCustomer?.id) { setCustomerStats(null); return; }
-    fetch(`/api/customers/${selectedCustomer.id}/stats`)
+    apiFetch(`/api/customers/${selectedCustomer.id}/stats`)
       .then(r => r.ok ? r.json() : null)
       .then(data => setCustomerStats(data))
       .catch(() => setCustomerStats(null));
@@ -425,7 +426,7 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
     if (!phone) { setQuickError(`Неверный формат телефона. ${PHONE_HINT}`); return; }
     setQuickSaving(true);
     try {
-      const res = await fetch("/api/customers", {
+      const res = await apiFetch("/api/customers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -459,7 +460,7 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
     setEditCustSaving(true);
     setEditCustError(null);
     try {
-      const res = await fetch(`/api/customers/${selectedCustomer.id}`, {
+      const res = await apiFetch(`/api/customers/${selectedCustomer.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -753,7 +754,7 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
 
     const url    = editingRental ? `/api/rentals/${editingRental.id}` : "/api/rentals";
     const method = editingRental ? "PATCH" : "POST";
-    const response = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const response = await apiFetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     if (!response.ok) { const data = await response.json(); throw new Error(data.error || "Ошибка"); }
     return await response.json();
   };
@@ -766,7 +767,7 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
       danger: true,
       onConfirm: async () => {
         try {
-          const res = await fetch(`/api/rentals/${editingRental.id}/status`, {
+          const res = await apiFetch(`/api/rentals/${editingRental.id}/status`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ status: "cancelled" }),
@@ -793,7 +794,7 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
       danger: true,
       onConfirm: async () => {
         try {
-          const res = await fetch(`/api/rentals/${editingRental.id}/status`, {
+          const res = await apiFetch(`/api/rentals/${editingRental.id}/status`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ status: "no_show" }),
@@ -1429,13 +1430,15 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
         <div className="modal-footer">
           {editingRental ? (
             <>
-              <button type="button" className="btn btn-primary-small" disabled={saving}
-                style={{ background: "white", color: "var(--color-primary-red)", border: "1px solid var(--color-primary-red)", transition: "background 0.15s, color 0.15s" }}
-                onMouseEnter={e => { e.currentTarget.style.background = "var(--color-primary-red)"; e.currentTarget.style.color = "white"; }}
-                onMouseLeave={e => { e.currentTarget.style.background = "white"; e.currentTarget.style.color = "var(--color-primary-red)"; }}
-                onClick={handleNoShow}>
-                Не явился
-              </button>
+              {editingRental.status === "overdue" && (
+                <button type="button" className="btn btn-primary-small" disabled={saving}
+                  style={{ background: "white", color: "var(--color-primary-red)", border: "1px solid var(--color-primary-red)", transition: "background 0.15s, color 0.15s" }}
+                  onMouseEnter={e => { e.currentTarget.style.background = "var(--color-primary-red)"; e.currentTarget.style.color = "white"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = "white"; e.currentTarget.style.color = "var(--color-primary-red)"; }}
+                  onClick={handleNoShow}>
+                  Не явился
+                </button>
+              )}
               <button type="button" className="btn btn-primary-small" disabled={saving}
                 style={{ background: "white", color: "#6b7280", border: "1px solid #d1d5db", transition: "background 0.15s, color 0.15s" }}
                 onMouseEnter={e => { e.currentTarget.style.background = "#f3f4f6"; }}

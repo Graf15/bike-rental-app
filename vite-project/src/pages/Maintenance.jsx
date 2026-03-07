@@ -1,3 +1,4 @@
+import { apiFetch } from "../utils/api";
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import MaintenanceTable from "../components/MaintenanceTable";
@@ -20,7 +21,7 @@ const Maintenance = () => {
   const fetchMaintenanceEvents = async () => {
     try {
       setLoading(true);
-      const response = await fetch("/api/maintenance");
+      const response = await apiFetch("/api/maintenance");
       if (!response.ok) {
         throw new Error("Ошибка при загрузке событий обслуживания");
       }
@@ -35,7 +36,7 @@ const Maintenance = () => {
 
   const handleCreateMaintenance = async (maintenanceData) => {
     try {
-      const response = await fetch("/api/maintenance", {
+      const response = await apiFetch("/api/maintenance", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -58,7 +59,7 @@ const Maintenance = () => {
 
   const handleEditMaintenance = async (maintenanceData) => {
     try {
-      const response = await fetch(`/api/maintenance/${editingEvent.id}`, {
+      const response = await apiFetch(`/api/maintenance/${editingEvent.id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -98,7 +99,7 @@ const Maintenance = () => {
           
         case 'delete':
           if (confirm(`Удалить ремонт #${eventId}?`)) {
-            const response = await fetch(`/api/maintenance/${eventId}`, {
+            const response = await apiFetch(`/api/maintenance/${eventId}`, {
               method: 'DELETE',
             });
             
@@ -121,7 +122,7 @@ const Maintenance = () => {
 
   const handleStatusChange = async (newStatus, notes = '') => {
     try {
-      const response = await fetch(`/api/maintenance/${statusChangeModal.eventId}/status`, {
+      const response = await apiFetch(`/api/maintenance/${statusChangeModal.eventId}/status`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

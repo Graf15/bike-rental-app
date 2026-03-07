@@ -2,9 +2,12 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import TableControls from "./TableControls";
 import MultiSelectPopover from "./MultiSelectPopover";
 import BikeActionsMenu from "./BikeActionsMenu";
+import DateRangePickerFilter from "./DateRangePickerFilter";
 import { RENTAL_OPTIONS } from "../constants/selectOptions";
 import "./BikeTable.css";
 import "./RentalsTable.css";
+
+const DATE_RANGE_KEYS = new Set(["booked_start", "booked_end"]);
 
 const formatDate = (dateString) => {
   if (!dateString) return "—";
@@ -192,6 +195,14 @@ const RentalsTable = ({ rentals, onRentalUpdate, onRentalEdit, onRentalDelete, o
   const filteredRentals = rentals.filter(r =>
     Object.entries(filters).every(([key, value]) => {
       if (!value || (Array.isArray(value) && value.length === 0)) return true;
+      // Фильтр по диапазону дат
+      if (DATE_RANGE_KEYS.has(key) && typeof value === "object" && !Array.isArray(value)) {
+        const d = r[key] ? new Date(r[key]) : null;
+        if (!d || isNaN(d)) return !value.from && !value.to;
+        if (value.from && d < new Date(value.from)) return false;
+        if (value.to   && d > new Date(value.to + "T23:59:59")) return false;
+        return true;
+      }
       const cell = key === "customer_name"
         ? `${r.last_name ? r.last_name + " " : ""}${r.first_name}`
         : r[key];
@@ -276,7 +287,12 @@ const RentalsTable = ({ rentals, onRentalUpdate, onRentalEdit, onRentalDelete, o
             <tr>
               {visibleColumnsData.map(({ key }) => (
                 <th key={key} data-column={key} style={{ width: columnWidths[key] }}>
-                  {selectOptions[key] ? (
+                  {DATE_RANGE_KEYS.has(key) ? (
+                    <DateRangePickerFilter
+                      value={filters[key] || null}
+                      onChange={(v) => updateFilter(key, v)}
+                    />
+                  ) : selectOptions[key] ? (
                     <div ref={(el) => (anchorRefs.current[key] = el)}
                       onClick={() => setPopoverInfo({ key, visible: popoverInfo.key !== key || !popoverInfo.visible })}
                       className="filter-select-box">

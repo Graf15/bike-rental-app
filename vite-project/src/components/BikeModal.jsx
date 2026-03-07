@@ -1,3 +1,4 @@
+import { apiFetch } from "../utils/api";
 import React, { useState, useEffect } from 'react';
 import { BIKE_OPTIONS } from '../constants/selectOptions';
 import AddBrandModal from './AddBrandModal';
@@ -92,7 +93,7 @@ const BikeModal = ({ isOpen, onClose, onSubmit, mode = 'create', bikeData = null
 
   const fetchBrands = async () => {
     try {
-      const response = await fetch('/api/brands');
+      const response = await apiFetch('/api/brands');
       if (response.ok) {
         const data = await response.json();
         setBrands(data);
@@ -104,7 +105,7 @@ const BikeModal = ({ isOpen, onClose, onSubmit, mode = 'create', bikeData = null
 
   const fetchTariffs = async () => {
     try {
-      const response = await fetch('/api/tariffs');
+      const response = await apiFetch('/api/tariffs');
       if (response.ok) {
         const data = await response.json();
         setTariffs(data.filter(t => t.is_active));
@@ -365,7 +366,7 @@ const BikeModal = ({ isOpen, onClose, onSubmit, mode = 'create', bikeData = null
   const getExchangeRate = async (date) => {
     try {
       const targetDate = date || new Date().toISOString().split('T')[0];
-      const response = await fetch(`/api/currency/rate?date=${targetDate}`);
+      const response = await apiFetch(`/api/currency/rate?date=${targetDate}`);
       if (response.ok) {
         const data = await response.json();
         return data;

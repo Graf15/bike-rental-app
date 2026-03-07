@@ -1,3 +1,4 @@
+import { apiFetch } from "../utils/api";
 import React, { useState, useRef } from 'react';
 import './Modal.css';
 
@@ -31,7 +32,7 @@ const AddBrandModal = ({ isOpen, onClose, onBrandAdded }) => {
     setError('');
 
     try {
-      const response = await fetch('/api/brands', {
+      const response = await apiFetch('/api/brands', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -1,3 +1,4 @@
+import { apiFetch } from "../utils/api";
 import React, { useState, useEffect, useRef } from "react";
 import "./Modal.css";
 import "./TariffModal.css";
@@ -93,7 +94,7 @@ const TariffModal = ({ tariff, onClose, onSave }) => {
     try {
       const url    = isEdit ? `/api/tariffs/${tariff.id}` : "/api/tariffs";
       const method = isEdit ? "PUT" : "POST";
-      const response = await fetch(url, {
+      const response = await apiFetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

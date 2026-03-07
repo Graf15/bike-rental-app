@@ -1,3 +1,4 @@
+import { apiFetch } from "../utils/api";
 import React, { useState, useEffect } from 'react';
 import './Modal.css';
 import { toast } from '../utils/toast';
@@ -67,7 +68,7 @@ const MaintenanceEventModal = ({
   // Загрузка пользователей
   const fetchUsers = async () => {
     try {
-      const response = await fetch('/api/users');
+      const response = await apiFetch('/api/users');
       if (response.ok) {
         const data = await response.json();
         setUsers(data);
@@ -80,7 +81,7 @@ const MaintenanceEventModal = ({
   // Загрузка велосипеда по ID
   const fetchBikeById = async (bikeId) => {
     try {
-      const response = await fetch(`/api/bikes/${bikeId}`);
+      const response = await apiFetch(`/api/bikes/${bikeId}`);
       if (response.ok) {
         const bike = await response.json();
         setSelectedBike(bike);
@@ -100,7 +101,7 @@ const MaintenanceEventModal = ({
 
     setSearchLoading(true);
     try {
-      const response = await fetch('/api/bikes');
+      const response = await apiFetch('/api/bikes');
       if (response.ok) {
         const bikes = await response.json();
         const filtered = bikes.filter(bike =>

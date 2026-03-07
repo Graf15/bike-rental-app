@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import TableControls from "./TableControls";
 import MultiSelectPopover from "./MultiSelectPopover";
-import DateRangeFilter from "./DateRangeFilter";
+import DateRangePickerFilter from "./DateRangePickerFilter";
 import { BIKE_OPTIONS } from "../constants/selectOptions";
 import "./MaintenanceTable.css";
 import "./BikeTable.css";
@@ -676,10 +676,9 @@ const MaintenanceTable = ({ events, onUpdate }) => {
                       <span className="arrow">▼</span>
                     </div>
                   ) : dateRangeOptions.includes(key) ? (
-                    <DateRangeFilter
-                      value={filters[key] || {}}
+                    <DateRangePickerFilter
+                      value={filters[key] || null}
                       onChange={(dateRange) => updateFilter(key, dateRange)}
-                      placeholder="Выбрать даты"
                     />
                   ) : (
                     <input

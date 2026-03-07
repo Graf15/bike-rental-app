@@ -1,3 +1,4 @@
+import { apiFetch } from "../utils/api";
 import React, { useState, useEffect, useRef } from "react";
 import MultiSelectPopover from "./MultiSelectPopover";
 import DateTimePickerField from "./DateTimePickerField";
@@ -105,7 +106,7 @@ const RentalViewModal = ({ rental: initialRental, onClose, onUpdate }) => {
 
   useEffect(() => {
     loadRental();
-    fetch("/api/users").then(r => r.json()).then(d => setUsers(Array.isArray(d) ? d : [])).catch(console.error);
+    apiFetch("/api/users").then(r => r.json()).then(d => setUsers(Array.isArray(d) ? d : [])).catch(console.error);
   }, []);
 
   useEffect(() => {
@@ -117,7 +118,7 @@ const RentalViewModal = ({ rental: initialRental, onClose, onUpdate }) => {
       const start = item.actual_start || rental.actual_start || rental.booked_start;
       if (!start || start >= now) return null;
       try {
-        const res = await fetch("/api/calculate/price", {
+        const res = await apiFetch("/api/calculate/price", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ tariff_id: item.tariff_id, start_time: start, end_time: now }),
@@ -137,7 +138,7 @@ const RentalViewModal = ({ rental: initialRental, onClose, onUpdate }) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/rentals/${initialRental.id}`);
+      const res = await apiFetch(`/api/rentals/${initialRental.id}`);
       if (!res.ok) throw new Error("Не удалось загрузить договор");
       const data = await res.json();
       setRental(data);
@@ -154,7 +155,7 @@ const RentalViewModal = ({ rental: initialRental, onClose, onUpdate }) => {
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch(`/api/rentals/${rental.id}/status`, {
+      const res = await apiFetch(`/api/rentals/${rental.id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status, ...extra }),
@@ -176,7 +177,7 @@ const RentalViewModal = ({ rental: initialRental, onClose, onUpdate }) => {
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch(`/api/rentals/${rental.id}/status`, {
+      const res = await apiFetch(`/api/rentals/${rental.id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -203,7 +204,7 @@ const RentalViewModal = ({ rental: initialRental, onClose, onUpdate }) => {
   const handleSaveNotes = async () => {
     setNotesSaving(true);
     try {
-      await fetch(`/api/rentals/${rental.id}/notes`, {
+      await apiFetch(`/api/rentals/${rental.id}/notes`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ notes_issue: notesIssue || null }),
@@ -232,7 +233,7 @@ const RentalViewModal = ({ rental: initialRental, onClose, onUpdate }) => {
     try {
       const start = rental.actual_start || rental.booked_start || "";
       const end = rental.booked_end || "";
-      const res = await fetch(`/api/bikes/for-rental?start=${start}&end=${end}&exclude_contract_id=${rental.id}`);
+      const res = await apiFetch(`/api/bikes/for-rental?start=${start}&end=${end}&exclude_contract_id=${rental.id}`);
       const data = await res.json();
       setSwapBikes((Array.isArray(data) ? data : []).filter(b => String(b.id) !== String(item.bike_id)));
     } catch {
@@ -249,7 +250,7 @@ const RentalViewModal = ({ rental: initialRental, onClose, onUpdate }) => {
     }
     setReturnCalcLoading(true);
     try {
-      const res = await fetch("/api/calculate/price", {
+      const res = await apiFetch("/api/calculate/price", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tariff_id: item.tariff_id, start_time: item.actual_start, end_time: endTimeIso }),
@@ -272,7 +273,7 @@ const RentalViewModal = ({ rental: initialRental, onClose, onUpdate }) => {
     if (!swapBikeId) { toast.warn("Выберите велосипед для замены"); return; }
     setSaving(true);
     try {
-      const res = await fetch(`/api/rentals/${rental.id}/items/${itemId}/swap`, {
+      const res = await apiFetch(`/api/rentals/${rental.id}/items/${itemId}/swap`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ new_bike_id: parseInt(swapBikeId), old_bike_status: oldBikeStatus }),
@@ -296,7 +297,7 @@ const RentalViewModal = ({ rental: initialRental, onClose, onUpdate }) => {
     setSaving(true);
     const localDisc = itemDiscounts[itemId];
     try {
-      const res = await fetch(`/api/rentals/${rental.id}/items/${itemId}/return`, {
+      const res = await apiFetch(`/api/rentals/${rental.id}/items/${itemId}/return`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -351,10 +352,7 @@ const RentalViewModal = ({ rental: initialRental, onClose, onUpdate }) => {
     );
   }
 
-  const canActivate   = rental.status === "booked";
   const canComplete   = rental.status === "active" || rental.status === "overdue";
-  const canCancel     = rental.status === "booked" || rental.status === "overdue";
-  const canNoShow     = rental.status === "booked" || rental.status === "overdue";
 
   const isActive      = rental.status === "active" || rental.status === "overdue";
 
@@ -659,7 +657,7 @@ const RentalViewModal = ({ rental: initialRental, onClose, onUpdate }) => {
                     </div>
 
                     {/* Действия */}
-                    {isItemActive && isBike && (isActive || canActivate) && (
+                    {isItemActive && isBike && isActive && (
                       <button type="button" title="Заменить велосипед"
                         onClick={() => swappingItemId === item.id ? setSwappingItemId(null) : openSwap(item)}
                         style={{ width: 28, height: 28, flexShrink: 0, background: "#eff6ff", color: "#2563eb", border: "1px solid #bfdbfe", borderRadius: 6, cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>
@@ -1059,28 +1057,6 @@ const RentalViewModal = ({ rental: initialRental, onClose, onUpdate }) => {
             Закрыть
           </button>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {canNoShow && (
-              <button type="button" className="btn btn-primary-small"
-                style={{ background: "var(--color-primary-red)", color: "white", border: "none", borderRadius: 6, cursor: "pointer", padding: "6px 14px", fontSize: "0.875rem", fontWeight: 500 }}
-                onClick={() => showConfirm({ title: "Не явился", message: "Отметить клиента как «Не явился»? Счётчик неявок увеличится.", confirmLabel: "Отметить", danger: true, onConfirm: () => handleStatusChange("no_show") })}
-                disabled={saving}>
-                Не явился
-              </button>
-            )}
-            {canCancel && (
-              <button type="button" className="btn btn-primary-small"
-                style={{ background: "#f3f4f6", color: "#374151", border: "1px solid #d1d5db", borderRadius: 6, cursor: "pointer", padding: "6px 14px", fontSize: "0.875rem", fontWeight: 500 }}
-                onClick={() => showConfirm({ title: "Отменить договор?", message: "Договор будет отменён, велосипеды освободятся.", confirmLabel: "Отменить", danger: true, onConfirm: () => handleStatusChange("cancelled") })}
-                disabled={saving}>
-                Отменить
-              </button>
-            )}
-            {canActivate && (
-              <button type="button" className="btn btn-primary-green btn-primary-small"
-                onClick={() => handleStatusChange("active")} disabled={saving}>
-                {saving ? "..." : "▶ Активировать прокат"}
-              </button>
-            )}
             {canComplete && (() => {
               const returnedItems = rental.items?.filter(i => i.status !== "active") || [];
               const stillActive   = rental.items?.filter(i => i.status === "active") || [];

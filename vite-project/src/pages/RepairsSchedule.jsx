@@ -1,3 +1,4 @@
+import { apiFetch } from "../utils/api";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import TableControls from "../components/TableControls";
 import MultiSelectPopover from "../components/MultiSelectPopover";
@@ -149,8 +150,8 @@ const RepairsSchedule = () => {
     try {
       setLoading(true);
       const [bikesResponse, scheduleResponse] = await Promise.all([
-        fetch("/api/bikes"),
-        fetch("/api/maintenance/weekly-schedule"),
+        apiFetch("/api/bikes"),
+        apiFetch("/api/maintenance/weekly-schedule"),
       ]);
 
       if (!bikesResponse.ok || !scheduleResponse.ok) {
@@ -320,7 +321,7 @@ const RepairsSchedule = () => {
 
   const handleDayAssignment = async (bikeId, selectedDays) => {
     try {
-      const response = await fetch("/api/maintenance/weekly-schedule", {
+      const response = await apiFetch("/api/maintenance/weekly-schedule", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -348,7 +349,7 @@ const RepairsSchedule = () => {
 
     setGenerating(true);
     try {
-      const response = await fetch("/api/maintenance/generate-weekly", {
+      const response = await apiFetch("/api/maintenance/generate-weekly", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

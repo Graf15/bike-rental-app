@@ -1,105 +1,115 @@
 import express from "express";
+import bcrypt from "bcrypt";
 import pool from "../db.js";
 
 const router = express.Router();
 
-// GET - получить всех пользователей
+// GET / — все сотрудники (без password_hash)
 router.get("/", async (req, res) => {
   try {
-    const result = await pool.query("SELECT * FROM users ORDER BY id");
+    const result = await pool.query(
+      "SELECT id, name, email, phone, role, is_active, created_at, updated_at FROM users ORDER BY name"
+    );
     res.json(result.rows);
   } catch (err) {
-    console.error("Ошибка при получении пользователей:", err);
+    console.error(err);
     res.status(500).json({ error: "Ошибка сервера" });
   }
 });
 
-// GET - получить пользователя по ID
-router.get("/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const result = await pool.query("SELECT * FROM users WHERE id = $1", [id]);
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Пользователь не найден" });
-    }
-
-    res.json(result.rows[0]);
-  } catch (err) {
-    console.error("Ошибка при получении пользователя:", err);
-    res.status(500).json({ error: "Ошибка сервера" });
-  }
-});
-
-// POST - создать нового пользователя
+// POST / — создать сотрудника
 router.post("/", async (req, res) => {
   try {
-    const { username, full_name, role } = req.body;
+    const { name, email, phone, role, password } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: "Укажите имя" });
+    if (!email?.trim()) return res.status(400).json({ error: "Укажите email" });
+    if (!password || password.length < 6)
+      return res.status(400).json({ error: "Пароль должен быть не менее 6 символов" });
 
+    const existing = await pool.query("SELECT id FROM users WHERE email = $1", [email.trim().toLowerCase()]);
+    if (existing.rows.length > 0)
+      return res.status(409).json({ error: "Сотрудник с таким email уже существует" });
+
+    const password_hash = await bcrypt.hash(password, 12);
     const result = await pool.query(
-      "INSERT INTO users (username, full_name, role) VALUES ($1, $2, $3) RETURNING *",
-      [username, full_name, role]
+      `INSERT INTO users (name, email, phone, role, password_hash, is_active)
+       VALUES ($1, $2, $3, $4, $5, true)
+       RETURNING id, name, email, phone, role, is_active, created_at`,
+      [name.trim(), email.trim().toLowerCase(), phone?.trim() || null, role || "manager", password_hash]
     );
-
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    console.error("Ошибка при создании пользователя:", err);
-    if (err.code === "23505") {
-      // unique violation
-      res
-        .status(400)
-        .json({ error: "Пользователь с таким логином уже существует" });
-    } else {
-      res.status(500).json({ error: "Ошибка сервера" });
-    }
+    console.error(err);
+    res.status(500).json({ error: "Ошибка сервера" });
   }
 });
 
-// PUT - обновить пользователя
+// PUT /:id — обновить данные сотрудника
 router.put("/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const { username, full_name, role } = req.body;
+    const { name, email, phone, role, is_active } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: "Укажите имя" });
+    if (!email?.trim()) return res.status(400).json({ error: "Укажите email" });
+
+    const existing = await pool.query(
+      "SELECT id FROM users WHERE email = $1 AND id != $2",
+      [email.trim().toLowerCase(), id]
+    );
+    if (existing.rows.length > 0)
+      return res.status(409).json({ error: "Этот email уже используется другим сотрудником" });
 
     const result = await pool.query(
-      "UPDATE users SET username = $1, full_name = $2, role = $3, updated_at = now() WHERE id = $4 RETURNING *",
-      [username, full_name, role, id]
+      `UPDATE users SET name=$1, email=$2, phone=$3, role=$4, is_active=$5, updated_at=NOW()
+       WHERE id=$6
+       RETURNING id, name, email, phone, role, is_active, created_at`,
+      [name.trim(), email.trim().toLowerCase(), phone?.trim() || null, role, is_active ?? true, id]
     );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Пользователь не найден" });
-    }
-
+    if (result.rows.length === 0)
+      return res.status(404).json({ error: "Сотрудник не найден" });
     res.json(result.rows[0]);
   } catch (err) {
-    console.error("Ошибка при обновлении пользователя:", err);
-    if (err.code === "23505") {
-      res
-        .status(400)
-        .json({ error: "Пользователь с таким логином уже существует" });
-    } else {
-      res.status(500).json({ error: "Ошибка сервера" });
-    }
+    console.error(err);
+    res.status(500).json({ error: "Ошибка сервера" });
   }
 });
 
-// DELETE - удалить пользователя
+// POST /:id/reset-password — сброс пароля администратором
+router.post("/:id/reset-password", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { password } = req.body;
+    if (!password || password.length < 6)
+      return res.status(400).json({ error: "Пароль должен быть не менее 6 символов" });
+
+    const password_hash = await bcrypt.hash(password, 12);
+    const result = await pool.query(
+      "UPDATE users SET password_hash=$1, updated_at=NOW() WHERE id=$2 RETURNING id",
+      [password_hash, id]
+    );
+    if (result.rows.length === 0)
+      return res.status(404).json({ error: "Сотрудник не найден" });
+
+    // Инвалидируем все сессии этого сотрудника
+    await pool.query("DELETE FROM sessions WHERE user_id = $1", [id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
+// DELETE /:id — удалить сотрудника
 router.delete("/:id", async (req, res) => {
   try {
     const { id } = req.params;
-
-    const result = await pool.query(
-      "DELETE FROM users WHERE id = $1 RETURNING *",
-      [id]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Пользователь не найден" });
-    }
-
-    res.json({ message: "Пользователь удален", user: result.rows[0] });
+    await pool.query("DELETE FROM sessions WHERE user_id = $1", [id]);
+    const result = await pool.query("DELETE FROM users WHERE id=$1 RETURNING id", [id]);
+    if (result.rows.length === 0)
+      return res.status(404).json({ error: "Сотрудник не найден" });
+    res.json({ ok: true });
   } catch (err) {
-    console.error("Ошибка при удалении пользователя:", err);
+    console.error(err);
     res.status(500).json({ error: "Ошибка сервера" });
   }
 });

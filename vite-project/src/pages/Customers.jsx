@@ -1,3 +1,4 @@
+import { apiFetch } from "../utils/api";
 import React, { useEffect, useRef, useState } from "react";
 import CustomersTable from "../components/CustomersTable";
 import CustomerModal from "../components/CustomerModal";
@@ -36,7 +37,7 @@ const Customers = () => {
     setFetching(true);
     try {
       const params = buildParams(currentPage, filters);
-      const response = await fetch(`/api/customers?${params}`);
+      const response = await apiFetch(`/api/customers?${params}`);
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const data = await response.json();
       setCustomers(data.rows);
@@ -76,7 +77,7 @@ const Customers = () => {
       danger: true,
       onConfirm: async () => {
         try {
-          const response = await fetch(`/api/customers/${customerId}`, { method: "DELETE" });
+          const response = await apiFetch(`/api/customers/${customerId}`, { method: "DELETE" });
           if (!response.ok) {
             const data = await response.json();
             throw new Error(data.error || "Ошибка при удалении");

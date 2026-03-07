@@ -1,3 +1,4 @@
+import { apiFetch } from "../utils/api";
 import React, { useState, useEffect, useRef } from "react";
 import "./PartsRequests.css";
 
@@ -27,7 +28,7 @@ const PartsRequests = () => {
 
   const fetchPurchaseRequests = async () => {
     try {
-      const response = await fetch("/api/purchase-requests");
+      const response = await apiFetch("/api/purchase-requests");
       if (!response.ok) throw new Error("Ошибка загрузки заказов");
       const data = await response.json();
       setRequests(data);
@@ -38,7 +39,7 @@ const PartsRequests = () => {
 
   const fetchMaintenanceNeeds = async () => {
     try {
-      const response = await fetch("/api/maintenance/parts-needs");
+      const response = await apiFetch("/api/maintenance/parts-needs");
       if (!response.ok) throw new Error("Ошибка загрузки потребностей");
       const data = await response.json();
       setMaintenanceNeeds(data);
@@ -54,7 +55,7 @@ const PartsRequests = () => {
     notes
   ) => {
     try {
-      const response = await fetch("/api/purchase-requests", {
+      const response = await apiFetch("/api/purchase-requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -81,7 +82,7 @@ const PartsRequests = () => {
     additionalData = {}
   ) => {
     try {
-      const response = await fetch(`/api/purchase-requests/${requestId}`, {
+      const response = await apiFetch(`/api/purchase-requests/${requestId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -116,7 +117,7 @@ const PartsRequests = () => {
       await updateRequestStatus(request.id, "получено");
 
       // Обновляем склад
-      const response = await fetch(
+      const response = await apiFetch(
         `/api/parts/${request.part_model_id}/stock`,
         {
           method: "PATCH",
@@ -467,7 +468,7 @@ const CreateRequestModal = ({ onClose, onSubmit }) => {
 
   const fetchParts = async () => {
     try {
-      const response = await fetch("/api/parts");
+      const response = await apiFetch("/api/parts");
       const data = await response.json();
       setParts(data);
     } catch (error) {

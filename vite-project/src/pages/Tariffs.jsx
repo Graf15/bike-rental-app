@@ -1,3 +1,4 @@
+import { apiFetch } from "../utils/api";
 import React, { useEffect, useState } from "react";
 import TariffsTable from "../components/TariffsTable";
 import TariffModal from "../components/TariffModal";
@@ -15,7 +16,7 @@ const Tariffs = () => {
   const fetchTariffs = async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/tariffs");
+      const response = await apiFetch("/api/tariffs");
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const data = await response.json();
       setTariffs(data);
@@ -44,7 +45,7 @@ const Tariffs = () => {
       danger: true,
       onConfirm: async () => {
         try {
-          const response = await fetch(`/api/tariffs/${tariffId}`, { method: "DELETE" });
+          const response = await apiFetch(`/api/tariffs/${tariffId}`, { method: "DELETE" });
           if (!response.ok) {
             const data = await response.json();
             throw new Error(data.error || "Ошибка при удалении");
@@ -59,7 +60,7 @@ const Tariffs = () => {
 
   const handleToggleActive = async (tariff) => {
     try {
-      const response = await fetch(`/api/tariffs/${tariff.id}`, {
+      const response = await apiFetch(`/api/tariffs/${tariff.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...tariff, is_active: !tariff.is_active }),

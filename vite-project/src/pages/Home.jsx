@@ -1,3 +1,4 @@
+import { apiFetch } from "../utils/api";
 import React, { useEffect, useState } from "react";
 import BikeTable from "../components/BikeTable";
 import BikeModal from "../components/BikeModal";
@@ -16,7 +17,7 @@ const Home = () => {
   const fetchBikes = async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/bikes");
+      const response = await apiFetch("/api/bikes");
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -68,7 +69,7 @@ const Home = () => {
 
   const handleCreateBike = async (bikeData) => {
     try {
-      const response = await fetch("/api/bikes", {
+      const response = await apiFetch("/api/bikes", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -92,7 +93,7 @@ const Home = () => {
 
   const handleUpdateBike = async (bikeData) => {
     try {
-      const response = await fetch(`/api/bikes/${editingBike.id}`, {
+      const response = await apiFetch(`/api/bikes/${editingBike.id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -116,7 +117,7 @@ const Home = () => {
 
   const handleBikeDelete = async (bikeId) => {
     try {
-      const response = await fetch(`/api/bikes/${bikeId}`, {
+      const response = await apiFetch(`/api/bikes/${bikeId}`, {
         method: "DELETE",
       });
 

@@ -1,3 +1,4 @@
+import { apiFetch } from "../utils/api";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ConfirmModal from "./ConfirmModal";
@@ -66,7 +67,7 @@ export default function OverdueAlertsManager() {
 
     const status = action === "no_show" ? "no_show" : "cancelled";
     try {
-      const res = await fetch(`/api/rentals/${alert.id}/status`, {
+      const res = await apiFetch(`/api/rentals/${alert.id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
@@ -88,7 +89,7 @@ export default function OverdueAlertsManager() {
   useEffect(() => {
     const poll = async () => {
       try {
-        const res = await fetch("/api/rentals/overdue-alerts");
+        const res = await apiFetch("/api/rentals/overdue-alerts");
         if (!res.ok) return;
         const alerts = await res.json();
         const shownStages = getShownStages();
