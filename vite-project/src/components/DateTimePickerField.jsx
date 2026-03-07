@@ -1,4 +1,5 @@
 import { forwardRef, useImperativeHandle, useRef, useEffect } from "react";
+import { CalendarDays } from "lucide-react";
 import {
   DatePicker,
   DateInput,
@@ -135,7 +136,7 @@ const DateTimePickerField = forwardRef(({ value, onChange, minDate, granularity 
         <DateInput>
           {(segment) => <DateSegment segment={segment} />}
         </DateInput>
-        <Button className="dt-cal-btn" aria-label="Открыть календарь">▾</Button>
+        <Button className="dt-cal-btn" aria-label="Открыть календарь"><CalendarDays size={18} /></Button>
       </Group>
 
       <Popover>

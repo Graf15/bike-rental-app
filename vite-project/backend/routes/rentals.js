@@ -629,7 +629,7 @@ router.patch("/:id", async (req, res) => {
 
     const contractCheck = await client.query("SELECT * FROM rental_contracts WHERE id = $1", [id]);
     if (contractCheck.rows.length === 0) throw new Error("Договор не найден");
-    if (contractCheck.rows[0].status !== "booked") throw new Error("Редактировать можно только забронированный договор");
+    if (!["booked", "overdue"].includes(contractCheck.rows[0].status)) throw new Error("Редактировать можно только забронированный или опаздывающий договор");
 
     if (!customer_id) throw new Error("Клиент обязателен");
     if (items.length === 0) throw new Error("Добавьте хотя бы одну позицию");
@@ -648,7 +648,7 @@ router.patch("/:id", async (req, res) => {
           JOIN rental_contracts rc ON ri.contract_id = rc.id
           WHERE ri.bike_id = $1
             AND ri.status = 'active'
-            AND rc.status IN ('booked', 'active')
+            AND rc.status IN ('booked', 'active', 'overdue')
             AND rc.id != $4
             AND rc.booked_start < $3
             AND rc.booked_end > $2

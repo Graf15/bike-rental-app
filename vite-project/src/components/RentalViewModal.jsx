@@ -1,5 +1,6 @@
 import { apiFetch } from "../utils/api";
 import React, { useState, useEffect, useRef } from "react";
+import { Bike } from "lucide-react";
 import MultiSelectPopover from "./MultiSelectPopover";
 import DateTimePickerField from "./DateTimePickerField";
 import ConfirmModal from "./ConfirmModal";
@@ -532,7 +533,7 @@ const RentalViewModal = ({ rental: initialRental, onClose, onUpdate }) => {
                 const isItemActive = item.status === "active";
                 const isBike = item.item_type === "bike";
                 const photo = item.photos?.urls?.length ? item.photos.urls[item.photos.main ?? 0] : null;
-                const bikeIcon = item.bike_model?.toLowerCase().includes("самокат") ? "🛴" : "🚲";
+                const bikeIcon = <Bike size={18} color="#9ca3af" />;
                 const localDiscount = getItemDiscount(item);
                 const livePrice = isItemActive ? liveItemPrices[item.id] : null;
                 const paidAmount = !isItemActive && item.paid_amount ? Math.round(parseFloat(item.paid_amount)) : null;
@@ -558,7 +559,7 @@ const RentalViewModal = ({ rental: initialRental, onClose, onUpdate }) => {
                       <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
                         {photo
                           ? <img src={photo} alt="" loading="lazy" style={{ width: 36, height: 36, objectFit: "cover", borderRadius: 4, flexShrink: 0 }} />
-                          : <div style={{ width: 36, height: 36, background: "#e5e7eb", borderRadius: 4, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>{bikeIcon}</div>
+                          : <div style={{ width: 36, height: 36, background: "#e5e7eb", borderRadius: 4, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{bikeIcon}</div>
                         }
                         <div style={{ fontSize: 12, lineHeight: 1.4, minWidth: 0, flex: 1 }}>
                           <div style={{ display: "flex", gap: 6, alignItems: "baseline", flexWrap: "wrap" }}>
@@ -729,7 +730,7 @@ const RentalViewModal = ({ rental: initialRental, onClose, onUpdate }) => {
                         return (a._heightMatch === "perfect" ? 0 : 1) - (b._heightMatch === "perfect" ? 0 : 1);
                       });
 
-                    const getBikeIcon = (b) => b?.model?.toLowerCase().includes("самокат") ? "🛴" : "🚲";
+                    const getBikeIcon = () => <Bike size={28} color="#9ca3af" />;
 
                     return (
                       <div style={{ padding: "12px 14px", background: "#eff6ff", border: "1px solid #bfdbfe", borderTop: "none", borderRadius: "0 0 6px 6px" }}>
@@ -811,7 +812,7 @@ const RentalViewModal = ({ rental: initialRental, onClose, onUpdate }) => {
                                   <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                                     {photo
                                       ? <img src={photo} alt="" loading="lazy" style={{ width: 60, height: 60, objectFit: "cover", borderRadius: 6, flexShrink: 0 }} />
-                                      : <div style={{ width: 60, height: 60, background: "#e5e7eb", borderRadius: 6, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26 }}>{getBikeIcon(b)}</div>
+                                      : <div style={{ width: 60, height: 60, background: "#e5e7eb", borderRadius: 6, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{getBikeIcon()}</div>
                                     }
                                     <div style={{ minWidth: 0 }}>
                                       <div style={{ fontWeight: 700, fontSize: 12 }}>{b.internal_article || "—"}</div>

@@ -1,5 +1,6 @@
 import { apiFetch } from "../utils/api";
 import { useState, useRef, useEffect, useCallback } from "react";
+import { Bike } from "lucide-react";
 import BikeStatusPopover from "./BikeStatusPopover";
 import BikeActionsMenu from "./BikeActionsMenu";
 import TableControls from "./TableControls";
@@ -609,7 +610,7 @@ const BikeTable = ({
                      const url = bike.photos?.urls?.[bike.photos?.main ?? 0];
                      return url
                        ? <img src={url} alt="" loading="lazy" style={{ width: 70, height: 70, objectFit: "cover", borderRadius: 4, display: "block", margin: "0 auto" }} />
-                       : <div style={{ width: 70, height: 70, background: "#e5e7eb", borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, margin: "0 auto" }}>🚲</div>;
+                       : <div style={{ width: 70, height: 70, background: "#e5e7eb", borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto" }}><Bike size={32} color="#9ca3af" /></div>;
                    })() :
                    key === 'last_maintenance_date' ? formatDate(bike[key]) :
                    key === 'condition_status' ? (

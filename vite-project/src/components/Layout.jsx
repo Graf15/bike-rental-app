@@ -2,34 +2,41 @@ import React, { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import ChangePasswordModal from "./ChangePasswordModal";
+import {
+  Bike, ClipboardList, Users, Tags, Wrench,
+  CalendarCog, Package, ShoppingCart, UserCog,
+  BarChart3, Settings, ChevronLeft, ChevronRight,
+  User, KeyRound, LogOut,
+} from "lucide-react";
 import "./Layout.css";
 
+const ICON_SIZE = 20;
+
+const menuItems = [
+  { path: "/",                 Icon: Bike,          label: "Велосипеды" },
+  { path: "/rentals",          Icon: ClipboardList,  label: "Аренда" },
+  { path: "/customers",        Icon: Users,          label: "Клиенты" },
+  { path: "/tariffs",          Icon: Tags,           label: "Тарифы" },
+  { path: "/maintenance",      Icon: Wrench,         label: "Обслуживание" },
+  { path: "/repairs-schedule", Icon: CalendarCog,    label: "Планирование ремонтов" },
+  { path: "/parts",            Icon: Package,        label: "Запчасти" },
+  { path: "/parts-requests",   Icon: ShoppingCart,   label: "Закупка запчастей" },
+  { path: "/users",            Icon: UserCog,        label: "Сотрудники" },
+  { path: "/analytics",        Icon: BarChart3,      label: "Аналитика" },
+  { path: "/settings",         Icon: Settings,       label: "Настройки" },
+];
 
 const Layout = ({ children }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [showChangePwd, setShowChangePwd] = useState(false);
-  const location   = useLocation();
-  const navigate   = useNavigate();
+  const location = useLocation();
+  const navigate = useNavigate();
   const { user, logout } = useAuth();
 
   const handleLogout = async () => {
     await logout();
     navigate("/login", { replace: true });
   };
-
-  const menuItems = [
-    { path: "/",                icon: "🚴", label: "Велосипеды" },
-    { path: "/rentals",         icon: "📋", label: "Аренда" },
-    { path: "/customers",       icon: "👥", label: "Клиенты" },
-    { path: "/tariffs",         icon: "💰", label: "Тарифы" },
-    { path: "/maintenance",     icon: "🔧", label: "Обслуживание" },
-    { path: "/repairs-schedule",icon: "📅", label: "Планирование ремонтов" },
-    { path: "/parts",           icon: "🔧", label: "Запчасти" },
-    { path: "/parts-requests",  icon: "🛒", label: "Закупка запчастей" },
-    { path: "/users",           icon: "👤", label: "Сотрудники" },
-    { path: "/analytics",       icon: "📊", label: "Аналитика" },
-    { path: "/settings",        icon: "⚙️", label: "Настройки" },
-  ];
 
   return (
     <div className="layout">
@@ -40,24 +47,22 @@ const Layout = ({ children }) => {
             onClick={() => setIsCollapsed(!isCollapsed)}
             title={isCollapsed ? "Развернуть меню" : "Свернуть меню"}
           >
-            {isCollapsed ? "→" : "←"}
+            {isCollapsed
+              ? <ChevronRight size={16} />
+              : <ChevronLeft size={16} />}
           </button>
         </div>
 
         <nav className="sidebar-nav">
-          {menuItems.map((item) => (
+          {menuItems.map(({ path, Icon, label }) => (
             <Link
-              key={item.path}
-              to={item.path}
-              className={`nav-item ${
-                location.pathname === item.path ? "active" : ""
-              }`}
-              title={isCollapsed ? item.label : ""}
+              key={path}
+              to={path}
+              className={`nav-item ${location.pathname === path ? "active" : ""}`}
+              title={isCollapsed ? label : ""}
             >
-              <span className="nav-icon">{item.icon}</span>
-              {!isCollapsed && (
-                <span className="nav-label">{item.label}</span>
-              )}
+              <span className="nav-icon"><Icon size={ICON_SIZE} /></span>
+              {!isCollapsed && <span className="nav-label">{label}</span>}
             </Link>
           ))}
         </nav>
@@ -66,8 +71,9 @@ const Layout = ({ children }) => {
           {user && (
             <div style={{ padding: isCollapsed ? "12px 0" : "12px 16px" }}>
               {!isCollapsed && (
-                <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  👤 {user.name}
+                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#9ca3af", marginBottom: 4, overflow: "hidden" }}>
+                  <User size={13} />
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.name}</span>
                 </div>
               )}
               {!isCollapsed && (
@@ -76,22 +82,26 @@ const Layout = ({ children }) => {
                   style={{
                     width: "100%", padding: "6px 10px", borderRadius: 6, marginBottom: 4,
                     border: "1px solid #374151", background: "transparent",
-                    color: "#9ca3af", fontSize: 12, cursor: "pointer", textAlign: "left",
+                    color: "#9ca3af", fontSize: 12, cursor: "pointer",
+                    textAlign: "left", display: "flex", alignItems: "center", gap: 6,
                   }}
                 >
-                  🔑 Сменить пароль
+                  <KeyRound size={13} /> Сменить пароль
                 </button>
               )}
               <button
                 onClick={handleLogout}
+                title={isCollapsed ? "Выйти" : ""}
                 style={{
                   width: "100%", padding: "7px 10px", borderRadius: 6,
                   border: "1px solid #374151", background: "transparent",
                   color: "#9ca3af", fontSize: 12, cursor: "pointer",
-                  textAlign: isCollapsed ? "center" : "left",
+                  display: "flex", alignItems: "center", gap: 6,
+                  justifyContent: isCollapsed ? "center" : "flex-start",
                 }}
               >
-                {isCollapsed ? "↩" : "↩ Выйти"}
+                <LogOut size={13} />
+                {!isCollapsed && "Выйти"}
               </button>
             </div>
           )}

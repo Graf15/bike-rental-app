@@ -67,11 +67,12 @@
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 22px;
   color: #9ca3af;
   padding: 0 2px;
   outline: none;
   line-height: 1;
+  display: flex;
+  align-items: center;
   transition: color 0.15s;
 }
 .dt-cal-btn:hover,

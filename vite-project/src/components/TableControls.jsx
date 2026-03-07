@@ -1,4 +1,5 @@
 import React, { useState, useRef } from "react";
+import { FilterX, Columns3 } from "lucide-react";
 import "./TableControls.css";
 
 const TableControls = ({
@@ -90,7 +91,7 @@ const TableControls = ({
           disabled={!hasActiveFilters}
           title="Сбросить все фильтры"
         >
-          🔄 Сбросить фильтры
+          <FilterX size={15} /> Сбросить фильтры
         </button>
 
         {/* Селектор видимых столбцов */}
@@ -100,7 +101,7 @@ const TableControls = ({
             onClick={() => setShowColumnSelector(!showColumnSelector)}
             title="Выбрать столбцы для отображения"
           >
-            📋 Столбцы
+            <Columns3 size={15} /> Столбцы
           </button>
           
           {showColumnSelector && (

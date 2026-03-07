@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { apiFetch } from "../utils/api";
 import { toast } from "../utils/toast";
 import PasswordInput from "./PasswordInput";
+import MultiSelectPopover from "./MultiSelectPopover";
+import CheckboxField from "./CheckboxField";
 import "./Modal.css";
 
 const ROLE_OPTIONS = [
@@ -20,6 +22,8 @@ const UserModal = ({ user, onClose, onSave }) => {
   const [showReset, setShowReset]     = useState(false);
   const [saving, setSaving]           = useState(false);
   const [errorSection, setErrorSection] = useState(null);
+  const [rolePopover, setRolePopover] = useState(false);
+  const roleAnchorRef = useRef(null);
   const mouseDownOnOverlay = useRef(false);
 
   useEffect(() => {
@@ -67,7 +71,7 @@ const UserModal = ({ user, onClose, onSave }) => {
       });
       const data = await res.json();
       if (!res.ok) { toast.error(data.error || "Ошибка"); return; }
-      toast.success(isEdit ? `Сотрудник обновлён` : `Сотрудник ${data.name} добавлен`);
+      toast.success(isEdit ? `Сотрудник ${form.name} обновлён` : `Сотрудник ${data.name} добавлен`);
       onSave();
     } catch { toast.error("Ошибка сервера"); }
     finally { setSaving(false); }
@@ -92,6 +96,7 @@ const UserModal = ({ user, onClose, onSave }) => {
   };
 
   return (
+    <>
     <div className="modal-overlay"
       onMouseDown={e => { mouseDownOnOverlay.current = e.target === e.currentTarget; }}
       onMouseUp={e => { if (mouseDownOnOverlay.current && e.target === e.currentTarget) onClose(); }}>
@@ -123,17 +128,25 @@ const UserModal = ({ user, onClose, onSave }) => {
                 </div>
                 <div className="form-group">
                   <label>Роль</label>
-                  <select className="form-input" name="role" value={form.role} onChange={handleChange}>
-                    {ROLE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
+                  <button
+                    type="button"
+                    ref={roleAnchorRef}
+                    className="filter-select-box"
+                    style={{ width: "100%" }}
+                    onClick={() => setRolePopover(v => !v)}
+                  >
+                    {ROLE_OPTIONS.find(o => o.value === form.role)?.label || "Менеджер"}
+                    <span className="arrow">▼</span>
+                  </button>
                 </div>
               </div>
               {isEdit && (
                 <div className="form-group">
-                  <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-                    <input type="checkbox" name="is_active" checked={form.is_active} onChange={handleChange} />
-                    Аккаунт активен
-                  </label>
+                  <CheckboxField
+                    checked={form.is_active}
+                    onChange={v => setForm(p => ({ ...p, is_active: v }))}
+                    label="Аккаунт активен"
+                  />
                 </div>
               )}
             </div>
@@ -197,6 +210,19 @@ const UserModal = ({ user, onClose, onSave }) => {
         </div>
       </div>
     </div>
+
+      {rolePopover && (
+        <MultiSelectPopover
+          options={ROLE_OPTIONS}
+          selected={[form.role]}
+          onChange={vals => { setForm(p => ({ ...p, role: vals[0] ?? "manager" })); setRolePopover(false); }}
+          visible={true}
+          anchorRef={roleAnchorRef}
+          onClose={() => setRolePopover(false)}
+          singleSelect
+        />
+      )}
+    </>
   );
 };
 

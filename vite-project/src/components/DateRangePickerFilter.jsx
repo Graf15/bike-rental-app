@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { CalendarRange } from "lucide-react";
 import DateTimePickerField from "./DateTimePickerField";
 
 const formatDisplay = (value) => {
@@ -76,7 +77,7 @@ const DateRangePickerFilter = ({ value, onChange }) => {
         style={isActive ? { borderColor: "var(--color-primary-green)", color: "var(--color-primary-green)" } : {}}
       >
         <span style={{ fontSize: 13 }}>{formatDisplay(value)}</span>
-        <span className="arrow">📅</span>
+        <CalendarRange size={14} />
       </div>
 
       {isOpen && (

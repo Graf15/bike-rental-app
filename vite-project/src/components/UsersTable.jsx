@@ -381,7 +381,7 @@ const UsersTable = ({ users, onEdit, onUpdate }) => {
               </tr>
             )}
             {paginated.map(user => (
-              <tr key={user.id}>
+              <tr key={user.id} onDoubleClick={() => onEdit(user)} style={{ cursor: "pointer" }}>
                 {orderedColumns.map(col => (
                   <td key={col.key} data-column={col.key}>{renderCell(user, col.key)}</td>
                 ))}

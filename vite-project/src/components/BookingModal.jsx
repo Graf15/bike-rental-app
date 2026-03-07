@@ -1,5 +1,6 @@
 import { apiFetch } from "../utils/api";
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { Bike } from "lucide-react";
 import MultiSelectPopover from "./MultiSelectPopover";
 import DateTimePickerField from "./DateTimePickerField";
 import CheckboxField from "./CheckboxField";
@@ -109,7 +110,7 @@ const formatDt = (dateStr) => {
   catch { return null; }
 };
 
-const getBikeIcon = (bike) => bike?.model?.toLowerCase().includes("самокат") ? "🛴" : "🚲";
+const getBikeIcon = (size = 20) => <Bike size={size} color="#9ca3af" />;
 
 const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue = null }) => {
   const [confirmProps, showConfirm] = useConfirm();
@@ -1200,7 +1201,7 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
                         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                           {photo
                             ? <img src={photo} alt="" loading="lazy" style={{ width: 60, height: 60, objectFit: "cover", borderRadius: 6, flexShrink: 0 }} />
-                            : <div style={{ width: 60, height: 60, background: "#e5e7eb", borderRadius: 6, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26 }}>{getBikeIcon(bike)}</div>
+                            : <div style={{ width: 60, height: 60, background: "#e5e7eb", borderRadius: 6, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{getBikeIcon(28)}</div>
                           }
                           <div style={{ minWidth: 0 }}>
                             <div style={{ fontWeight: 700, fontSize: 12 }}>{bike.internal_article || "—"}</div>
@@ -1308,7 +1309,7 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
                         return (
                           <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
                             {photo ? <img src={photo} alt="" loading="lazy" style={{ width: 36, height: 36, objectFit: "cover", borderRadius: 4, flexShrink: 0 }} />
-                              : <div style={{ width: 36, height: 36, background: "#e5e7eb", borderRadius: 4, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>{getBikeIcon(bike)}</div>}
+                              : <div style={{ width: 36, height: 36, background: "#e5e7eb", borderRadius: 4, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{getBikeIcon(18)}</div>}
                             <div style={{ fontSize: 12, lineHeight: 1.4, minWidth: 0, flex: 1 }}>
                               <div style={{ display: "flex", gap: 6, alignItems: "baseline" }}>
                                 {bike.internal_article && <span style={{ fontWeight: 700 }}>{bike.internal_article}</span>}
