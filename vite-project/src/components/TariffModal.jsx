@@ -1,5 +1,6 @@
 import { apiFetch } from "../utils/api";
 import React, { useState, useEffect, useRef } from "react";
+import CheckboxField from "./CheckboxField";
 import "./Modal.css";
 import "./TariffModal.css";
 import { toast } from "../utils/toast";
@@ -151,19 +152,16 @@ const TariffModal = ({ tariff, onClose, onSave }) => {
                 />
               </div>
               <div style={{ marginTop: 12, display: "flex", gap: 24, alignItems: "center" }}>
-                <label className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    name="has_weekend_pricing"
-                    checked={form.has_weekend_pricing}
-                    onChange={handleChange}
-                  />
-                  Разные цены в будни и выходные
-                </label>
-                <label className="checkbox-label">
-                  <input type="checkbox" name="is_active" checked={form.is_active} onChange={handleChange} />
-                  Тариф активен
-                </label>
+                <CheckboxField
+                  label="Разные цены в будни и выходные"
+                  checked={form.has_weekend_pricing}
+                  onChange={v => setForm(prev => ({ ...prev, has_weekend_pricing: v }))}
+                />
+                <CheckboxField
+                  label="Тариф активен"
+                  checked={form.is_active}
+                  onChange={v => setForm(prev => ({ ...prev, is_active: v }))}
+                />
               </div>
             </div>
 

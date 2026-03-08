@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { Pencil, Copy, Trash2 } from "lucide-react";
 import "./Popover.css";
 import ConfirmModal from "./ConfirmModal";
 import { useConfirm } from "../utils/useConfirm";
@@ -100,13 +101,13 @@ const BikeActionsMenu = ({ bike, onEdit, onCopy, onDelete }) => {
           }}>
           {onEdit && (
             <button className="menu-item" onClick={() => handleAction("edit")}>
-              ✏️ Редактировать
+              <Pencil size={13} /> Редактировать
             </button>
           )}
 
           {onCopy && (
             <button className="menu-item" onClick={() => handleAction("copy")}>
-              📋 Копировать
+              <Copy size={13} /> Копировать
             </button>
           )}
 
@@ -117,7 +118,7 @@ const BikeActionsMenu = ({ bike, onEdit, onCopy, onDelete }) => {
               className="menu-item danger"
               onClick={() => handleAction("delete")}
             >
-              🗑️ Удалить
+              <Trash2 size={13} /> Удалить
             </button>
           )}
         </div>

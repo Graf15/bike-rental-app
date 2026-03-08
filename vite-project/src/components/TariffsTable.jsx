@@ -30,7 +30,7 @@ const TariffsTable = ({ tariffs, onEdit, onDelete, onToggleActive }) => {
     const saved = localStorage.getItem("tariffsTableVisibleColumns");
     return saved
       ? JSON.parse(saved)
-      : ["id", "name", "description", "price_first_hour", "price_next_hour", "price_day", "price_24h", "price_week", "is_active"];
+      : ["id", "name", "description", "price_first_hour", "price_next_hour", "price_day", "price_24h", "price_week", "price_2weeks", "price_month", "is_active"];
   });
 
   const defaultColumnWidths = {
@@ -42,6 +42,16 @@ const TariffsTable = ({ tariffs, onEdit, onDelete, onToggleActive }) => {
     price_day: 100,
     price_24h: 100,
     price_week: 100,
+    price_2weeks: 100,
+    price_month: 100,
+    price_first_hour_wd: 120,
+    price_next_hour_wd: 120,
+    price_day_wd: 110,
+    price_24h_wd: 110,
+    price_first_hour_we: 120,
+    price_next_hour_we: 120,
+    price_day_we: 110,
+    price_24h_we: 110,
     is_active: 100,
     actions: 100,
   };
@@ -55,7 +65,7 @@ const TariffsTable = ({ tariffs, onEdit, onDelete, onToggleActive }) => {
     const saved = localStorage.getItem("tariffsTableColumnOrder");
     return saved
       ? JSON.parse(saved)
-      : ["id", "name", "description", "price_first_hour", "price_next_hour", "price_day", "price_24h", "price_week", "is_active"];
+      : ["id", "name", "description", "price_first_hour", "price_next_hour", "price_day", "price_24h", "price_week", "price_2weeks", "price_month", "is_active"];
   });
 
   const isResizing = useRef(false);
@@ -224,7 +234,7 @@ const TariffsTable = ({ tariffs, onEdit, onDelete, onToggleActive }) => {
     localStorage.setItem("tariffsTablePageSize", size.toString());
   };
 
-  const fmt = (val) => (val != null ? `${val} ₴` : "—");
+  const fmt = (val) => (val != null ? Number(val).toString() : "—");
 
   const columns = [
     { key: "id",               label: "ID"           },
@@ -234,8 +244,18 @@ const TariffsTable = ({ tariffs, onEdit, onDelete, onToggleActive }) => {
     { key: "price_next_hour",  label: "Доп. час"      },
     { key: "price_day",        label: "День"          },
     { key: "price_24h",        label: "Сутки (24ч)"   },
-    { key: "price_week",       label: "Неделя"        },
-    { key: "is_active",        label: "Статус"        },
+    { key: "price_week",         label: "Неделя"         },
+    { key: "price_2weeks",       label: "2 недели"       },
+    { key: "price_month",        label: "Месяц"          },
+    { key: "price_first_hour_wd", label: "1й час (буд)"  },
+    { key: "price_next_hour_wd",  label: "Доп.час (буд)" },
+    { key: "price_day_wd",        label: "День (буд)"    },
+    { key: "price_24h_wd",        label: "Сутки (буд)"   },
+    { key: "price_first_hour_we", label: "1й час (вых)"  },
+    { key: "price_next_hour_we",  label: "Доп.час (вых)" },
+    { key: "price_day_we",        label: "День (вых)"    },
+    { key: "price_24h_we",        label: "Сутки (вых)"   },
+    { key: "is_active",           label: "Статус"        },
   ];
 
   const getOrderedColumns = () => {
@@ -279,7 +299,17 @@ const TariffsTable = ({ tariffs, onEdit, onDelete, onToggleActive }) => {
       case "price_next_hour":  return fmt(tariff.price_next_hour);
       case "price_day":        return fmt(tariff.price_day);
       case "price_24h":        return fmt(tariff.price_24h);
-      case "price_week":       return fmt(tariff.price_week);
+      case "price_week":          return fmt(tariff.price_week);
+      case "price_2weeks":        return fmt(tariff.price_2weeks);
+      case "price_month":         return fmt(tariff.price_month);
+      case "price_first_hour_wd": return fmt(tariff.price_first_hour_wd);
+      case "price_next_hour_wd":  return fmt(tariff.price_next_hour_wd);
+      case "price_day_wd":        return fmt(tariff.price_day_wd);
+      case "price_24h_wd":        return fmt(tariff.price_24h_wd);
+      case "price_first_hour_we": return fmt(tariff.price_first_hour_we);
+      case "price_next_hour_we":  return fmt(tariff.price_next_hour_we);
+      case "price_day_we":        return fmt(tariff.price_day_we);
+      case "price_24h_we":        return fmt(tariff.price_24h_we);
       case "is_active":
         return (
           <span

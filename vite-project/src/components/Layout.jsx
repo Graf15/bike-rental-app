@@ -2,29 +2,12 @@ import React, { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import ChangePasswordModal from "./ChangePasswordModal";
-import {
-  Bike, ClipboardList, Users, Tags, Wrench,
-  CalendarCog, Package, ShoppingCart, UserCog,
-  BarChart3, Settings, ChevronLeft, ChevronRight,
-  User, KeyRound, LogOut,
-} from "lucide-react";
+import { ROUTES } from "../constants/routes";
+import { usePermissions } from "../context/PermissionsContext";
+import { ChevronLeft, ChevronRight, User, KeyRound, LogOut } from "lucide-react";
 import "./Layout.css";
 
 const ICON_SIZE = 20;
-
-const menuItems = [
-  { path: "/",                 Icon: Bike,          label: "Велосипеды" },
-  { path: "/rentals",          Icon: ClipboardList,  label: "Аренда" },
-  { path: "/customers",        Icon: Users,          label: "Клиенты" },
-  { path: "/tariffs",          Icon: Tags,           label: "Тарифы" },
-  { path: "/maintenance",      Icon: Wrench,         label: "Обслуживание" },
-  { path: "/repairs-schedule", Icon: CalendarCog,    label: "Планирование ремонтов" },
-  { path: "/parts",            Icon: Package,        label: "Запчасти" },
-  { path: "/parts-requests",   Icon: ShoppingCart,   label: "Закупка запчастей" },
-  { path: "/users",            Icon: UserCog,        label: "Сотрудники" },
-  { path: "/analytics",        Icon: BarChart3,      label: "Аналитика" },
-  { path: "/settings",         Icon: Settings,       label: "Настройки" },
-];
 
 const Layout = ({ children }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -32,6 +15,9 @@ const Layout = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { canAccess } = usePermissions();
+
+  const menuItems = ROUTES.filter(route => canAccess(route.path, user?.role));
 
   const handleLogout = async () => {
     await logout();

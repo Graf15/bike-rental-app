@@ -1,6 +1,12 @@
 import { apiFetch } from "../utils/api";
 import React, { useState, useEffect, useRef } from "react";
-import { Bike } from "lucide-react";
+import { Bike, Scooter, Package, Flashlight, Backpack } from "lucide-react";
+
+const getEquipmentIcon = (tariffId, size = 18) => {
+  if (Number(tariffId) === 9)  return <Flashlight size={size} color="#0369a1" />;
+  if (Number(tariffId) === 10) return <Backpack size={size} color="#0369a1" />;
+  return <Package size={size} color="#0369a1" />;
+};
 import MultiSelectPopover from "./MultiSelectPopover";
 import DateTimePickerField from "./DateTimePickerField";
 import ConfirmModal from "./ConfirmModal";
@@ -507,7 +513,7 @@ const RentalViewModal = ({ rental: initialRental, onClose, onUpdate }) => {
               <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "0 0 8px" }}>
                 <h3 style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>Позиции договора</h3>
                 {rental.items?.length > 0 && (() => {
-                  const scootCount = rental.items.filter(i => i.item_type === "bike" && i.bike_model?.toLowerCase().includes("самокат")).length;
+                  const scootCount = rental.items.filter(i => i.item_type === "bike" && Number(i.tariff_id) === 5).length;
                   const bikeCount  = rental.items.filter(i => i.item_type === "bike").length - scootCount;
                   const eqCount    = rental.items.filter(i => i.item_type === "equipment").length;
                   return (
@@ -533,7 +539,9 @@ const RentalViewModal = ({ rental: initialRental, onClose, onUpdate }) => {
                 const isItemActive = item.status === "active";
                 const isBike = item.item_type === "bike";
                 const photo = item.photos?.urls?.length ? item.photos.urls[item.photos.main ?? 0] : null;
-                const bikeIcon = <Bike size={18} color="#9ca3af" />;
+                const bikeIcon = Number(item.tariff_id) === 5
+                  ? <Scooter size={18} color="#9ca3af" />
+                  : <Bike size={18} color="#9ca3af" />;
                 const localDiscount = getItemDiscount(item);
                 const livePrice = isItemActive ? liveItemPrices[item.id] : null;
                 const paidAmount = !isItemActive && item.paid_amount ? Math.round(parseFloat(item.paid_amount)) : null;
@@ -574,7 +582,7 @@ const RentalViewModal = ({ rental: initialRental, onClose, onUpdate }) => {
                       </div>
                     ) : (
                       <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
-                        <div style={{ width: 36, height: 36, background: "#e0f2fe", borderRadius: 4, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🔦</div>
+                        <div style={{ width: 36, height: 36, background: "#e0f2fe", borderRadius: 4, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{getEquipmentIcon(item.tariff_id)}</div>
                         <div style={{ fontSize: 12, lineHeight: 1.4, minWidth: 0, flex: 1 }}>
                           <div style={{ fontWeight: 600 }}>{item.equipment_model_name || item.equipment_name || "Оборудование"}</div>
                         </div>
@@ -730,7 +738,9 @@ const RentalViewModal = ({ rental: initialRental, onClose, onUpdate }) => {
                         return (a._heightMatch === "perfect" ? 0 : 1) - (b._heightMatch === "perfect" ? 0 : 1);
                       });
 
-                    const getBikeIcon = () => <Bike size={28} color="#9ca3af" />;
+                    const getBikeIcon = (b) => Number(b?.tariff_id) === 5
+                      ? <Scooter size={28} color="#9ca3af" />
+                      : <Bike size={28} color="#9ca3af" />;
 
                     return (
                       <div style={{ padding: "12px 14px", background: "#eff6ff", border: "1px solid #bfdbfe", borderTop: "none", borderRadius: "0 0 6px 6px" }}>

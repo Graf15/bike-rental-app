@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import TableControls from "../components/TableControls";
 import MultiSelectPopover from "../components/MultiSelectPopover";
 import { BIKE_OPTIONS, SCHEDULE_OPTIONS } from "../constants/selectOptions";
+import { CalendarPlus, Bike, Scooter } from "lucide-react";
 import "./RepairsSchedule.css";
 import "../components/BikeTable.css";
 
@@ -20,7 +21,7 @@ const RepairsSchedule = () => {
   
   // Состояния для пагинации
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [itemsPerPage, setItemsPerPage] = useState(50);
   
   // Состояния для ресайза столбцов
   const [columnWidths, setColumnWidths] = useState({});
@@ -65,17 +66,18 @@ const RepairsSchedule = () => {
     
     // Проверяем версию настроек для миграции
     const settingsVersion = localStorage.getItem('repairsScheduleSettingsVersion');
-    if (settingsVersion !== '2.0') {
+    if (settingsVersion !== '2.1') {
       // Очищаем старые настройки при добавлении новых столбцов
       localStorage.removeItem('repairsScheduleColumnOrder');
       localStorage.removeItem('repairsScheduleVisibleColumns');
       localStorage.removeItem('repairsScheduleColumnWidths');
-      localStorage.setItem('repairsScheduleSettingsVersion', '2.0');
+      localStorage.setItem('repairsScheduleSettingsVersion', '2.1');
     }
     
     // Инициализация ширин столбцов
     const defaultWidths = {
       id: 60,
+      photo: 70,
       internal_article: 120,
       model: 200,
       brand_name: 100,
@@ -96,8 +98,9 @@ const RepairsSchedule = () => {
     // Инициализация видимости столбцов
     const defaultVisible = [
       "id",
+      "photo",
       "internal_article",
-      "model", 
+      "model",
       "model_year",
       "wheel_size",
       "frame_size",
@@ -109,6 +112,7 @@ const RepairsSchedule = () => {
 
     const defaultOrder = [
       "id",
+      "photo",
       "internal_article",
       "model",
       "brand_name",
@@ -131,7 +135,7 @@ const RepairsSchedule = () => {
     
     // Проверяем, что все столбцы из defaultOrder присутствуют в savedOrder
     const allColumns = [
-      "id", "internal_article", "model", "brand_name", "model_year", 
+      "id", "photo", "internal_article", "model", "brand_name", "model_year",
       "wheel_size", "frame_size", "frame_number", "gender", "tariff_name",
       "condition_status", "scheduled_day", "notes"
     ];
@@ -523,6 +527,7 @@ const RepairsSchedule = () => {
     
     const columns = [
       { key: "id", label: "ID", filterable: true },
+      { key: "photo", label: "Фото", filterable: false },
       { key: "internal_article", label: "Внутр. артикул", filterable: true },
       { key: "model", label: "Модель", filterable: true },
       { key: "brand_name", label: "Бренд", filterable: true },
@@ -573,6 +578,7 @@ const RepairsSchedule = () => {
 
   const columns = [
     { key: "id", label: "ID", filterable: true },
+    { key: "photo", label: "Фото", filterable: false },
     { key: "internal_article", label: "Внутр. артикул", filterable: true },
     { key: "model", label: "Модель", filterable: true },
     { key: "brand_name", label: "Бренд", filterable: true },
@@ -670,7 +676,7 @@ const RepairsSchedule = () => {
             onClick={handleGenerateWeekly}
             disabled={generating || totalScheduled === 0}
           >
-            {generating ? "Создание..." : "📅 Создать ремонты на неделю"}
+            {generating ? "Создание..." : <><CalendarPlus size={15} /> Создать ремонты на неделю</>}
           </button>
         </div>
       </div>
@@ -685,9 +691,9 @@ const RepairsSchedule = () => {
         totalItems={sortedBikes.length}
         currentPage={currentPage}
         totalPages={totalPages}
-        itemsPerPage={itemsPerPage}
+        pageSize={itemsPerPage}
         onPageChange={handlePageChange}
-        onItemsPerPageChange={handleItemsPerPageChange}
+        onPageSizeChange={handleItemsPerPageChange}
       />
 
       {/* Таблица велосипедов с планированием */}
@@ -696,23 +702,25 @@ const RepairsSchedule = () => {
           <thead>
             <tr>
               {orderedColumns.filter(col => visibleColumns.includes(col.key)).map(({ key, label }) => (
-                <th 
+                <th
                   key={key}
                   data-column={key}
-                  draggable={true}
-                  onClick={() => handleSort(key)}
+                  draggable={key !== 'photo'}
+                  onClick={() => key !== 'photo' && handleSort(key)}
                   onDragStart={(e) => handleDragStart(e, key)}
                   onDragOver={(e) => handleDragOver(e, key)}
                   onDragEnter={(e) => handleDragEnter(e, key)}
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, key)}
                   onDragEnd={handleDragEnd}
-                  style={{}}
+                  style={key === 'photo' ? { cursor: 'default' } : {}}
                 >
-                  {label}{" "}
-                  <span className="sort-arrow">
-                    {sortColumn === key && (sortAsc ? "▲" : "▼")}
-                  </span>
+                  {key !== 'photo' && label}{" "}
+                  {key !== 'photo' && (
+                    <span className="sort-arrow">
+                      {sortColumn === key && (sortAsc ? "▲" : "▼")}
+                    </span>
+                  )}
                   <div
                     className="column-resizer"
                     onMouseDown={(e) => handleResizeStart(e, key)}
@@ -764,6 +772,19 @@ const RepairsSchedule = () => {
                     
                     if (key === 'id') {
                       return <td key={key} data-column={key}>{bike.id}</td>;
+                    }
+                    if (key === 'photo') {
+                      const url = bike.photos?.urls?.[bike.photos?.main ?? 0];
+                      return (
+                        <td key={key} data-column={key} style={{ padding: 3, textAlign: "center", verticalAlign: "middle" }}>
+                          {url
+                            ? <img src={url} alt="" loading="lazy" style={{ width: 70, height: 70, objectFit: "cover", borderRadius: 4, display: "block", margin: "0 auto" }} />
+                            : <div style={{ width: 70, height: 70, background: "#e5e7eb", borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto" }}>
+                                {Number(bike.tariff_id) === 5 ? <Scooter size={32} color="#9ca3af" /> : <Bike size={32} color="#9ca3af" />}
+                              </div>
+                          }
+                        </td>
+                      );
                     }
                     if (key === 'internal_article') {
                       return <td key={key} data-column={key}>{bike.internal_article}</td>;

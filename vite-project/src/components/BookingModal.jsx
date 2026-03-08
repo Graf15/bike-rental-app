@@ -1,6 +1,12 @@
 import { apiFetch } from "../utils/api";
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Bike } from "lucide-react";
+import { Bike, Scooter, Package, Flashlight, Backpack } from "lucide-react";
+
+const getEquipmentIcon = (tariffId, size = 18) => {
+  if (Number(tariffId) === 9)  return <Flashlight size={size} color="#0369a1" />;
+  if (Number(tariffId) === 10) return <Backpack size={size} color="#0369a1" />;
+  return <Package size={size} color="#0369a1" />;
+};
 import MultiSelectPopover from "./MultiSelectPopover";
 import DateTimePickerField from "./DateTimePickerField";
 import CheckboxField from "./CheckboxField";
@@ -110,7 +116,9 @@ const formatDt = (dateStr) => {
   catch { return null; }
 };
 
-const getBikeIcon = (size = 20) => <Bike size={size} color="#9ca3af" />;
+const getBikeIcon = (bike, size = 20) => Number(bike?.tariff_id) === 5
+  ? <Scooter size={size} color="#9ca3af" />
+  : <Bike size={size} color="#9ca3af" />;
 
 const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue = null }) => {
   const [confirmProps, showConfirm] = useConfirm();
@@ -850,7 +858,7 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
     >
       <div className="modal-content" style={{ maxWidth: 920 }} onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>{editingRental ? `Бронь #${editingRental.id}` : "📅 Создать бронь"}</h2>
+          <h2>{editingRental ? `Бронь #${editingRental.id}` : "Создать бронь"}</h2>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
 
@@ -1201,7 +1209,7 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
                         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                           {photo
                             ? <img src={photo} alt="" loading="lazy" style={{ width: 60, height: 60, objectFit: "cover", borderRadius: 6, flexShrink: 0 }} />
-                            : <div style={{ width: 60, height: 60, background: "#e5e7eb", borderRadius: 6, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{getBikeIcon(28)}</div>
+                            : <div style={{ width: 60, height: 60, background: "#e5e7eb", borderRadius: 6, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{getBikeIcon(bike, 28)}</div>
                           }
                           <div style={{ minWidth: 0 }}>
                             <div style={{ fontWeight: 700, fontSize: 12 }}>{bike.internal_article || "—"}</div>
@@ -1259,7 +1267,7 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
                           onMouseLeave={e => { if (!isFocused) e.currentTarget.style.boxShadow = ""; }}
                         >
                           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                            <div style={{ width: 60, height: 60, background: isDup ? "#dbeafe" : "#e0f2fe", borderRadius: 6, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26 }}>🔦</div>
+                            <div style={{ width: 60, height: 60, background: isDup ? "#dbeafe" : "#e0f2fe", borderRadius: 6, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{getEquipmentIcon(eq.rental_tariff_id, 28)}</div>
                             <div style={{ minWidth: 0 }}>
                               <div style={{ fontWeight: 700, fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{eq.name}</div>
                               {eq.category && <div style={{ fontSize: 11, color: "#4b5563" }}>{eq.category}</div>}
@@ -1284,7 +1292,7 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
                   <h3 style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>Позиции договора</h3>
                   {(() => {
-                    const scootCount = items.filter(i => i.item_type === "bike" && allBikes.find(b => String(b.id) === String(i.bike_id))?.model?.toLowerCase().includes("самокат")).length;
+                    const scootCount = items.filter(i => i.item_type === "bike" && Number(allBikes.find(b => String(b.id) === String(i.bike_id))?.tariff_id) === 5).length;
                     const bikeCount  = items.filter(i => i.item_type === "bike").length - scootCount;
                     const eqCount    = items.filter(i => i.item_type === "equipment").length;
                     return (
@@ -1309,7 +1317,7 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
                         return (
                           <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
                             {photo ? <img src={photo} alt="" loading="lazy" style={{ width: 36, height: 36, objectFit: "cover", borderRadius: 4, flexShrink: 0 }} />
-                              : <div style={{ width: 36, height: 36, background: "#e5e7eb", borderRadius: 4, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{getBikeIcon(18)}</div>}
+                              : <div style={{ width: 36, height: 36, background: "#e5e7eb", borderRadius: 4, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{getBikeIcon(bike, 18)}</div>}
                             <div style={{ fontSize: 12, lineHeight: 1.4, minWidth: 0, flex: 1 }}>
                               <div style={{ display: "flex", gap: 6, alignItems: "baseline" }}>
                                 {bike.internal_article && <span style={{ fontWeight: 700 }}>{bike.internal_article}</span>}
@@ -1321,7 +1329,7 @@ const BookingModal = ({ onClose, onSave, editingRental = null, onProceedToIssue 
                         );
                       })() : (
                         <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
-                          <div style={{ width: 36, height: 36, background: "#e0f2fe", borderRadius: 4, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🔦</div>
+                          <div style={{ width: 36, height: 36, background: "#e0f2fe", borderRadius: 4, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{getEquipmentIcon(eq?.rental_tariff_id)}</div>
                           <div style={{ fontSize: 12, lineHeight: 1.4, minWidth: 0, flex: 1 }}>
                             <div style={{ fontWeight: 600 }}>{eq?.name || "Оборудование"}</div>
                             {eq?.category && <div style={{ color: "#6b7280", fontSize: 11 }}>{eq.category}</div>}

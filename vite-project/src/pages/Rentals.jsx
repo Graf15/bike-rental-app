@@ -1,5 +1,6 @@
 import { apiFetch } from "../utils/api";
 import React, { useEffect, useRef, useState } from "react";
+import { CalendarPlus } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "../utils/toast";
 import RentalsTable from "../components/RentalsTable";
@@ -189,7 +190,7 @@ const Rentals = () => {
               className="btn btn-secondary-green add-bike-btn"
               onClick={() => setIsBookingModalOpen(true)}
             >
-              📅 Создать бронь
+              <CalendarPlus size={15} /> Создать бронь
             </button>
           </div>
         </div>

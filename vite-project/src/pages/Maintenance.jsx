@@ -1,6 +1,7 @@
 import { apiFetch } from "../utils/api";
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { CalendarCog } from "lucide-react";
 import MaintenanceTable from "../components/MaintenanceTable";
 import MaintenanceEventModal from "../components/MaintenanceEventModal";
 import "./Maintenance.css";
@@ -154,7 +155,7 @@ const Maintenance = () => {
             to="/repairs-schedule"
             className="btn btn-secondary-green"
           >
-            📅 Еженедельное расписание
+            <CalendarCog size={15} /> Еженедельное расписание
           </Link>
           <button className="btn-primary" onClick={() => setIsModalOpen(true)}>
             + Добавить событие

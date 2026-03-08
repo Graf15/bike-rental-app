@@ -15,7 +15,9 @@ import tariffsRouter from "./routes/tariffs.js";
 import calculateRouter from "./routes/calculate.js";
 import equipmentRouter from "./routes/equipment.js";
 import authRouter from "./routes/auth.js";
+import permissionsRouter from "./routes/permissions.js";
 import { authenticate, cleanExpiredSessions } from "./middleware/auth.js";
+import { authorizeByRoute } from "./middleware/routePermissions.js";
 
 const app = express();
 const PORT = 3001;
@@ -40,18 +42,19 @@ app.use("/api/auth", authRouter);
 // Все роуты ниже требуют авторизации
 app.use("/api", authenticate);
 
-app.use("/api/bikes", bikesRoutes);
-app.use("/api/users", usersRouter);
-app.use("/api/maintenance", maintenanceRouter);
-app.use("/api/parts", partsRouter);
-app.use("/api/purchase-requests", purchaseRequestsRouter);
-app.use("/api/brands", brandsRouter);
-app.use("/api/currency", currencyRouter);
-app.use("/api/customers", customersRouter);
-app.use("/api/rentals", rentalsRouter);
-app.use("/api/tariffs", tariffsRouter);
-app.use("/api/calculate", calculateRouter);
-app.use("/api/equipment", equipmentRouter);
+app.use("/api/bikes",             authorizeByRoute("/api/bikes"),             bikesRoutes);
+app.use("/api/users",             authorizeByRoute("/api/users"),             usersRouter);
+app.use("/api/maintenance",       authorizeByRoute("/api/maintenance"),       maintenanceRouter);
+app.use("/api/parts",             authorizeByRoute("/api/parts"),             partsRouter);
+app.use("/api/purchase-requests", authorizeByRoute("/api/purchase-requests"), purchaseRequestsRouter);
+app.use("/api/brands",            authorizeByRoute("/api/brands"),            brandsRouter);
+app.use("/api/currency",          authorizeByRoute("/api/currency"),          currencyRouter);
+app.use("/api/customers",         authorizeByRoute("/api/customers"),         customersRouter);
+app.use("/api/rentals",           authorizeByRoute("/api/rentals"),           rentalsRouter);
+app.use("/api/tariffs",           authorizeByRoute("/api/tariffs"),           tariffsRouter);
+app.use("/api/calculate",         authorizeByRoute("/api/calculate"),         calculateRouter);
+app.use("/api/equipment",         authorizeByRoute("/api/equipment"),         equipmentRouter);
+app.use("/api/permissions",       permissionsRouter);
 
 app.listen(PORT, () => {
   console.log(`Сервер запущен на http://localhost:${PORT}`);
