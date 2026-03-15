@@ -518,9 +518,9 @@ const RentalViewModal = ({ rental: initialRental, onClose, onUpdate }) => {
                   const eqCount    = rental.items.filter(i => i.item_type === "equipment").length;
                   return (
                     <>
-                      {bikeCount  > 0 && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, background: "#dcfce7", color: "#15803d", fontWeight: 600 }}>🚲 {bikeCount}</span>}
-                      {scootCount > 0 && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, background: "#dcfce7", color: "#15803d", fontWeight: 600 }}>🛴 {scootCount}</span>}
-                      {eqCount    > 0 && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, background: "#e0f2fe", color: "#0369a1", fontWeight: 600 }}>🔦 {eqCount}</span>}
+                      {bikeCount  > 0 && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, background: "#dcfce7", color: "#15803d", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 3 }}><Bike size={11} /> {bikeCount}</span>}
+                      {scootCount > 0 && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, background: "#dcfce7", color: "#15803d", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 3 }}><Scooter size={11} /> {scootCount}</span>}
+                      {eqCount    > 0 && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, background: "#e0f2fe", color: "#0369a1", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 3 }}><Flashlight size={11} /> {eqCount}</span>}
                     </>
                   );
                 })()}

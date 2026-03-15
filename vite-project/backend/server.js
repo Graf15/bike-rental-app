@@ -1,6 +1,8 @@
+import http from "http";
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import { initWebSocket } from "./ws.js";
 import { processOverdueBookings } from "./jobs/processOverdue.js";
 import bikesRoutes from "./routes/bikes.js";
 import usersRouter from "./routes/users.js";
@@ -16,6 +18,7 @@ import calculateRouter from "./routes/calculate.js";
 import equipmentRouter from "./routes/equipment.js";
 import authRouter from "./routes/auth.js";
 import permissionsRouter from "./routes/permissions.js";
+import callsRouter from "./routes/calls.js";
 import { authenticate, cleanExpiredSessions } from "./middleware/auth.js";
 import { authorizeByRoute } from "./middleware/routePermissions.js";
 
@@ -39,6 +42,9 @@ app.get("/", (req, res) => {
 
 app.use("/api/auth", authRouter);
 
+// Вебхуки от MacroDroid — своя auth через API-ключ (до authenticate)
+app.use("/api/calls", callsRouter);
+
 // Все роуты ниже требуют авторизации
 app.use("/api", authenticate);
 
@@ -56,7 +62,10 @@ app.use("/api/calculate",         authorizeByRoute("/api/calculate"),         ca
 app.use("/api/equipment",         authorizeByRoute("/api/equipment"),         equipmentRouter);
 app.use("/api/permissions",       permissionsRouter);
 
-app.listen(PORT, () => {
+const server = http.createServer(app);
+initWebSocket(server);
+
+server.listen(PORT, () => {
   console.log(`Сервер запущен на http://localhost:${PORT}`);
 
   // Фоновая обработка просроченных броней каждую минуту
@@ -64,8 +73,18 @@ app.listen(PORT, () => {
   setInterval(processOverdueBookings, 60 * 1000);
   console.log("[overdue] Фоновый job запущен (каждую минуту)");
 
-  // Очистка устаревших сессий раз в час
-  cleanExpiredSessions();
-  setInterval(cleanExpiredSessions, 60 * 60 * 1000);
-  console.log("[sessions] Очистка устаревших сессий запущена (каждый час)");
+  // Очистка устаревших сессий раз в сутки в 03:00 по Киеву
+  const scheduleSessionCleanup = () => {
+    const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Kyiv" }));
+    const next3am = new Date(now);
+    next3am.setHours(3, 0, 0, 0);
+    if (next3am <= now) next3am.setDate(next3am.getDate() + 1);
+    const msUntil = next3am - now;
+    setTimeout(() => {
+      cleanExpiredSessions();
+      setInterval(cleanExpiredSessions, 24 * 60 * 60 * 1000);
+    }, msUntil);
+    console.log(`[sessions] Очистка запланирована на 03:00 (через ${Math.round(msUntil/60000)} мин)`);
+  };
+  scheduleSessionCleanup();
 });

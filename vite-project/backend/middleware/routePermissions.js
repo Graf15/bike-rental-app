@@ -31,6 +31,7 @@ const API_TO_FRONTEND = {
   "/api/calculate":         "/rentals",
   "/api/equipment":         "/rentals",
   "/api/permissions":       "/settings",
+  "/api/calls":             "/calls",
 };
 
 // Middleware: authorizeByRoute("/api/bikes")

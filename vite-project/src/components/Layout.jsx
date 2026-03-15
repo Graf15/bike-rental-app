@@ -5,6 +5,7 @@ import ChangePasswordModal from "./ChangePasswordModal";
 import { ROUTES } from "../constants/routes";
 import { usePermissions } from "../context/PermissionsContext";
 import { ChevronLeft, ChevronRight, User, KeyRound, LogOut } from "lucide-react";
+import CallNotification from "./CallNotification";
 import "./Layout.css";
 
 const ICON_SIZE = 20;
@@ -26,6 +27,7 @@ const Layout = ({ children }) => {
 
   return (
     <div className="layout">
+      <CallNotification />
       <aside className={`sidebar ${isCollapsed ? "collapsed" : ""}`}>
         <div className="sidebar-header">
           <button

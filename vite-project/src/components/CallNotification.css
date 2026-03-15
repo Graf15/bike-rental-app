@@ -1,0 +1,203 @@
+.call-notif {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+  width: 300px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.10);
+  border-left: 4px solid var(--color-primary-green);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: callSlideIn 0.25s ease;
+}
+
+@keyframes callSlideIn {
+  from { transform: translateY(20px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.call-notif--incoming { border-left-color: var(--color-primary-green); }
+.call-notif--active   { border-left-color: #3b82f6; }
+.call-notif--missed   { border-left-color: #ef4444; }
+.call-notif--ended    { border-left-color: #9ca3af; }
+
+/* Шапка */
+.call-notif-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.call-notif-icon {
+  display: flex;
+  align-items: center;
+  color: var(--color-primary-green);
+}
+.call-notif--active .call-notif-icon { color: #3b82f6; }
+.call-notif--missed .call-notif-icon { color: #ef4444; }
+.call-notif--ended  .call-notif-icon { color: #9ca3af; }
+
+.call-notif-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  flex: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.call-notif-duration {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.call-notif-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #9ca3af;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  border-radius: 4px;
+}
+.call-notif-close:hover { color: #374151; background: #f3f4f6; }
+
+/* Номер */
+.call-notif-phone {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+  letter-spacing: 0.3px;
+}
+
+/* Имя */
+.call-notif-name-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #374151;
+}
+.call-notif-name {
+  font-size: 13px;
+  font-weight: 600;
+  flex: 1;
+}
+
+.call-notif-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 8px;
+}
+.call-notif-badge--no_booking { background: #fef3c7; color: #92400e; }
+.call-notif-badge--no_rental  { background: #fee2e2; color: #991b1b; }
+
+/* Алерты */
+.call-notif-alerts {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.call-notif-alert {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 8px;
+}
+.call-notif-alert--blue   { background: #dbeafe; color: #1e40af; }
+.call-notif-alert--pink   { background: #fce7f3; color: #9d174d; }
+.call-notif-alert--orange { background: #ffedd5; color: #9a3412; }
+
+/* Статистика */
+.call-notif-stats {
+  display: flex;
+  gap: 10px;
+  font-size: 11px;
+  color: #6b7280;
+  flex-wrap: wrap;
+}
+.call-notif-stat--active { color: #15803d; font-weight: 600; }
+
+/* Договор */
+.call-notif-contract {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #f0fdf4;
+  color: #15803d;
+}
+.call-notif-contract--booked  { background: #eff6ff; color: #1d4ed8; }
+.call-notif-contract--overdue { background: #fef2f2; color: #dc2626; }
+
+.call-notif-contract-id {
+  font-weight: 700;
+}
+.call-notif-contract-link {
+  margin-left: auto;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  color: inherit;
+  padding: 0;
+  text-decoration: underline;
+}
+.call-notif-contract-link:hover { opacity: 0.75; }
+
+/* Ограничение */
+.call-notif-restriction {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #dc2626;
+  background: #fef2f2;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+/* Не найден */
+.call-notif-unknown {
+  font-size: 12px;
+  color: #9ca3af;
+  font-style: italic;
+}
+
+/* Кнопки */
+.call-notif-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+}
+.call-notif-btn {
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 6px;
+  transition: opacity 0.15s;
+}
+.call-notif-btn:hover { opacity: 0.85; }
+
+.call-notif-btn--primary {
+  background: var(--color-primary-green);
+  color: #fff;
+  flex: 1;
+}
+.call-notif-btn--ghost {
+  background: #f3f4f6;
+  color: #374151;
+}

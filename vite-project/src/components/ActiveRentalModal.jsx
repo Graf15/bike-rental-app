@@ -1205,9 +1205,9 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
                   const eqCount    = items.filter(i => i.item_type === "equipment").length;
                   return (
                     <>
-                      {bikeCount  > 0 && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, background: "#dcfce7", color: "#15803d", fontWeight: 600 }}>🚲 {bikeCount}</span>}
-                      {scootCount > 0 && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, background: "#dcfce7", color: "#15803d", fontWeight: 600 }}>🛴 {scootCount}</span>}
-                      {eqCount    > 0 && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, background: "#e0f2fe", color: "#0369a1", fontWeight: 600 }}>🔦 {eqCount}</span>}
+                      {bikeCount  > 0 && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, background: "#dcfce7", color: "#15803d", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 3 }}><Bike size={11} /> {bikeCount}</span>}
+                      {scootCount > 0 && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, background: "#dcfce7", color: "#15803d", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 3 }}><Scooter size={11} /> {scootCount}</span>}
+                      {eqCount    > 0 && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, background: "#e0f2fe", color: "#0369a1", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 3 }}><Flashlight size={11} /> {eqCount}</span>}
                     </>
                   );
                 })()}
@@ -1516,7 +1516,7 @@ const ActiveRentalModal = ({ onClose, onSave, bookingId }) => {
             <div onMouseDown={e => e.stopPropagation()}
               style={{ background: "white", borderRadius: 10, padding: "20px 24px", boxShadow: "0 8px 32px rgba(0,0,0,0.22)", minWidth: 270, display: "flex", flexDirection: "column", gap: 14 }}>
               <div style={{ fontWeight: 600, fontSize: 14 }}>
-                ⛑️ {qtyPopup.eq.name}
+                <Flashlight size={14} style={{ verticalAlign: "middle", marginRight: 4 }} /> {qtyPopup.eq.name}
                 {qtyPopup.eq.category && <span style={{ fontWeight: 400, color: "#6b7280", fontSize: 12, marginLeft: 8 }}>{qtyPopup.eq.category}</span>}
               </div>
               {qtyPopup.eq.available_quantity != null && (

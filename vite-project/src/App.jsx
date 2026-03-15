@@ -19,7 +19,10 @@ import Customers from "./pages/Customers";
 import Rentals from "./pages/Rentals";
 import Tariffs from "./pages/Tariffs";
 import Settings from "./pages/Settings";
+import { connectWebSocket } from "./hooks/useWebSocket";
 import "./App.css";
+
+connectWebSocket();
 
 const PAGE_COMPONENTS = {
   "/":                 <Home />,
